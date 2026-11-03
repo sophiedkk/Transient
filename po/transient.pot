@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: transient\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 14:29+0100\n"
+"POT-Creation-Date: 2026-11-03 14:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,7 +22,7 @@ msgstr ""
 #: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:8
 #: crates/transient/resources/ui/window.blp:8
 #: crates/transient/resources/ui/window.blp:25
-#: crates/transient/src/application.rs:104
+#: crates/transient/src/application.rs:111
 msgid "Transient"
 msgstr ""
 
@@ -67,61 +67,71 @@ msgid "Window maximized"
 msgstr ""
 
 #: crates/transient/resources/ui/window.blp:31
-#: crates/transient/resources/ui/shortcuts-dialog.blp:47
+#: crates/transient/resources/ui/shortcuts-dialog.blp:86
 #: crates/transient/src/window/import.rs:27
 msgid "Import Audio"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:39
-msgid "Main Menu"
+#: crates/transient/resources/ui/window.blp:45
+#: crates/transient/resources/ui/shortcuts-dialog.blp:28
+msgid "Undo"
 msgstr ""
 
 #: crates/transient/resources/ui/window.blp:52
+#: crates/transient/resources/ui/shortcuts-dialog.blp:33
+msgid "Redo"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:60
+msgid "Main Menu"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:73
 msgid "Start a New Project"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:53
+#: crates/transient/resources/ui/window.blp:74
 msgid "Import audio files to start mixing"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:56
+#: crates/transient/resources/ui/window.blp:77
 msgid "_Import Audio…"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:122
+#: crates/transient/resources/ui/window.blp:143
 msgid "Timeline"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:155
+#: crates/transient/resources/ui/window.blp:176
 #: crates/transient/resources/ui/shortcuts-dialog.blp:19
 msgid "Go to Start"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:161
+#: crates/transient/resources/ui/window.blp:182
 #: crates/transient/src/window/transport.rs:118
 msgid "Play"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:186
-#: crates/transient/resources/ui/shortcuts-dialog.blp:33
+#: crates/transient/resources/ui/window.blp:207
+#: crates/transient/resources/ui/shortcuts-dialog.blp:72
 msgid "Zoom Out"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:192
-#: crates/transient/resources/ui/shortcuts-dialog.blp:38
+#: crates/transient/resources/ui/window.blp:213
+#: crates/transient/resources/ui/shortcuts-dialog.blp:77
 msgid "Zoom to Fit"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:198
-#: crates/transient/resources/ui/shortcuts-dialog.blp:28
+#: crates/transient/resources/ui/window.blp:219
+#: crates/transient/resources/ui/shortcuts-dialog.blp:67
 msgid "Zoom In"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:209
+#: crates/transient/resources/ui/window.blp:230
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:214
+#: crates/transient/resources/ui/window.blp:235
 msgid "_About Transient"
 msgstr ""
 
@@ -134,28 +144,60 @@ msgid "Play or Pause"
 msgstr ""
 
 #: crates/transient/resources/ui/shortcuts-dialog.blp:25
+msgid "Editing"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:38
+msgid "Split at Playhead"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:43
+msgid "Delete Clip"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:48
+msgid "Move Clip Left"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:53
+msgid "Move Clip Right"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:58
+msgid "Deselect"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:64
 msgid "View"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:44
+#: crates/transient/resources/ui/shortcuts-dialog.blp:83
 msgid "General"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:52
+#: crates/transient/resources/ui/shortcuts-dialog.blp:91
 msgid "Show Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:57
+#: crates/transient/resources/ui/shortcuts-dialog.blp:96
 msgid "Close Window"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:62
+#: crates/transient/resources/ui/shortcuts-dialog.blp:101
 msgid "Quit"
 msgstr ""
 
 #. Translators: replace with your name and email, one translator per line.
-#: crates/transient/src/application.rs:114
+#: crates/transient/src/application.rs:121
 msgid "translator-credits"
+msgstr ""
+
+#: crates/transient/src/window/edit.rs:96
+msgid "Clip deleted"
+msgstr ""
+
+#: crates/transient/src/window/edit.rs:97
+msgid "_Undo"
 msgstr ""
 
 #: crates/transient/src/window/import.rs:21
@@ -182,31 +224,31 @@ msgid_plural "Opening {} Files"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/import.rs:103
+#: crates/transient/src/window/import.rs:105
 #, rust-format
 msgid "Could not open “{}”"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:107
+#: crates/transient/src/window/import.rs:109
 #, rust-format
 msgid "Could not open {} file"
 msgid_plural "Could not open {} files"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/import.rs:161
+#: crates/transient/src/window/import.rs:166
 msgid "Unknown"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:173
+#: crates/transient/src/window/import.rs:178
 msgid "Mono"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:174
+#: crates/transient/src/window/import.rs:179
 msgid "Stereo"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:175
+#: crates/transient/src/window/import.rs:180
 #, rust-format
 msgid "{} channel"
 msgid_plural "{} channels"
@@ -224,7 +266,7 @@ msgid_plural "{} tracks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/project.rs:90
+#: crates/transient/src/window/project.rs:91
 msgid "Playback is not available"
 msgstr ""
 

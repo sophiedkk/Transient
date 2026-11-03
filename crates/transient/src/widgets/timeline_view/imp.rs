@@ -14,8 +14,10 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::glib::subclass::Signal;
+use transient_core::project::ClipId;
 use transient_core::time::{Frames, SampleRate};
 
+use super::interaction::Drag;
 use super::{LANE_HEIGHT, Lane, RULER_HEIGHT};
 
 /// The view's state.
@@ -43,8 +45,10 @@ pub(crate) struct TimelineView {
     pub(super) playhead: Cell<Frames>,
     /// Where the pointer is, so Ctrl+scroll zooms around it.
     pub(super) pointer_x: Cell<Option<f64>>,
-    /// Where a click-and-drag started.
-    pub(super) drag_start_x: Cell<f64>,
+    /// The selected clip, drawn highlighted.
+    pub(super) selected: Cell<Option<ClipId>>,
+    /// The drag in progress, if any.
+    pub(super) drag: RefCell<Option<Drag>>,
 }
 
 #[glib::object_subclass]
@@ -61,13 +65,22 @@ impl ObjectSubclass for TimelineView {
 
 #[glib::derived_properties]
 impl ObjectImpl for TimelineView {
-    /// `seek(frame)`: the user clicked or dragged to a position.
+    /// The signals the view emits:
+    /// - `seek(frame)`: the user clicked or dragged to a position.
+    /// - `clip-selected(clip id)`: a clip was clicked; 0 means "nothing".
+    /// - `clip-changed(clip id, start, offset, length, lane)`: a clip was moved or
+    ///   trimmed by dragging.
     fn signals() -> &'static [Signal] {
         static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
         SIGNALS.get_or_init(|| {
+            let u64_type = u64::static_type();
             vec![
-                Signal::builder("seek")
-                    .param_types([u64::static_type()])
+                Signal::builder("seek").param_types([u64_type]).build(),
+                Signal::builder("clip-selected")
+                    .param_types([u64_type])
+                    .build(),
+                Signal::builder("clip-changed")
+                    .param_types([u64_type, u64_type, u64_type, u64_type, u32::static_type()])
                     .build(),
             ]
         })

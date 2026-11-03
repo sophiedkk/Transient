@@ -5,7 +5,8 @@ use std::cell::{Cell, OnceCell, RefCell};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{CompositeTemplate, gio, glib};
-use transient_core::project::Project;
+use transient_core::edit::History;
+use transient_core::project::{ClipId, Project};
 use transient_engine::player::{AudioOutput, Player};
 
 use super::project::LoadedSources;
@@ -43,6 +44,12 @@ pub(crate) struct Window {
     pub(super) project: RefCell<Project>,
     /// The decoded audio of the project's sources.
     pub(super) sources: RefCell<LoadedSources>,
+    /// The undo/redo history.
+    pub(super) history: RefCell<History>,
+    /// The selected clip, if any.
+    pub(super) selected: Cell<Option<ClipId>>,
+    /// The "Clip deleted" toast, closed when the deletion is undone.
+    pub(super) undo_toast: RefCell<Option<adw::Toast>>,
     /// Plays the project's mix; `None` until something is imported.
     pub(super) player: RefCell<Option<Player>>,
     /// Where playback goes (`--silent` sends it nowhere).
@@ -71,6 +78,24 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.go-to-start", None, |window, _, _| {
             window.seek_to_frame(0);
+        });
+        klass.install_action("win.undo", None, |window, _, _| window.undo());
+        klass.install_action("win.redo", None, |window, _, _| window.redo());
+        klass.install_action("win.split", None, |window, _, _| {
+            window.split_at_playhead();
+        });
+        klass.install_action("win.delete-clip", None, |window, _, _| {
+            window.delete_selected_clip();
+        });
+        klass.install_action("win.deselect", None, |window, _, _| window.select(None));
+        klass.install_action("win.select-clip-at-playhead", None, |window, _, _| {
+            window.select_clip_at_playhead();
+        });
+        klass.install_action("win.nudge-left", None, |window, _, _| {
+            window.nudge_selected_clip(-1);
+        });
+        klass.install_action("win.nudge-right", None, |window, _, _| {
+            window.nudge_selected_clip(1);
         });
         klass.install_action("win.zoom-in", None, |window, _, _| {
             window.zoom_in();
@@ -105,6 +130,7 @@ impl ObjectImpl for Window {
         }
 
         window.setup_transport();
+        window.setup_editing();
     }
 }
 

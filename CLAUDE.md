@@ -26,7 +26,9 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   line up via `RULER_HEIGHT`/`LANE_HEIGHT`.
 - Dependencies point downward only: `transient`/`transient-cli` → `transient-engine` →
   `transient-core`.
-- Undo/redo = snapshots of the whole project (clips reference audio via `Arc`).
+- Undo/redo = snapshots of the whole project (`transient-core::edit::History`).
+  Every change goes through `Window::apply_edit`, which records the snapshot.
+  The timeline only previews drags and emits `clip-changed` on release.
 
 ## UI rules (GNOME HIG)
 
@@ -87,7 +89,11 @@ just test-audio                                 # decode the whole test collecti
   Dark mode: prefix with `ADW_DEBUG_COLOR_SCHEME=prefer-dark`.
 - App options (`transient --help`): `FILE…` opens files, `--play`, `--silent`
   (no sound output, still real time), `--screenshot=FILE`, `--quit-after=SECONDS`,
-  `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead).
+  `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead), and
+  `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
+  `select-clip-at-playhead`, `nudge-right`, `delete-clip`) to script edits.
+  Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
+  (unit- and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.
 - Never play audio through the speakers in automated runs: always pass `--silent`.
 - `test-audio/` is downloaded by `dev/fetch-test-audio.sh` from `dev/test-audio.tsv`

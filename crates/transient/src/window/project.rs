@@ -66,6 +66,7 @@ impl Window {
         let has_audio = project.length() > 0;
         imp.toolbar_view.set_reveal_bottom_bars(has_audio);
         self.set_playback_enabled(has_audio);
+        self.update_edit_actions();
     }
 
     /// Gives the player the new mix, creating the player the first time.
@@ -142,9 +143,7 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
                 .iter()
                 .filter_map(|clip| {
                     Some(LaneClip {
-                        start: clip.start,
-                        offset: clip.offset,
-                        length: clip.length,
+                        clip: *clip,
                         waveform: sources.get(&clip.source)?.waveform.clone(),
                         name: track.name.clone(),
                     })

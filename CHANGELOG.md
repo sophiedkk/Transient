@@ -17,6 +17,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one lane per track with its clips and waveforms, track headers with the name
   and original format, and a playhead across all tracks.
 - Mixing: all tracks play together; edits reach the player without stopping it.
+- Editing: click a clip to select it, drag it to move it (also to another track),
+  drag its edges to trim it; edges snap to other clips, the playhead and the
+  start. Split at the playhead (S), delete (Delete), nudge (Ctrl+Left/Right),
+  deselect (Escape).
+- Undo and redo for every change (Ctrl+Z, Shift+Ctrl+Z, and buttons in the
+  header bar). Deleting shows a toast with an Undo button instead of asking
+  for confirmation.
 - Zoom and scroll the timeline: click or drag to move the playhead,
   Shift+scroll or a touchpad to move sideways, Ctrl+scroll,
   Ctrl+plus/minus/0 or the zoom buttons to zoom. The view follows the playhead
@@ -25,7 +32,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The file's name, format and length are shown in the header bar.
 - Open files from the command line (`transient FILE`) and from "Open With".
 - Command-line options for testing: `--play`, `--silent`, `--screenshot`,
-  `--quit-after`, `--seek`, `--zoom`; `transient-cli probe` decodes files and
+  `--quit-after`, `--seek`, `--zoom`, `--action`; `transient-cli probe` decodes files and
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
 - The window remembers its size.

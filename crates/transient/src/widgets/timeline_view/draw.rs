@@ -8,6 +8,7 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, graphene, gsk, pango};
+use transient_core::project::Clip;
 use transient_core::ruler;
 use transient_core::time::frames_to_f64;
 use transient_core::waveform::Peak;
@@ -66,15 +67,46 @@ impl TimelineView {
         };
 
         self.draw_ruler(snapshot, &view, &palette);
-        for (index, lane) in imp.lanes.borrow().iter().enumerate() {
-            let top = pixels(RULER_HEIGHT) + pixels(LANE_HEIGHT) * index_f32(index);
+
+        // A clip being dragged is drawn at its preview position, on top of the rest.
+        let drag = imp.drag.borrow();
+        let preview = drag.as_ref().and_then(|drag| drag.preview);
+        let selected = imp.selected.get();
+        let lanes = imp.lanes.borrow();
+        let mut dragged = None;
+        for (index, lane) in lanes.iter().enumerate() {
+            let top = lane_top(index);
             snapshot.append_color(
                 &palette.foreground.with_alpha(0.08),
                 &graphene::Rect::new(0.0, top + pixels(LANE_HEIGHT) - 1.0, width, 1.0),
             );
             for clip in &lane.clips {
-                self.draw_clip(snapshot, &view, &palette, clip, top);
+                if preview.is_some_and(|(_, moved)| moved.id == clip.clip.id) {
+                    dragged = Some(clip);
+                    continue;
+                }
+                let is_selected = selected == Some(clip.clip.id);
+                self.draw_clip(
+                    snapshot,
+                    &view,
+                    &palette,
+                    clip,
+                    &clip.clip,
+                    top,
+                    is_selected,
+                );
             }
+        }
+        if let (Some(clip), Some((lane, moved))) = (dragged, preview) {
+            self.draw_clip(
+                snapshot,
+                &view,
+                &palette,
+                clip,
+                &moved,
+                lane_top(lane),
+                true,
+            );
         }
 
         if self.rate().is_some() {
@@ -121,17 +153,24 @@ impl TimelineView {
         }
     }
 
-    /// One clip: a rounded box with its name and waveform.
+    /// One clip: a rounded box with its name and waveform. `clip` is where to draw
+    /// it (its own position, or a drag preview); `drawn` supplies waveform and name.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "drawing state is passed explicitly rather than hidden in a struct"
+    )]
     fn draw_clip(
         &self,
         snapshot: &gtk::Snapshot,
         view: &View,
         palette: &Palette,
-        clip: &LaneClip,
+        drawn: &LaneClip,
+        clip: &Clip,
         lane_top: f32,
+        selected: bool,
     ) {
         let left = view.x(frames_to_f64(clip.start));
-        let right = view.x(frames_to_f64(clip.start.saturating_add(clip.length)));
+        let right = view.x(frames_to_f64(clip.end()));
         if right < 0.0 || left > f64::from(view.width) {
             return;
         }
@@ -145,10 +184,11 @@ impl TimelineView {
         let bounds = graphene::Rect::new(box_left, top, (box_right - box_left).max(1.0), height);
         let rounded = gsk::RoundedRect::from_rect(bounds, CLIP_RADIUS);
 
+        let (fill, strip) = if selected { (0.26, 0.45) } else { (0.16, 0.28) };
         snapshot.push_rounded_clip(&rounded);
-        snapshot.append_color(&palette.accent.with_alpha(0.16), &bounds);
+        snapshot.append_color(&palette.accent.with_alpha(fill), &bounds);
         snapshot.append_color(
-            &palette.accent.with_alpha(0.28),
+            &palette.accent.with_alpha(strip),
             &graphene::Rect::new(box_left, top, bounds.width(), CLIP_LABEL_HEIGHT),
         );
 
@@ -161,7 +201,7 @@ impl TimelineView {
         let source_start =
             frames_to_f64(clip.offset) + view.start + first_column * view.frames_per_pixel
                 - frames_to_f64(clip.start);
-        let peaks = clip.waveform.peaks_within(
+        let peaks = drawn.waveform.peaks_within(
             clip.offset..clip.offset.saturating_add(clip.length),
             source_start,
             view.frames_per_pixel,
@@ -177,7 +217,7 @@ impl TimelineView {
         }
 
         // The name, starting at the visible left edge so it stays readable when scrolled.
-        let layout = self.small_text(&clip.name);
+        let layout = self.small_text(&drawn.name);
         layout.set_width(pango_units(box_right - box_left.max(0.0) - 12.0));
         layout.set_ellipsize(pango::EllipsizeMode::End);
         snapshot.save();
@@ -185,6 +225,10 @@ impl TimelineView {
         snapshot.append_layout(&layout, &palette.foreground);
         snapshot.restore();
         snapshot.pop();
+
+        if selected {
+            snapshot.append_border(&rounded, &[2.0; 4], &[palette.accent; 4]);
+        }
     }
 
     /// A text layout in the "caption" size (a little smaller than normal text).
@@ -230,6 +274,11 @@ fn waveform_path(
     }
     builder.close();
     Some(builder.to_path())
+}
+
+/// The top of lane `index`, in pixels.
+fn lane_top(index: usize) -> f32 {
+    pixels(RULER_HEIGHT) + pixels(LANE_HEIGHT) * index_f32(index)
 }
 
 /// A widget size in pixels as `f32`, the unit GTK draws in.

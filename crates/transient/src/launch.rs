@@ -6,6 +6,7 @@
 //! transient --screenshot=shot.png song.flac # save an image of the window, then quit
 //! transient --play --quit-after=5 song.flac # quit after five seconds
 //! transient --seek=30 --zoom=4 song.flac    # zoom in around 0:30
+//! transient --seek=5 --action=split a.flac  # run window actions (repeatable)
 //! ```
 //!
 //! `transient --help` lists the options. They are meant for testing (by people
@@ -42,6 +43,8 @@ pub(crate) struct LaunchOptions {
     pub(crate) seek: Option<f64>,
     /// Zoom in this many steps (around the playhead) after opening.
     pub(crate) zoom: Option<u32>,
+    /// Window actions to run after opening, in order (for example "split").
+    pub(crate) actions: Vec<String>,
 }
 
 impl LaunchOptions {
@@ -89,6 +92,14 @@ impl LaunchOptions {
             Some("STEPS"),
         );
         app.add_main_option(
+            "action",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::StringArray,
+            "Run the window action NAME after opening (repeatable), for example split or undo",
+            Some("NAME"),
+        );
+        app.add_main_option(
             "quit-after",
             glib::Char::from(0),
             none,
@@ -115,6 +126,11 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .and_then(|steps| u32::try_from(steps).ok()),
+            actions: dict
+                .lookup::<Vec<String>>("action")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
         }
     }
 
@@ -127,6 +143,7 @@ impl LaunchOptions {
             || self.quit_after.is_some()
             || self.seek.is_some()
             || self.zoom.is_some()
+            || !self.actions.is_empty()
     }
 
     /// Carries out the options for a freshly shown window.
@@ -145,6 +162,17 @@ impl LaunchOptions {
         }
         for _ in 0..self.zoom.unwrap_or(0) {
             window.zoom_in();
+        }
+        for action in &self.actions {
+            let name = if action.contains('.') {
+                action.clone()
+            } else {
+                format!("win.{action}")
+            };
+            match WidgetExt::activate_action(&window, &name, None) {
+                Ok(()) => info!("ran action {name}"),
+                Err(err) => error!("could not run action {name}: {err}"),
+            }
         }
         if self.play {
             window.toggle_playback();

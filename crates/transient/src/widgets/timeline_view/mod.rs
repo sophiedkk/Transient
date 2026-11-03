@@ -1,8 +1,12 @@
 //! `TimelineView`: the timeline. A time ruler on top, one lane per track below
 //! it with the clips and their waveforms, and a playhead across everything.
 //!
-//! - Click or drag: emits `seek` with the frame under the pointer.
-//! - Scroll: moves through the timeline. Ctrl+scroll: zooms around the pointer.
+//! - Click on the ruler or an empty lane: emits `seek` with the frame there.
+//! - Click a clip: selects it (`clip-selected`). Drag it to move it, also to
+//!   another lane; drag its left or right edge to trim it. While dragging, the
+//!   view shows a preview; on release it emits `clip-changed` (see `interaction.rs`).
+//! - Shift+scroll (or a touchpad): moves through the timeline.
+//!   Ctrl+scroll: zooms around the pointer.
 //! - The visible range lives in a `gtk::Adjustment` (seconds), which a
 //!   `gtk::Scrollbar` can share, giving a scrollbar for free.
 //!
@@ -11,10 +15,12 @@
 
 mod draw;
 mod imp;
+mod interaction;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, glib};
+use transient_core::project::{Clip, ClipId};
 use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
 use transient_core::waveform::Waveform;
 
@@ -33,12 +39,8 @@ const FOLLOW_MARGIN: f64 = 0.05;
 /// A clip as the timeline draws it.
 #[derive(Debug, Clone)]
 pub(crate) struct LaneClip {
-    /// Where it starts on the timeline.
-    pub(crate) start: Frames,
-    /// Where in the source it starts.
-    pub(crate) offset: Frames,
-    /// How long it plays.
-    pub(crate) length: Frames,
+    /// Position, in-point and length (the project's own clip).
+    pub(crate) clip: Clip,
     /// The source's waveform overview.
     pub(crate) waveform: Waveform,
     /// The label drawn on the clip.
@@ -73,6 +75,18 @@ impl TimelineView {
             self.queue_resize();
         }
         self.update_adjustment();
+    }
+
+    /// Highlights the selected clip (or none).
+    pub(crate) fn set_selection(&self, clip: Option<ClipId>) {
+        if self.imp().selected.replace(clip) != clip {
+            self.queue_draw();
+        }
+    }
+
+    /// The zoom level, as frames per pixel (used for nudging by a few pixels).
+    pub(crate) fn frames_per_pixel(&self) -> f64 {
+        self.imp().frames_per_pixel.get()
     }
 
     /// Moves the playhead. With `follow`, scrolls so that it stays visible.
@@ -210,6 +224,59 @@ impl TimelineView {
             .min(self.imp().length.get())
     }
 
+    /// Calls `callback` with the clip the user clicked (or `None` for empty space).
+    pub(crate) fn connect_clip_selected<F: Fn(&Self, Option<ClipId>) + 'static>(
+        &self,
+        callback: F,
+    ) {
+        self.connect_closure(
+            "clip-selected",
+            false,
+            glib::closure_local!(move |view: Self, id: u64| {
+                callback(&view, (id != 0).then_some(ClipId(id)));
+            }),
+        );
+    }
+
+    /// Calls `callback` with the changed clip and its (possibly new) lane, after
+    /// the user moved or trimmed it.
+    pub(crate) fn connect_clip_changed<F: Fn(&Self, Clip, usize) + 'static>(&self, callback: F) {
+        self.connect_closure(
+            "clip-changed",
+            false,
+            glib::closure_local!(move |view: Self,
+                                       id: u64,
+                                       start: u64,
+                                       offset: u64,
+                                       length: u64,
+                                       lane: u32| {
+                let Some(original) = view.find_clip(ClipId(id)).map(|(_, c)| c.clip) else {
+                    return;
+                };
+                let clip = Clip {
+                    start,
+                    offset,
+                    length,
+                    ..original
+                };
+                callback(&view, clip, usize::try_from(lane).unwrap_or(0));
+            }),
+        );
+    }
+
+    /// The lane index and drawing data of a clip.
+    fn find_clip(&self, id: ClipId) -> Option<(usize, LaneClip)> {
+        self.imp()
+            .lanes
+            .borrow()
+            .iter()
+            .enumerate()
+            .find_map(|(index, lane)| {
+                let clip = lane.clips.iter().find(|c| c.clip.id == id)?;
+                Some((index, clip.clone()))
+            })
+    }
+
     fn seek_to_x(&self, x: f64) {
         if self.rate().is_some() {
             self.emit_by_name::<()>("seek", &[&self.frame_at(x)]);
@@ -218,29 +285,15 @@ impl TimelineView {
 
     /// Mouse and touchpad handling. Called once, from `constructed`.
     fn setup_controllers(&self) {
-        // Click and drag: seek. GestureDrag reports the start and the offset since.
-        let drag = gtk::GestureDrag::new();
-        let weak = self.downgrade();
-        drag.connect_drag_begin(move |_, x, _| {
-            if let Some(view) = weak.upgrade() {
-                view.imp().drag_start_x.set(x);
-                view.seek_to_x(x);
-            }
-        });
-        let weak = self.downgrade();
-        drag.connect_drag_update(move |_, offset_x, _| {
-            if let Some(view) = weak.upgrade() {
-                view.seek_to_x(view.imp().drag_start_x.get() + offset_x);
-            }
-        });
-        self.add_controller(drag);
+        self.setup_drag();
 
         // Remember the pointer position for Ctrl+scroll zooming.
         let motion = gtk::EventControllerMotion::new();
         let weak = self.downgrade();
-        motion.connect_motion(move |_, x, _| {
+        motion.connect_motion(move |_, x, y| {
             if let Some(view) = weak.upgrade() {
                 view.imp().pointer_x.set(Some(x));
+                view.update_cursor(x, y);
             }
         });
         let weak = self.downgrade();

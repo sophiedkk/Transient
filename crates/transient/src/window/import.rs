@@ -88,6 +88,8 @@ impl Window {
         .await
         .unwrap_or_default();
 
+        // Importing is undoable like any other change.
+        let before = imp.project.borrow().clone();
         let mut failed = Vec::new();
         for (path, decoded) in results {
             match decoded {
@@ -110,6 +112,9 @@ impl Window {
             }
         }
 
+        if failed.len() < paths.len() {
+            imp.history.borrow_mut().record(before);
+        }
         if imp.project.borrow().tracks.is_empty() {
             if let Some(page) = previous_page {
                 imp.stack.set_visible_child_name(&page);

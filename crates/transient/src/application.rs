@@ -84,6 +84,13 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.import-audio", &["<Control>i"]);
     app.set_accels_for_action("win.play-pause", &["space"]);
     app.set_accels_for_action("win.go-to-start", &["Home"]);
+    app.set_accels_for_action("win.undo", &["<Control>z"]);
+    app.set_accels_for_action("win.redo", &["<Shift><Control>z"]);
+    app.set_accels_for_action("win.split", &["s"]);
+    app.set_accels_for_action("win.delete-clip", &["Delete"]);
+    app.set_accels_for_action("win.deselect", &["Escape"]);
+    app.set_accels_for_action("win.nudge-left", &["<Control>Left"]);
+    app.set_accels_for_action("win.nudge-right", &["<Control>Right"]);
     app.set_accels_for_action(
         "win.zoom-in",
         &["<Control>plus", "<Control>equal", "<Control>KP_Add"],

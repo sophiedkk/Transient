@@ -32,6 +32,27 @@ template $TransientWindow: Adw.ApplicationWindow {
           action-name: "win.import-audio";
         }
 
+        [start]
+        Separator {
+          styles [
+            "spacer",
+          ]
+        }
+
+        [start]
+        Button {
+          icon-name: "edit-undo-symbolic";
+          tooltip-text: _("Undo");
+          action-name: "win.undo";
+        }
+
+        [start]
+        Button {
+          icon-name: "edit-redo-symbolic";
+          tooltip-text: _("Redo");
+          action-name: "win.redo";
+        }
+
         [end]
         MenuButton {
           primary: true;

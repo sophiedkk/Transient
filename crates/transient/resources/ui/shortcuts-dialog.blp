@@ -22,6 +22,45 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("Editing");
+
+    Adw.ShortcutsItem {
+      title: _("Undo");
+      action-name: "win.undo";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Redo");
+      action-name: "win.redo";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Split at Playhead");
+      action-name: "win.split";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Delete Clip");
+      action-name: "win.delete-clip";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Move Clip Left");
+      action-name: "win.nudge-left";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Move Clip Right");
+      action-name: "win.nudge-right";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Deselect");
+      action-name: "win.deselect";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("View");
 
     Adw.ShortcutsItem {

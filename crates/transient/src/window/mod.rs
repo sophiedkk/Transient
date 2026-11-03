@@ -5,13 +5,15 @@
 //! - `imp.rs`: the *private* implementation that GTK calls into
 //!   (template children, lifecycle hooks such as "window is closing").
 //!
-//! The methods are spread over a few files by topic: `import.rs` (opening files),
+//! The methods are spread over a few files by topic: `edit.rs` (editing, undo),
+//! `import.rs` (opening files),
 //! `project.rs` (the project and everything shown from it) and `transport.rs`
 //! (play, pause, seek).
 //!
 //! See the gtk-rs book, chapter "GObject Subclassing":
 //! <https://gtk-rs.org/gtk4-rs/stable/latest/book/g_object_subclassing.html>
 
+mod edit;
 mod imp;
 mod import;
 mod project;
