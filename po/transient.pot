@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: transient\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 15:49+0100\n"
+"POT-Creation-Date: 2026-11-03 15:57+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,7 +22,7 @@ msgstr ""
 #: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:8
 #: crates/transient/resources/ui/window.blp:8
 #: crates/transient/resources/ui/window.blp:33
-#: crates/transient/src/application.rs:114
+#: crates/transient/src/application.rs:124
 msgid "Transient"
 msgstr ""
 
@@ -67,7 +67,7 @@ msgid "Window maximized"
 msgstr ""
 
 #: crates/transient/resources/ui/window.blp:39
-#: crates/transient/resources/ui/shortcuts-dialog.blp:105
+#: crates/transient/resources/ui/shortcuts-dialog.blp:125
 #: crates/transient/src/window/import.rs:27
 msgid "Import Audio"
 msgstr ""
@@ -90,119 +90,141 @@ msgstr ""
 msgid "Clip Properties"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:94
+#: crates/transient/resources/ui/window.blp:100
 msgid "No Clip Selected"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:95
+#: crates/transient/resources/ui/window.blp:101
 msgid "Select a clip to change its gain and fades"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:119
+#: crates/transient/resources/ui/window.blp:125
 msgid "Gain"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:120
+#: crates/transient/resources/ui/window.blp:126
 msgid "In decibels"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:132
+#: crates/transient/resources/ui/window.blp:138
 msgid "Fade In"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:133
-#: crates/transient/resources/ui/window.blp:146
+#: crates/transient/resources/ui/window.blp:139
+#: crates/transient/resources/ui/window.blp:152
 msgid "In seconds"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:145
+#: crates/transient/resources/ui/window.blp:151
 msgid "Fade Out"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:159
+#: crates/transient/resources/ui/window.blp:165
 msgid "Fades"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:162
+#: crates/transient/resources/ui/window.blp:168
 msgid "Fade In to Playhead"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:167
+#: crates/transient/resources/ui/window.blp:173
 msgid "Fade Out from Playhead"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:173
+#: crates/transient/resources/ui/window.blp:179
 msgid "Normalize"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:174
+#: crates/transient/resources/ui/window.blp:180
 msgid "Set the gain so the clip reaches a standard level"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:177
+#: crates/transient/resources/ui/window.blp:183
 msgid "Peak to −1 dB"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:182
+#: crates/transient/resources/ui/window.blp:188
 msgid "Loudness to −16 LUFS"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:198
+#: crates/transient/resources/ui/window.blp:204
 msgid "Start a New Project"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:199
+#: crates/transient/resources/ui/window.blp:205
 msgid "Import audio files to start mixing"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:202
+#: crates/transient/resources/ui/window.blp:213
 msgid "_Import Audio…"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:277
+#: crates/transient/resources/ui/window.blp:224
+#: crates/transient/resources/ui/window.blp:469
+msgid "_Open Project…"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:241
+msgid "Recent Projects"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:323
 msgid "Timeline"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:311
+#: crates/transient/resources/ui/window.blp:357
 #: crates/transient/resources/ui/shortcuts-dialog.blp:19
 msgid "Go to Start"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:317
+#: crates/transient/resources/ui/window.blp:363
 #: crates/transient/src/window/transport.rs:124
 msgid "Play"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:346
-#: crates/transient/resources/ui/window.blp:361
+#: crates/transient/resources/ui/window.blp:392
+#: crates/transient/resources/ui/window.blp:407
 msgid "Output Level"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:373
-#: crates/transient/resources/ui/window.blp:383
+#: crates/transient/resources/ui/window.blp:419
+#: crates/transient/resources/ui/window.blp:429
 msgid "Master Volume"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:395
+#: crates/transient/resources/ui/window.blp:441
 #: crates/transient/resources/ui/shortcuts-dialog.blp:91
 msgid "Zoom Out"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:401
+#: crates/transient/resources/ui/window.blp:447
 #: crates/transient/resources/ui/shortcuts-dialog.blp:96
 msgid "Zoom to Fit"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:407
+#: crates/transient/resources/ui/window.blp:453
 #: crates/transient/resources/ui/shortcuts-dialog.blp:86
 msgid "Zoom In"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:418
+#: crates/transient/resources/ui/window.blp:464
+msgid "_New Project"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:474
+#: crates/transient/src/window/file.rs:216
+msgid "_Save"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:479
+msgid "Save _As…"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:486
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:423
+#: crates/transient/resources/ui/window.blp:491
 msgid "_About Transient"
 msgstr ""
 
@@ -262,15 +284,32 @@ msgstr ""
 msgid "General"
 msgstr ""
 
+#: crates/transient/resources/ui/shortcuts-dialog.blp:105
+msgid "New Project"
+msgstr ""
+
 #: crates/transient/resources/ui/shortcuts-dialog.blp:110
-msgid "Show Shortcuts"
+#: crates/transient/src/window/file.rs:130
+msgid "Open Project"
 msgstr ""
 
 #: crates/transient/resources/ui/shortcuts-dialog.blp:115
-msgid "Close Window"
+msgid "Save"
 msgstr ""
 
 #: crates/transient/resources/ui/shortcuts-dialog.blp:120
+msgid "Save As"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:130
+msgid "Show Shortcuts"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:135
+msgid "Close Window"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:140
 msgid "Quit"
 msgstr ""
 
@@ -291,7 +330,7 @@ msgid "Pan"
 msgstr ""
 
 #. Translators: replace with your name and email, one translator per line.
-#: crates/transient/src/application.rs:124
+#: crates/transient/src/application.rs:134
 msgid "translator-credits"
 msgstr ""
 
@@ -311,6 +350,68 @@ msgstr ""
 msgid "_Undo"
 msgstr ""
 
+#: crates/transient/src/window/file.rs:53
+msgid "Untitled Project"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:69
+msgid "Save Project"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:89
+msgid "Projects can only be saved on this computer"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:97
+#: crates/transient/src/window/file.rs:113
+msgid "Could not save the project"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:149
+msgid "Only projects on this computer can be opened"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:160
+#: crates/transient/src/window/import.rs:105
+#, rust-format
+msgid "Could not open “{}”"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:168
+#: crates/transient/src/window/import.rs:61
+#, rust-format
+msgid "Opening “{}”"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:206
+msgid "Save Changes?"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:208
+msgid ""
+"The project has unsaved changes. Changes which are not saved will be "
+"permanently lost."
+msgstr ""
+
+#: crates/transient/src/window/file.rs:214
+msgid "_Cancel"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:215
+msgid "_Discard"
+msgstr ""
+
+#: crates/transient/src/window/file.rs:282
+#, rust-format
+msgid "{} audio file could not be found"
+msgid_plural "{} audio files could not be found"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/transient/src/window/file.rs:331
+msgid "Transient Projects"
+msgstr ""
+
 #: crates/transient/src/window/import.rs:21
 msgid "Audio Files"
 msgstr ""
@@ -323,22 +424,12 @@ msgstr ""
 msgid "Only files on this computer can be opened"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:61
-#, rust-format
-msgid "Opening “{}”"
-msgstr ""
-
 #: crates/transient/src/window/import.rs:64
 #, rust-format
 msgid "Opening {} File"
 msgid_plural "Opening {} Files"
 msgstr[0] ""
 msgstr[1] ""
-
-#: crates/transient/src/window/import.rs:105
-#, rust-format
-msgid "Could not open “{}”"
-msgstr ""
 
 #: crates/transient/src/window/import.rs:109
 #, rust-format
@@ -366,18 +457,14 @@ msgid_plural "{} channels"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/project.rs:55
-msgid "Untitled Project"
-msgstr ""
-
-#: crates/transient/src/window/project.rs:59
+#: crates/transient/src/window/project.rs:69
 #, rust-format
 msgid "{} track"
 msgid_plural "{} tracks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/project.rs:110
+#: crates/transient/src/window/project.rs:125
 msgid "Playback is not available"
 msgstr ""
 
@@ -411,4 +498,9 @@ msgstr ""
 #: crates/transient/src/widgets/track_header.rs:203
 #, rust-format
 msgid "Pan: {}% right"
+msgstr ""
+
+#: crates/transient/src/widgets/timeline_view/draw.rs:265
+#, rust-format
+msgid "{} (audio file missing)"
 msgstr ""

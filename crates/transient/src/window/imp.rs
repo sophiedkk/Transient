@@ -49,6 +49,12 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) master_scale: TemplateChild<gtk::Scale>,
     #[template_child]
+    pub(super) recent_group: TemplateChild<gtk::Box>,
+    #[template_child]
+    pub(super) recent_list: TemplateChild<gtk::ListBox>,
+    #[template_child]
+    pub(super) missing_banner: TemplateChild<adw::Banner>,
+    #[template_child]
     pub(super) split_view: TemplateChild<adw::OverlaySplitView>,
     #[template_child]
     pub(super) pane_stack: TemplateChild<adw::ViewStack>,
@@ -64,6 +70,12 @@ pub(crate) struct Window {
     pub(super) settings: OnceCell<gio::Settings>,
     /// The open project (what gets saved).
     pub(super) project: RefCell<Project>,
+    /// The project as last saved or opened, to detect unsaved changes.
+    pub(super) saved_project: RefCell<Project>,
+    /// The project's file, once saved or opened.
+    pub(super) file: RefCell<Option<gio::File>>,
+    /// Set once the user agreed to close despite unsaved changes.
+    pub(super) close_confirmed: Cell<bool>,
     /// The decoded audio of the project's sources.
     pub(super) sources: RefCell<LoadedSources>,
     /// The undo/redo history.
@@ -104,6 +116,18 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.go-to-start", None, |window, _, _| {
             window.seek_to_frame(0);
+        });
+        klass.install_action_async("win.new-project", None, |window, _, _| async move {
+            window.new_project().await;
+        });
+        klass.install_action_async("win.open-project", None, |window, _, _| async move {
+            window.open_project_dialog().await;
+        });
+        klass.install_action_async("win.save", None, |window, _, _| async move {
+            window.save().await;
+        });
+        klass.install_action_async("win.save-as", None, |window, _, _| async move {
+            window.save_as().await;
         });
         klass.install_action("win.undo", None, |window, _, _| window.undo());
         klass.install_action("win.redo", None, |window, _, _| window.redo());
@@ -176,15 +200,28 @@ impl ObjectImpl for Window {
         window.setup_editing();
         window.setup_mixer();
         window.setup_clip_pane();
+        window.update_recent_projects();
     }
 }
 
 impl WidgetImpl for Window {}
 
 impl WindowImpl for Window {
-    /// Runs when the window is about to close.
+    /// Runs when the window is about to close. With unsaved changes, it asks
+    /// first ("Save Changes?") and only closes once that is settled.
     fn close_request(&self) -> glib::Propagation {
-        self.obj().save_window_state();
+        let window = self.obj();
+        if window.has_unsaved_changes() && !self.close_confirmed.get() {
+            let window = window.clone();
+            glib::spawn_future_local(async move {
+                if window.confirm_discard_changes().await {
+                    window.imp().close_confirmed.set(true);
+                    window.close();
+                }
+            });
+            return glib::Propagation::Stop;
+        }
+        window.save_window_state();
         // Stop playback right away instead of when the window is finally freed.
         self.player.replace(None);
         self.parent_close_request()

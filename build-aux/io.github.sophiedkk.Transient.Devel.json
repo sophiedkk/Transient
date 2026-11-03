@@ -13,6 +13,7 @@
         "--socket=wayland",
         "--device=dri",
         "--socket=pulseaudio",
+        "--filesystem=home",
         "--env=RUST_LOG=transient=debug,info",
         "--env=RUST_BACKTRACE=1"
     ],

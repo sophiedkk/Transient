@@ -7,6 +7,7 @@
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use gettextrs::gettext;
 use gtk::{gdk, graphene, gsk, pango};
 use transient_core::mix::{db_to_gain, fade_shape};
 use transient_core::project::Clip;
@@ -190,10 +191,16 @@ impl TimelineView {
         let rounded = gsk::RoundedRect::from_rect(bounds, CLIP_RADIUS);
 
         let (fill, strip) = if selected { (0.26, 0.45) } else { (0.16, 0.28) };
+        // A clip whose audio file is missing is drawn grey, without a waveform.
+        let (colour, strength) = if drawn.waveform.is_some() {
+            (palette.accent, 1.0)
+        } else {
+            (palette.foreground, 0.6)
+        };
         snapshot.push_rounded_clip(&rounded);
-        snapshot.append_color(&palette.accent.with_alpha(fill), &bounds);
+        snapshot.append_color(&colour.with_alpha(fill * strength), &bounds);
         snapshot.append_color(
-            &palette.accent.with_alpha(strip),
+            &colour.with_alpha(strip * strength),
             &graphene::Rect::new(box_left, top, bounds.width(), CLIP_LABEL_HEIGHT),
         );
 
@@ -206,12 +213,14 @@ impl TimelineView {
         let source_start =
             frames_to_f64(clip.offset) + view.start + first_column * view.frames_per_pixel
                 - frames_to_f64(clip.start);
-        let peaks = drawn.waveform.peaks_within(
-            clip.offset..clip.offset.saturating_add(clip.length),
-            source_start,
-            view.frames_per_pixel,
-            columns,
-        );
+        let peaks = drawn.waveform.as_ref().map_or_else(Vec::new, |waveform| {
+            waveform.peaks_within(
+                clip.offset..clip.offset.saturating_add(clip.length),
+                source_start,
+                view.frames_per_pixel,
+                columns,
+            )
+        });
         // Drawn with the clip's gain applied, so normalizing visibly changes it.
         if let Some(path) = waveform_path(
             &peaks,
@@ -250,7 +259,12 @@ impl TimelineView {
         }
 
         // The name, starting at the visible left edge so it stays readable when scrolled.
-        let layout = self.small_text(&drawn.name);
+        let label = if drawn.waveform.is_some() {
+            drawn.name.clone()
+        } else {
+            gettext("{} (audio file missing)").replace("{}", &drawn.name)
+        };
+        let layout = self.small_text(&label);
         // On a selected clip the name starts after the fade-in handle.
         let text_inset = if selected { 18.0 } else { 6.0 };
         layout.set_width(pango_units(

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers the project file type, so file managers recognise .transient files
+     and offer to open them with Transient. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-transient-project">
+    <comment>Transient project</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.transient"/>
+  </mime-type>
+</mime-info>

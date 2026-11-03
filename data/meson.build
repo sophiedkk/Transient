@@ -28,6 +28,14 @@ metainfo_file = i18n.merge_file(
   install_dir: datadir / 'metainfo',
 )
 
+# The project file type (.transient). Flatpak only exports MIME definitions
+# named after the app ID, hence the rename.
+install_data(
+  base_id + '.mime.xml',
+  install_dir: datadir / 'mime' / 'packages',
+  rename: application_id + '.xml',
+)
+
 install_data(
   base_id + '.gschema.xml',
   install_dir: datadir / 'glib-2.0' / 'schemas',

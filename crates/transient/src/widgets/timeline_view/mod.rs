@@ -59,7 +59,8 @@ pub(crate) struct LaneClip {
     /// Position, in-point and length (the project's own clip).
     pub(crate) clip: Clip,
     /// The source's waveform overview.
-    pub(crate) waveform: Waveform,
+    /// `None` when the audio file could not be found: the clip is drawn grey.
+    pub(crate) waveform: Option<Waveform>,
     /// The label drawn on the clip.
     pub(crate) name: String,
 }

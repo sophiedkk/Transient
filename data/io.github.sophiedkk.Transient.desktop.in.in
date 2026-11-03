@@ -9,4 +9,4 @@ Terminal=false
 Type=Application
 Categories=AudioVideo;Audio;AudioVideoEditing;GTK;
 StartupNotify=true
-MimeType=audio/mpeg;audio/flac;audio/x-wav;audio/ogg;audio/opus;
+MimeType=application/x-transient-project;audio/mpeg;audio/flac;audio/x-wav;audio/ogg;audio/opus;

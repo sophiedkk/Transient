@@ -52,19 +52,34 @@ impl Window {
 
         let length = format_position(project.length(), project.sample_rate);
         let tracks = project.tracks.len();
-        imp.header_title.set_title(&gettext("Untitled Project"));
-        imp.header_title.set_subtitle(&format!(
-            "{} · {length}",
-            ngettext(
-                "{} track",
-                "{} tracks",
-                u32::try_from(tracks).unwrap_or(u32::MAX)
+        // A "•" before the name marks unsaved changes.
+        let title = if self.has_unsaved_changes() {
+            format!("• {}", self.project_title())
+        } else {
+            self.project_title()
+        };
+        imp.header_title.set_title(&title);
+        self.set_title(Some(&title));
+        let subtitle = if tracks == 0 {
+            String::new()
+        } else {
+            format!(
+                "{} · {length}",
+                ngettext(
+                    "{} track",
+                    "{} tracks",
+                    u32::try_from(tracks).unwrap_or(u32::MAX)
+                )
+                .replace("{}", &tracks.to_string())
             )
-            .replace("{}", &tracks.to_string())
-        ));
+        };
+        imp.header_title.set_subtitle(&subtitle);
         imp.duration_label.set_label(&format!("/ {length}"));
         imp.stack
             .set_visible_child_name(if tracks == 0 { "empty" } else { "project" });
+        if tracks == 0 {
+            self.update_recent_projects();
+        }
         let has_audio = project.length() > 0;
         imp.toolbar_view.set_reveal_bottom_bars(has_audio);
         self.set_playback_enabled(has_audio);
@@ -165,12 +180,10 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
             clips: track
                 .clips
                 .iter()
-                .filter_map(|clip| {
-                    Some(LaneClip {
-                        clip: *clip,
-                        waveform: sources.get(&clip.source)?.waveform.clone(),
-                        name: track.name.clone(),
-                    })
+                .map(|clip| LaneClip {
+                    clip: *clip,
+                    waveform: sources.get(&clip.source).map(|s| s.waveform.clone()),
+                    name: track.name.clone(),
                 })
                 .collect(),
         })

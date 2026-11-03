@@ -13,7 +13,7 @@
 //! Editing never changes the audio itself, only these numbers. The file stores
 //! the sources' paths; the decoded audio lives in memory (see [`crate::mix`]).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -203,6 +203,33 @@ impl Project {
         Ok(serde_json::to_string_pretty(self)?)
     }
 
+    /// The project as it is saved in `folder`: sources inside that folder (or a
+    /// folder in it) get a path relative to it, so the project keeps working
+    /// when the whole folder is moved or copied. Other paths stay absolute.
+    #[must_use]
+    pub fn with_paths_relative_to(&self, folder: &Path) -> Self {
+        let mut project = self.clone();
+        for source in &mut project.sources {
+            if let Ok(relative) = source.path.strip_prefix(folder) {
+                source.path = relative.to_owned();
+            }
+        }
+        project
+    }
+
+    /// The project as opened from `folder`: relative source paths are turned
+    /// back into full paths. The opposite of [`Self::with_paths_relative_to`].
+    #[must_use]
+    pub fn with_paths_resolved_from(&self, folder: &Path) -> Self {
+        let mut project = self.clone();
+        for source in &mut project.sources {
+            if source.path.is_relative() {
+                source.path = folder.join(&source.path);
+            }
+        }
+        project
+    }
+
     /// Hands out a fresh ID number.
     fn new_id(&mut self) -> u64 {
         let id = self.next_id;
@@ -360,6 +387,25 @@ mod tests {
     fn a_sample_rate_of_zero_is_refused() {
         let error = Project::from_json(r#"{ "sample_rate": 0 }"#).unwrap_err();
         assert!(matches!(error, ProjectError::Malformed(_)));
+    }
+
+    #[test]
+    fn sources_inside_the_project_folder_get_relative_paths() {
+        let mut project = Project::default();
+        project.add_source("/music/mix/stems/drums.wav".into(), 10);
+        project.add_source("/elsewhere/vocals.wav".into(), 10);
+
+        let saved = project.with_paths_relative_to(Path::new("/music/mix"));
+        assert_eq!(saved.sources[0].path, Path::new("stems/drums.wav"));
+        assert_eq!(saved.sources[1].path, Path::new("/elsewhere/vocals.wav"));
+
+        // Opened from a moved folder, the relative path follows the folder.
+        let opened = saved.with_paths_resolved_from(Path::new("/backup/mix"));
+        assert_eq!(
+            opened.sources[0].path,
+            Path::new("/backup/mix/stems/drums.wav")
+        );
+        assert_eq!(opened.sources[1].path, Path::new("/elsewhere/vocals.wav"));
     }
 
     #[test]

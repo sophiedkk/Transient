@@ -77,6 +77,12 @@ template $TransientWindow: Adw.ApplicationWindow {
         }
       }
 
+      // Shown when a project's audio files cannot be found.
+      [top]
+      Adw.Banner missing_banner {
+        revealed: false;
+      }
+
       // One page is visible at a time; the code switches by name.
       // The clip pane (F9) is a utility pane on the right; on narrow windows it
       // slides over the timeline instead of beside it.
@@ -198,16 +204,56 @@ template $TransientWindow: Adw.ApplicationWindow {
               title: _("Start a New Project");
               description: _("Import audio files to start mixing");
 
-              child: Button {
-                label: _("_Import Audio…");
-                use-underline: true;
+              child: Box {
+                orientation: vertical;
+                spacing: 12;
                 halign: center;
-                action-name: "win.import-audio";
 
-                styles [
-                  "pill",
-                  "suggested-action",
-                ]
+                Button {
+                  label: _("_Import Audio…");
+                  use-underline: true;
+                  action-name: "win.import-audio";
+
+                  styles [
+                    "pill",
+                    "suggested-action",
+                  ]
+                }
+
+                Button {
+                  label: _("_Open Project…");
+                  use-underline: true;
+                  action-name: "win.open-project";
+
+                  styles [
+                    "pill",
+                  ]
+                }
+
+                Box recent_group {
+                  orientation: vertical;
+                  spacing: 6;
+                  margin-top: 24;
+                  width-request: 360;
+                  visible: false;
+
+                  Label {
+                    label: _("Recent Projects");
+                    xalign: 0;
+
+                    styles [
+                      "heading",
+                    ]
+                  }
+
+                  ListBox recent_list {
+                    selection-mode: none;
+
+                    styles [
+                      "boxed-list",
+                    ]
+                  }
+                }
               };
             };
           }
@@ -413,6 +459,28 @@ template $TransientWindow: Adw.ApplicationWindow {
 }
 
 menu primary_menu {
+  section {
+    item {
+      label: _("_New Project");
+      action: "win.new-project";
+    }
+
+    item {
+      label: _("_Open Project…");
+      action: "win.open-project";
+    }
+
+    item {
+      label: _("_Save");
+      action: "win.save";
+    }
+
+    item {
+      label: _("Save _As…");
+      action: "win.save-as";
+    }
+  }
+
   section {
     item {
       label: _("_Keyboard Shortcuts");

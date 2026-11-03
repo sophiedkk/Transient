@@ -7,6 +7,8 @@
 //! transient --play --quit-after=5 song.flac # quit after five seconds
 //! transient --seek=30 --zoom=4 song.flac    # zoom in around 0:30
 //! transient --seek=5 --action=split a.flac  # run window actions (repeatable)
+//! transient a.flac --save-to=mix.transient  # save the project afterwards
+//! transient mix.transient                   # open a project
 //! ```
 //!
 //! `transient --help` lists the options. They are meant for testing (by people
@@ -20,7 +22,7 @@ use gtk::{gio, glib};
 use tracing::{error, info};
 use transient_engine::player::AudioOutput;
 
-use crate::window::Window;
+use crate::window::{Window, is_project_file};
 
 /// How long to let the window settle (layout, first frames) before a screenshot.
 const SETTLE_TIME: Duration = Duration::from_millis(800);
@@ -45,6 +47,8 @@ pub(crate) struct LaunchOptions {
     pub(crate) zoom: Option<u32>,
     /// Window actions to run after opening, in order (for example "split").
     pub(crate) actions: Vec<String>,
+    /// Save the project to this file after the actions.
+    pub(crate) save_to: Option<PathBuf>,
 }
 
 impl LaunchOptions {
@@ -100,6 +104,14 @@ impl LaunchOptions {
             Some("NAME"),
         );
         app.add_main_option(
+            "save-to",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::Filename,
+            "Save the project to FILE after the actions",
+            Some("FILE"),
+        );
+        app.add_main_option(
             "quit-after",
             glib::Char::from(0),
             none,
@@ -131,6 +143,7 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .unwrap_or_default(),
+            save_to: dict.lookup::<PathBuf>("save-to").ok().flatten(),
         }
     }
 
@@ -144,6 +157,7 @@ impl LaunchOptions {
             || self.seek.is_some()
             || self.zoom.is_some()
             || !self.actions.is_empty()
+            || self.save_to.is_some()
     }
 
     /// Carries out the options for a freshly shown window.
@@ -151,7 +165,10 @@ impl LaunchOptions {
         if self.silent {
             window.set_audio_output(AudioOutput::Silent);
         }
-        if !files.is_empty() {
+        // A project file is opened; anything else is imported as audio.
+        if let Some(project) = files.iter().find(|file| is_project_file(file)) {
+            window.open_project(project).await;
+        } else if !files.is_empty() {
             window.import_files(&files).await;
         }
         if self.seek.is_some() || self.zoom.is_some() {
@@ -173,6 +190,10 @@ impl LaunchOptions {
                 Ok(()) => info!("ran action {name}"),
                 Err(err) => error!("could not run action {name}: {err}"),
             }
+        }
+        if let Some(path) = &self.save_to {
+            let file = gio::File::for_path(std::path::absolute(path).unwrap_or(path.clone()));
+            window.write_project(&file).await;
         }
         if self.play {
             window.toggle_playback();

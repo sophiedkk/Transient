@@ -232,7 +232,13 @@ impl TimelineView {
             return;
         };
         let clip = original.clip;
-        let source_frames = original.waveform.buffer().frames();
+        // Without its audio, a clip cannot be extended beyond what it already plays.
+        let source_frames = original
+            .waveform
+            .as_ref()
+            .map_or(clip.offset + clip.length, |waveform| {
+                waveform.buffer().frames()
+            });
         let points = &drag.snap_points;
         drag.preview = Some(match drag.kind {
             DragKind::Move => {

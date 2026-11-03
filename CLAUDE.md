@@ -33,6 +33,11 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   inside the clip; trims and splits preserve that). `Mix` applies equal-power
   fades (`fade_shape`). `transient-core::normalize` computes peak/LUFS gains
   (ebur128). The clip pane (`window/clip_pane.rs`, F9) edits the selected clip.
+- Project files (`window/file.rs`): `.transient` JSON; `Project::with_paths_relative_to`
+  / `with_paths_resolved_from` make sources inside the project folder relative.
+  Unsaved changes = `project != saved_project`. Closing, quitting (app.quit closes
+  each window) and New/Open ask "Save Changes?" via `confirm_discard_changes`.
+  Clips whose audio is missing stay, drawn grey (`LaneClip::waveform` is `None`).
 - Mixer settings (track volume/pan/mute/solo, master volume) live on `Track`/
   `Project`; `Mix` applies them (balance pan law). Slider changes go through
   `Window::apply_mixer_change`: coalesced undo steps and `update_mix()` only,
@@ -95,7 +100,8 @@ just test-audio                                 # decode the whole test collecti
 ```
 
 - `just headless` / `just screenshot` run the app in an invisible mutter compositor
-  (`dev/headless.sh`) with its own D-Bus session and in-memory settings.
+  (`dev/headless.sh`) with its own D-Bus session, in-memory settings and a
+  throwaway XDG data folder (so tests never touch the user's recent files).
   Dark mode: prefix with `ADW_DEBUG_COLOR_SCHEME=prefer-dark`.
 - App options (`transient --help`): `FILE…` opens files, `--play`, `--silent`
   (no sound output, still real time), `--screenshot=FILE`, `--quit-after=SECONDS`,
@@ -103,7 +109,9 @@ just test-audio                                 # decode the whole test collecti
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
   `select-clip-at-playhead`, `nudge-right`, `delete-clip`, `toggle-mute`,
   `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
-  `normalize-peak`, `normalize-loudness`, `toggle-clip-pane`) to script edits. With `--play`, the level meter (red = clipping)
+  `normalize-peak`, `normalize-loudness`, `toggle-clip-pane`, `new-project`,
+  `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
+  `.transient` file opens it — together they test a full save/open round trip. With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
   (unit- and property-tested).

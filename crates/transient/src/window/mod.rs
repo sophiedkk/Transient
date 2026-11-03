@@ -15,6 +15,7 @@
 
 mod clip_pane;
 mod edit;
+mod file;
 mod imp;
 mod import;
 mod mixer;
@@ -38,6 +39,8 @@ glib::wrapper! {
         @implements gio::ActionGroup, gio::ActionMap, gtk::Accessible, gtk::Buildable,
                     gtk::ConstraintTarget, gtk::Native, gtk::Root, gtk::ShortcutManager;
 }
+
+pub(crate) use file::is_project_file;
 
 impl Window {
     /// Creates a new main window for `app`.

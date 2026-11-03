@@ -71,8 +71,14 @@ fn present_window(
 /// Shortcuts follow the GNOME HIG's standard keys where one exists.
 /// Keep resources/ui/shortcuts-dialog.blp in sync with this list.
 fn setup_actions(app: &adw::Application) {
+    // Quit by closing every window, so each can ask about unsaved changes first;
+    // the application ends by itself once the last window is gone.
     let quit = gio::ActionEntry::builder("quit")
-        .activate(|app: &adw::Application, _, _| app.quit())
+        .activate(|app: &adw::Application, _, _| {
+            for window in app.windows() {
+                window.close();
+            }
+        })
         .build();
     let about = gio::ActionEntry::builder("about")
         .activate(|app: &adw::Application, _, _| show_about(app))
@@ -82,6 +88,10 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("app.quit", &["<Control>q"]);
     app.set_accels_for_action("window.close", &["<Control>w"]);
     app.set_accels_for_action("win.import-audio", &["<Control>i"]);
+    app.set_accels_for_action("win.new-project", &["<Control>n"]);
+    app.set_accels_for_action("win.open-project", &["<Control>o"]);
+    app.set_accels_for_action("win.save", &["<Control>s"]);
+    app.set_accels_for_action("win.save-as", &["<Shift><Control>s"]);
     app.set_accels_for_action("win.play-pause", &["space"]);
     app.set_accels_for_action("win.go-to-start", &["Home"]);
     app.set_accels_for_action("win.undo", &["<Control>z"]);
