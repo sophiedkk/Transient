@@ -44,6 +44,16 @@ impl Window {
         self.imp().audio_output.set(output);
     }
 
+    /// Zooms the waveform in one step (also used by `--zoom`).
+    pub(crate) fn zoom_in(&self) {
+        self.imp().waveform.zoom_in();
+    }
+
+    /// Whether the waveform has been given a size yet.
+    pub(crate) fn is_laid_out(&self) -> bool {
+        self.imp().waveform.is_laid_out()
+    }
+
     /// Shows a short message at the bottom of the window.
     fn show_toast(&self, message: &str) {
         self.imp().toast_overlay.add_toast(adw::Toast::new(message));

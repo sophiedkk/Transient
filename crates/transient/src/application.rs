@@ -84,6 +84,12 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.import-audio", &["<Control>i"]);
     app.set_accels_for_action("win.play-pause", &["space"]);
     app.set_accels_for_action("win.go-to-start", &["Home"]);
+    app.set_accels_for_action(
+        "win.zoom-in",
+        &["<Control>plus", "<Control>equal", "<Control>KP_Add"],
+    );
+    app.set_accels_for_action("win.zoom-out", &["<Control>minus", "<Control>KP_Subtract"]);
+    app.set_accels_for_action("win.zoom-fit", &["<Control>0", "<Control>KP_0"]);
 }
 
 fn show_about(app: &adw::Application) {

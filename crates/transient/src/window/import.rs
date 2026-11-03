@@ -9,6 +9,7 @@ use gettextrs::{gettext, ngettext};
 use gtk::gio;
 use tracing::{info, warn};
 use transient_core::time::{SampleRate, format_position};
+use transient_core::waveform::Waveform;
 use transient_engine::decode::{DecodedAudio, SourceFormat, decode_file};
 use transient_engine::player::Player;
 
@@ -67,14 +68,19 @@ impl Window {
             .set_title(&gettext("Opening “{}”").replace("{}", &name));
         imp.stack.set_visible_child_name("loading");
 
-        // Decoding takes a while for long files, so it runs on a background thread.
-        // `.await` lets the window keep responding in the meantime.
+        // Decoding (and computing the waveform overview) takes a while for long files,
+        // so it runs on a background thread. `.await` keeps the window responsive.
         let decode_path = path.clone();
-        let result =
-            gio::spawn_blocking(move || decode_file(&decode_path, SampleRate::default())).await;
+        let result = gio::spawn_blocking(move || {
+            decode_file(&decode_path, SampleRate::default()).map(|decoded| {
+                let waveform = Waveform::new(decoded.buffer.clone());
+                (decoded, waveform)
+            })
+        })
+        .await;
 
         let error = match result {
-            Ok(Ok(decoded)) => match self.show_audio(&name, &path, decoded) {
+            Ok(Ok((decoded, waveform))) => match self.show_audio(&name, &path, decoded, waveform) {
                 Ok(()) => return,
                 Err(error) => error.to_string(),
             },
@@ -94,6 +100,7 @@ impl Window {
         name: &str,
         path: &Path,
         decoded: DecodedAudio,
+        waveform: Waveform,
     ) -> Result<(), transient_engine::EngineError> {
         let imp = self.imp();
         let frames = decoded.buffer.frames();
@@ -103,16 +110,15 @@ impl Window {
         imp.player.replace(Some(player));
 
         self.set_title(Some(name));
-        imp.clip_group.set_title(name);
-        imp.length_row.set_subtitle(&format_position(frames, rate));
-        imp.format_row
-            .set_subtitle(&describe_format(decoded.source_format));
-        imp.location_row.set_subtitle(
-            &path
-                .parent()
-                .map(|folder| folder.display().to_string())
-                .unwrap_or_default(),
-        );
+        imp.header_title.set_title(name);
+        imp.header_title.set_subtitle(&format!(
+            "{} · {}",
+            describe_format(decoded.source_format),
+            format_position(frames, rate)
+        ));
+        imp.header_title
+            .set_tooltip_text(Some(&path.display().to_string()));
+        imp.waveform.set_waveform(Some(waveform));
 
         self.reset_transport(frames, rate);
         imp.stack.set_visible_child_name("clip");

@@ -60,6 +60,9 @@ pub struct Player {
     sample_rate: SampleRate,
     duration: Frames,
     playing: bool,
+    /// A seek GStreamer has not finished yet. Seeks complete asynchronously, and
+    /// until then the pipeline still reports the old position.
+    pending_seek: Option<Frames>,
 }
 
 impl Player {
@@ -112,6 +115,7 @@ impl Player {
             sample_rate,
             duration,
             playing: false,
+            pending_seek: None,
         })
     }
 
@@ -152,17 +156,21 @@ impl Player {
     ///
     /// Returns [`EngineError`] if the seek fails.
     pub fn seek(&mut self, frame: Frames) -> Result<(), EngineError> {
-        let time = frames_to_time(frame.min(self.duration), self.sample_rate);
+        let frame = frame.min(self.duration);
         self.pipeline.seek_simple(
             gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::ACCURATE,
-            time,
+            frames_to_time(frame, self.sample_rate),
         )?;
+        self.pending_seek = Some(frame);
         Ok(())
     }
 
     /// The current playback position in frames.
     #[must_use]
     pub fn position(&self) -> Frames {
+        if let Some(frame) = self.pending_seek {
+            return frame;
+        }
         self.pipeline
             .query_position::<gstreamer::ClockTime>()
             .map_or(0, |time| time_to_frames(time, self.sample_rate))
@@ -189,10 +197,14 @@ impl Player {
             return Vec::new();
         };
         let mut events = Vec::new();
-        while let Some(message) =
-            bus.pop_filtered(&[gstreamer::MessageType::Eos, gstreamer::MessageType::Error])
-        {
+        while let Some(message) = bus.pop_filtered(&[
+            gstreamer::MessageType::Eos,
+            gstreamer::MessageType::Error,
+            gstreamer::MessageType::AsyncDone,
+        ]) {
             match message.view() {
+                // A seek (or start-up) finished: the pipeline's position is right again.
+                gstreamer::MessageView::AsyncDone(_) => self.pending_seek = None,
                 gstreamer::MessageView::Eos(_) => {
                     if let Err(error) = self.pause() {
                         tracing::warn!("could not pause at the end: {error}");
@@ -313,10 +325,12 @@ mod tests {
     fn seeking_moves_the_position() {
         crate::init().unwrap();
         let mut player = Player::new(quarter_second(), AudioOutput::Silent).unwrap();
-        // Wait for the pipeline to be ready (prerolled) before seeking.
-        let _ = player.pipeline.state(gstreamer::ClockTime::from_seconds(5));
         player.seek(6_000).unwrap();
+        // Right away, before GStreamer has finished the seek…
+        assert_eq!(player.position(), 6_000);
+        // …and after it has.
         let _ = player.pipeline.state(gstreamer::ClockTime::from_seconds(5));
+        player.poll_events();
         assert_eq!(player.position(), 6_000);
     }
 }

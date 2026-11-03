@@ -6,6 +6,7 @@
 mod application;
 mod config;
 mod launch;
+mod widgets;
 mod window;
 
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};

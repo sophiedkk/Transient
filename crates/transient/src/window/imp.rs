@@ -8,6 +8,7 @@ use gtk::{CompositeTemplate, gio, glib};
 use transient_engine::player::{AudioOutput, Player};
 
 use crate::config;
+use crate::widgets::waveform_view::WaveformView;
 
 /// The window's state. `#[template_child]` fields are filled in from window.blp
 /// by matching the field name to the object id there.
@@ -21,21 +22,15 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) stack: TemplateChild<adw::ViewStack>,
     #[template_child]
+    pub(super) header_title: TemplateChild<adw::WindowTitle>,
+    #[template_child]
     pub(super) loading_page: TemplateChild<adw::StatusPage>,
     #[template_child]
-    pub(super) clip_group: TemplateChild<adw::PreferencesGroup>,
-    #[template_child]
-    pub(super) length_row: TemplateChild<adw::ActionRow>,
-    #[template_child]
-    pub(super) format_row: TemplateChild<adw::ActionRow>,
-    #[template_child]
-    pub(super) location_row: TemplateChild<adw::ActionRow>,
+    pub(super) waveform: TemplateChild<WaveformView>,
     #[template_child]
     pub(super) play_button: TemplateChild<gtk::Button>,
     #[template_child]
     pub(super) position_label: TemplateChild<gtk::Label>,
-    #[template_child]
-    pub(super) position_scale: TemplateChild<gtk::Scale>,
     #[template_child]
     pub(super) duration_label: TemplateChild<gtk::Label>,
 
@@ -54,6 +49,8 @@ impl ObjectSubclass for Window {
     type ParentType = adw::ApplicationWindow;
 
     fn class_init(klass: &mut Self::Class) {
+        // window.blp uses $TransientWaveformView, so its type must exist first.
+        WaveformView::ensure_type();
         klass.bind_template();
 
         // `win.import-audio`: used by the header bar button, the empty-state button
@@ -66,6 +63,15 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.go-to-start", None, |window, _, _| {
             window.seek_to_frame(0);
+        });
+        klass.install_action("win.zoom-in", None, |window, _, _| {
+            window.zoom_in();
+        });
+        klass.install_action("win.zoom-out", None, |window, _, _| {
+            window.imp().waveform.zoom_out();
+        });
+        klass.install_action("win.zoom-fit", None, |window, _, _| {
+            window.imp().waveform.zoom_to_fit();
         });
     }
 

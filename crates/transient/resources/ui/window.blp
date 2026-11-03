@@ -20,6 +20,11 @@ template $TransientWindow: Adw.ApplicationWindow {
 
       [top]
       Adw.HeaderBar {
+        // Shows the file name, with its format and length below it.
+        title-widget: Adw.WindowTitle header_title {
+          title: _("Transient");
+        };
+
         [start]
         Button {
           icon-name: "list-add-symbolic";
@@ -73,42 +78,28 @@ template $TransientWindow: Adw.ApplicationWindow {
           };
         }
 
-        // An open file. The waveform replaces this in milestone 2.
+        // An open file: its waveform, with a scrollbar sharing the visible range.
         Adw.ViewStackPage {
           name: "clip";
 
-          child: Adw.Clamp {
-            maximum-size: 600;
-            valign: center;
-            margin-start: 12;
-            margin-end: 12;
+          child: Box {
+            orientation: vertical;
 
-            child: Adw.PreferencesGroup clip_group {
-              Adw.ActionRow length_row {
-                title: _("Length");
+            $TransientWaveformView waveform {
+              vexpand: true;
+              margin-top: 12;
+              margin-bottom: 12;
+              adjustment: Adjustment view_adjustment {};
 
-                styles [
-                  "property",
-                ]
+              accessibility {
+                label: _("Waveform");
               }
+            }
 
-              Adw.ActionRow format_row {
-                title: _("Original Format");
-
-                styles [
-                  "property",
-                ]
-              }
-
-              Adw.ActionRow location_row {
-                title: _("Location");
-                subtitle-selectable: true;
-
-                styles [
-                  "property",
-                ]
-              }
-            };
+            Scrollbar {
+              orientation: horizontal;
+              adjustment: view_adjustment;
+            }
           };
         }
       };
@@ -141,28 +132,33 @@ template $TransientWindow: Adw.ApplicationWindow {
           ]
         }
 
-        Scale position_scale {
-          hexpand: true;
-
-          adjustment: Adjustment {
-            lower: 0;
-            upper: 1;
-            step-increment: 1;
-            page-increment: 10;
-          };
-
-          accessibility {
-            label: _("Playback Position");
-          }
-        }
-
         Label duration_label {
-          label: "0:00.000";
+          label: "/ 0:00.000";
+          hexpand: true;
+          xalign: 0;
 
           styles [
             "numeric",
             "dimmed",
           ]
+        }
+
+        Button {
+          icon-name: "zoom-out-symbolic";
+          tooltip-text: _("Zoom Out");
+          action-name: "win.zoom-out";
+        }
+
+        Button {
+          icon-name: "zoom-fit-best-symbolic";
+          tooltip-text: _("Zoom to Fit");
+          action-name: "win.zoom-fit";
+        }
+
+        Button {
+          icon-name: "zoom-in-symbolic";
+          tooltip-text: _("Zoom In");
+          action-name: "win.zoom-in";
         }
       }
     };

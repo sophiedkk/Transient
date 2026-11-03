@@ -22,6 +22,25 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("View");
+
+    Adw.ShortcutsItem {
+      title: _("Zoom In");
+      action-name: "win.zoom-in";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Zoom Out");
+      action-name: "win.zoom-out";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Zoom to Fit");
+      action-name: "win.zoom-fit";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("General");
 
     Adw.ShortcutsItem {

@@ -6,3 +6,4 @@
 pub mod audio;
 pub mod project;
 pub mod time;
+pub mod waveform;

@@ -5,6 +5,7 @@
 //! transient --play --silent song.flac       # play it without sound output
 //! transient --screenshot=shot.png song.flac # save an image of the window, then quit
 //! transient --play --quit-after=5 song.flac # quit after five seconds
+//! transient --seek=30 --zoom=4 song.flac    # zoom in around 0:30
 //! ```
 //!
 //! `transient --help` lists the options. They are meant for testing (by people
@@ -37,6 +38,10 @@ pub(crate) struct LaunchOptions {
     pub(crate) screenshot: Option<PathBuf>,
     /// Quit after this many seconds.
     pub(crate) quit_after: Option<u32>,
+    /// Move the playhead to this position (in seconds) after opening.
+    pub(crate) seek: Option<f64>,
+    /// Zoom in this many steps (around the playhead) after opening.
+    pub(crate) zoom: Option<u32>,
 }
 
 impl LaunchOptions {
@@ -68,6 +73,22 @@ impl LaunchOptions {
             Some("FILE"),
         );
         app.add_main_option(
+            "seek",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::Double,
+            "Move the playhead to SECONDS after opening",
+            Some("SECONDS"),
+        );
+        app.add_main_option(
+            "zoom",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::Int,
+            "Zoom in STEPS times after opening",
+            Some("STEPS"),
+        );
+        app.add_main_option(
             "quit-after",
             glib::Char::from(0),
             none,
@@ -88,13 +109,24 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .and_then(|seconds| u32::try_from(seconds).ok()),
+            seek: dict.lookup::<f64>("seek").ok().flatten(),
+            zoom: dict
+                .lookup::<i32>("zoom")
+                .ok()
+                .flatten()
+                .and_then(|steps| u32::try_from(steps).ok()),
         }
     }
 
     /// Whether this is an automated run, which should get its own process
     /// instead of handing its files to an already-running Transient.
     pub(crate) fn is_automated(&self) -> bool {
-        self.play || self.silent || self.screenshot.is_some() || self.quit_after.is_some()
+        self.play
+            || self.silent
+            || self.screenshot.is_some()
+            || self.quit_after.is_some()
+            || self.seek.is_some()
+            || self.zoom.is_some()
     }
 
     /// Carries out the options for a freshly shown window.
@@ -104,6 +136,15 @@ impl LaunchOptions {
         }
         if !files.is_empty() {
             window.import_files(&files).await;
+        }
+        if self.seek.is_some() || self.zoom.is_some() {
+            wait_for_layout(&window).await;
+        }
+        if let Some(seconds) = self.seek {
+            window.seek_to_seconds(seconds);
+        }
+        for _ in 0..self.zoom.unwrap_or(0) {
+            window.zoom_in();
         }
         if self.play {
             window.toggle_playback();
@@ -120,6 +161,16 @@ impl LaunchOptions {
             info!("quitting as requested on the command line");
             app.quit();
         }
+    }
+}
+
+/// Waits (up to 2 seconds) until the waveform has a size, so zooming can work.
+async fn wait_for_layout(window: &Window) {
+    for _ in 0..40 {
+        if window.is_laid_out() {
+            return;
+        }
+        glib::timeout_future(Duration::from_millis(50)).await;
     }
 }
 

@@ -47,13 +47,7 @@ impl SampleRate {
     /// Converts a frame count to seconds.
     #[must_use]
     pub fn frames_to_seconds(self, frames: Frames) -> f64 {
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_precision_loss,
-            reason = "exact for every count below 2^53 frames (see MAX_EXACT_FRAMES)"
-        )]
-        let frames = frames as f64;
-        frames / f64::from(self.hz())
+        frames_to_f64(frames) / f64::from(self.hz())
     }
 
     /// Converts seconds to the nearest frame count.
@@ -62,18 +56,38 @@ impl SampleRate {
     /// large to count exactly.
     #[must_use]
     pub fn seconds_to_frames(self, seconds: f64) -> Option<Frames> {
-        let frames = (seconds * f64::from(self.hz())).round();
-        if !(0.0..=MAX_EXACT_FRAMES).contains(&frames) {
-            return None;
-        }
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "range-checked above: a whole number in 0..=2^53"
-        )]
-        Some(frames as Frames)
+        frames_from_f64(seconds * f64::from(self.hz()))
     }
+}
+
+/// A frame count as `f64`, for maths with pixels and zoom levels.
+/// Exact for every count below 2^53 frames (see `MAX_EXACT_FRAMES`).
+#[must_use]
+pub fn frames_to_f64(frames: Frames) -> f64 {
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_precision_loss,
+        reason = "exact for every count below 2^53 frames (see MAX_EXACT_FRAMES)"
+    )]
+    let frames = frames as f64;
+    frames
+}
+
+/// The nearest whole frame to `value`, or `None` for negative, infinite or NaN
+/// values and for values too large to count exactly.
+#[must_use]
+pub fn frames_from_f64(value: f64) -> Option<Frames> {
+    let frames = value.round();
+    if !(0.0..=MAX_EXACT_FRAMES).contains(&frames) {
+        return None;
+    }
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "range-checked above: a whole number in 0..=2^53"
+    )]
+    Some(frames as Frames)
 }
 
 /// Formats a timeline position for display, like `1:02.345` (minutes, seconds,

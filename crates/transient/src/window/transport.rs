@@ -1,4 +1,5 @@
-//! The transport bar: play/pause, go to start, the position slider and time display.
+//! The transport bar: play/pause, go to start, the time display and zoom buttons,
+//! plus seeking by clicking on the waveform.
 //!
 //! The player runs on GStreamer's threads; the window asks it for the position
 //! a few times per second (`update_transport`) and updates the controls.
@@ -23,17 +24,13 @@ impl Window {
     pub(super) fn setup_transport(&self) {
         self.set_playback_enabled(false);
 
-        // `change-value` only fires when the *user* moves the slider, not when
-        // the code updates it, so there is no feedback loop.
+        // Clicking or dragging on the waveform seeks.
         let weak = self.downgrade();
-        self.imp()
-            .position_scale
-            .connect_change_value(move |_, _, seconds| {
-                if let Some(window) = weak.upgrade() {
-                    window.seek_to_seconds(seconds);
-                }
-                glib::Propagation::Proceed
-            });
+        self.imp().waveform.connect_seek(move |_, frame| {
+            if let Some(window) = weak.upgrade() {
+                window.seek_to_frame(frame);
+            }
+        });
 
         // A weak reference, so this timer does not keep a closed window alive.
         let weak = self.downgrade();
@@ -49,10 +46,8 @@ impl Window {
     /// Prepares the controls for a newly opened file of `frames` length.
     pub(super) fn reset_transport(&self, frames: Frames, rate: SampleRate) {
         let imp = self.imp();
-        imp.position_scale
-            .set_range(0.0, rate.frames_to_seconds(frames).max(0.001));
-        imp.position_scale.set_value(0.0);
-        imp.duration_label.set_label(&format_position(frames, rate));
+        imp.duration_label
+            .set_label(&format!("/ {}", format_position(frames, rate)));
         imp.toolbar_view.set_reveal_bottom_bars(true);
         self.set_playback_enabled(true);
         self.update_transport();
@@ -79,7 +74,7 @@ impl Window {
     }
 
     /// Jumps to a position (the `win.go-to-start` action uses frame 0).
-    pub(super) fn seek_to_frame(&self, frame: Frames) {
+    pub(crate) fn seek_to_frame(&self, frame: Frames) {
         let result = self
             .imp()
             .player
@@ -89,10 +84,13 @@ impl Window {
         if let Some(Err(error)) = result {
             warn!("seeking failed: {error}");
         }
+        // After a deliberate jump, make sure the playhead is in view.
+        self.imp().waveform.set_playhead(frame, true);
         self.update_transport();
     }
 
-    fn seek_to_seconds(&self, seconds: f64) {
+    /// Jumps to a position in seconds (used by `--seek`).
+    pub(crate) fn seek_to_seconds(&self, seconds: f64) {
         let rate = self.imp().player.borrow().as_ref().map(Player::sample_rate);
         if let Some(frame) = rate.and_then(|rate| rate.seconds_to_frames(seconds.max(0.0))) {
             self.seek_to_frame(frame);
@@ -122,8 +120,8 @@ impl Window {
 
         imp.position_label
             .set_label(&format_position(position, rate));
-        imp.position_scale
-            .set_value(rate.frames_to_seconds(position));
+        // While playing, the view scrolls along with the playhead.
+        imp.waveform.set_playhead(position, playing);
         let (icon, tooltip) = if playing {
             ("media-playback-pause-symbolic", gettext("Pause"))
         } else {
@@ -136,5 +134,8 @@ impl Window {
     fn set_playback_enabled(&self, enabled: bool) {
         self.action_set_enabled("win.play-pause", enabled);
         self.action_set_enabled("win.go-to-start", enabled);
+        self.action_set_enabled("win.zoom-in", enabled);
+        self.action_set_enabled("win.zoom-out", enabled);
+        self.action_set_enabled("win.zoom-fit", enabled);
     }
 }
