@@ -5,14 +5,16 @@
 //! - `imp.rs`: the *private* implementation that GTK calls into
 //!   (template children, lifecycle hooks such as "window is closing").
 //!
-//! The methods are spread over a few files by topic:
-//! `import.rs` (opening files) and `transport.rs` (play, pause, seek).
+//! The methods are spread over a few files by topic: `import.rs` (opening files),
+//! `project.rs` (the project and everything shown from it) and `transport.rs`
+//! (play, pause, seek).
 //!
 //! See the gtk-rs book, chapter "GObject Subclassing":
 //! <https://gtk-rs.org/gtk4-rs/stable/latest/book/g_object_subclassing.html>
 
 mod imp;
 mod import;
+mod project;
 mod transport;
 
 use std::path::Path;
@@ -44,14 +46,14 @@ impl Window {
         self.imp().audio_output.set(output);
     }
 
-    /// Zooms the waveform in one step (also used by `--zoom`).
+    /// Zooms the timeline in one step (also used by `--zoom`).
     pub(crate) fn zoom_in(&self) {
-        self.imp().waveform.zoom_in();
+        self.imp().timeline.zoom_in();
     }
 
-    /// Whether the waveform has been given a size yet.
+    /// Whether the timeline has been given a size yet.
     pub(crate) fn is_laid_out(&self) -> bool {
-        self.imp().waveform.is_laid_out()
+        self.imp().timeline.is_laid_out()
     }
 
     /// Shows a short message at the bottom of the window.

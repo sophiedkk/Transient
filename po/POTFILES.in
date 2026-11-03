@@ -6,4 +6,5 @@ crates/transient/resources/ui/window.blp
 crates/transient/resources/ui/shortcuts-dialog.blp
 crates/transient/src/application.rs
 crates/transient/src/window/import.rs
+crates/transient/src/window/project.rs
 crates/transient/src/window/transport.rs

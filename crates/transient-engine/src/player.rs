@@ -7,18 +7,20 @@
 //! ```
 //!
 //! `appsrc` is GStreamer's door for data coming *from* our code. Whenever the
-//! pipeline wants more audio it calls `need-data`, and we push the next chunk of
-//! the buffer. When the user seeks, GStreamer calls `seek-data` with the new
+//! pipeline wants more audio it calls `need-data`, and we render the next chunk
+//! of the [`Mix`]. When the user seeks, GStreamer calls `seek-data` with the new
 //! position and we continue from there. These callbacks run on GStreamer's own
-//! threads, so the playback position is shared through a `Mutex`.
+//! threads, so the mix and position are shared through a `Mutex`.
 //!
-//! In milestone 3 the source becomes the mixer instead of a single buffer.
+//! After an edit, [`Player::set_mix`] swaps in the new mix; playback continues
+//! with it from the next chunk on.
 
 use std::sync::{Arc, Mutex};
 
 use gstreamer::prelude::*;
 use gstreamer_app::{AppSrc, AppSrcCallbacks, AppStreamType};
-use transient_core::audio::{AudioBuffer, CHANNELS};
+use transient_core::audio::CHANNELS;
+use transient_core::mix::Mix;
 use transient_core::time::{Frames, SampleRate};
 
 use crate::{EngineError, make_element};
@@ -48,15 +50,16 @@ pub enum PlayerEvent {
 /// What the `need-data` and `seek-data` callbacks share.
 #[derive(Debug)]
 struct Source {
-    buffer: AudioBuffer,
+    mix: Mix,
     /// The next frame to hand to GStreamer.
     next_frame: Frames,
 }
 
-/// Plays one [`AudioBuffer`].
+/// Plays a [`Mix`].
 #[derive(Debug)]
 pub struct Player {
     pipeline: gstreamer::Pipeline,
+    source: Arc<Mutex<Source>>,
     sample_rate: SampleRate,
     duration: Frames,
     playing: bool,
@@ -66,14 +69,14 @@ pub struct Player {
 }
 
 impl Player {
-    /// Builds a player for `buffer`, paused at the start.
+    /// Builds a player for `mix`, paused at the start.
     ///
     /// # Errors
     ///
     /// Returns [`EngineError`] if the pipeline cannot be built.
-    pub fn new(buffer: AudioBuffer, output: AudioOutput) -> Result<Self, EngineError> {
-        let sample_rate = buffer.sample_rate();
-        let duration = buffer.frames();
+    pub fn new(mix: Mix, output: AudioOutput) -> Result<Self, EngineError> {
+        let sample_rate = mix.sample_rate();
+        let duration = mix.length();
         let channels = u32::try_from(CHANNELS).unwrap_or(2);
         let caps = gstreamer_audio::AudioInfo::builder(
             gstreamer_audio::AudioFormat::F32le,
@@ -88,10 +91,7 @@ impl Player {
             .format(gstreamer::Format::Time)
             .stream_type(AppStreamType::Seekable)
             .build();
-        let source = Arc::new(Mutex::new(Source {
-            buffer,
-            next_frame: 0,
-        }));
+        let source = Arc::new(Mutex::new(Source { mix, next_frame: 0 }));
         appsrc.set_callbacks(callbacks(&source, sample_rate));
 
         let convert = make_element("audioconvert")?;
@@ -112,6 +112,7 @@ impl Player {
 
         Ok(Self {
             pipeline,
+            source,
             sample_rate,
             duration,
             playing: false,
@@ -177,6 +178,15 @@ impl Player {
             .min(self.duration)
     }
 
+    /// Replaces what is played, keeping the position. Used after every edit.
+    /// Audio GStreamer has already received (about 0.1 s) still plays as it was.
+    pub fn set_mix(&mut self, mix: Mix) {
+        self.duration = mix.length();
+        if let Ok(mut source) = self.source.lock() {
+            source.mix = mix;
+        }
+    }
+
     /// The length of the audio in frames.
     #[must_use]
     pub fn duration(&self) -> Frames {
@@ -240,14 +250,16 @@ fn callbacks(source: &Arc<Mutex<Source>>, sample_rate: SampleRate) -> AppSrcCall
                 return;
             };
             let start = source.next_frame;
-            let samples = source.buffer.frames_from(start, CHUNK_FRAMES);
-            if samples.is_empty() {
+            let remaining = source.mix.length().saturating_sub(start);
+            if remaining == 0 {
                 if let Err(error) = appsrc.end_of_stream() {
                     tracing::debug!("end of stream: {error}");
                 }
                 return;
             }
-            let frames = Frames::try_from(samples.len() / CHANNELS).unwrap_or(0);
+            let frames = remaining.min(Frames::try_from(CHUNK_FRAMES).unwrap_or(1));
+            let mut samples = vec![0.0; usize::try_from(frames).unwrap_or(0) * CHANNELS];
+            source.mix.render(start, &mut samples);
             let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
             let mut buffer = gstreamer::Buffer::from_mut_slice(bytes);
             if let Some(buffer) = buffer.get_mut() {
@@ -288,10 +300,19 @@ fn time_to_frames(time: gstreamer::ClockTime, rate: SampleRate) -> Frames {
 mod tests {
     use std::time::{Duration, Instant};
 
+    use transient_core::audio::AudioBuffer;
+    use transient_core::mix::AudioPool;
+    use transient_core::project::Project;
+
     use super::*;
 
-    fn quarter_second() -> AudioBuffer {
-        AudioBuffer::new(SampleRate::HZ_48000, vec![0.1; 2 * 12_000]).unwrap()
+    /// A mix of one quarter-second clip.
+    fn quarter_second() -> Mix {
+        let mut project = Project::default();
+        let track = project.import("tone.wav".into(), 12_000, "tone".to_owned());
+        let source = project.track(track).unwrap().clips[0].source;
+        let audio = AudioBuffer::new(SampleRate::HZ_48000, vec![0.1; 2 * 12_000]).unwrap();
+        Mix::new(&project, &AudioPool::from([(source, audio)]))
     }
 
     #[test]

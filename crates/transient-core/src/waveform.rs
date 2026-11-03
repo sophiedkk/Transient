@@ -12,6 +12,8 @@
 //!
 //! The pyramid costs about 1/100 of the audio's memory.
 
+use std::ops::Range;
+
 use crate::audio::{AudioBuffer, CHANNELS};
 use crate::time::{Frames, frames_from_f64};
 
@@ -105,6 +107,19 @@ impl Waveform {
     /// Columns before the start or after the end of the audio are `None`.
     #[must_use]
     pub fn peaks(&self, start: f64, frames_per_column: f64, columns: usize) -> Vec<Option<Peak>> {
+        self.peaks_within(0..self.buffer.frames(), start, frames_per_column, columns)
+    }
+
+    /// Like [`Self::peaks`], but only looking at the frames in `range`: a clip
+    /// shows only its own part of the source, even when trimmed.
+    #[must_use]
+    pub fn peaks_within(
+        &self,
+        range: Range<Frames>,
+        start: f64,
+        frames_per_column: f64,
+        columns: usize,
+    ) -> Vec<Option<Peak>> {
         let frames_per_column = frames_per_column.max(f64::MIN_POSITIVE);
         let level = self.level_for(frames_per_column);
         (0..columns)
@@ -114,9 +129,19 @@ impl Waveform {
                 // Every column covers at least one frame, even when zoomed in very far.
                 let end_frame =
                     frames_from_f64((first + frames_per_column).ceil())?.max(first_frame + 1);
+                let clamped_first = first_frame.max(range.start);
+                let clamped_end = end_frame.min(range.end);
+                if clamped_first >= clamped_end {
+                    return None;
+                }
+                // Whole blocks would include audio outside the range, so columns at
+                // the range's edges read the samples themselves.
+                let at_edge = clamped_first != first_frame || clamped_end != end_frame;
                 match level {
-                    Some(level) => self.peak_from_level(level, first_frame, end_frame),
-                    None => self.peak_from_samples(first_frame, end_frame),
+                    Some(level) if !at_edge => {
+                        self.peak_from_level(level, clamped_first, clamped_end)
+                    }
+                    _ => self.peak_from_samples(clamped_first, clamped_end),
                 }
             })
             .collect()
@@ -223,6 +248,22 @@ mod tests {
         assert_eq!(peaks[0], None, "before the start");
         assert!(peaks[1].is_some());
         assert_eq!(peaks[11], None, "after the end");
+    }
+
+    #[test]
+    fn a_range_hides_audio_outside_it() {
+        // Loud first half, silent second half; show only frames 500..1000.
+        let mut samples = vec![0.9; 2 * 500];
+        samples.extend(vec![0.0; 2 * 500]);
+        let w = waveform(samples);
+        for frames_per_column in [1.0, 100.0, 300.0, 1000.0] {
+            let peaks = w.peaks_within(500..1000, 0.0, frames_per_column, 20);
+            let loudest = peaks.iter().flatten().map(|p| p.max).fold(0.0, f32::max);
+            assert!(
+                loudest.abs() < f32::EPSILON,
+                "{frames_per_column}: {loudest}"
+            );
+        }
     }
 
     proptest! {

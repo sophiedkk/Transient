@@ -5,10 +5,12 @@ use std::cell::{Cell, OnceCell, RefCell};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{CompositeTemplate, gio, glib};
+use transient_core::project::Project;
 use transient_engine::player::{AudioOutput, Player};
 
+use super::project::LoadedSources;
 use crate::config;
-use crate::widgets::waveform_view::WaveformView;
+use crate::widgets::timeline_view::TimelineView;
 
 /// The window's state. `#[template_child]` fields are filled in from window.blp
 /// by matching the field name to the object id there.
@@ -26,7 +28,9 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) loading_page: TemplateChild<adw::StatusPage>,
     #[template_child]
-    pub(super) waveform: TemplateChild<WaveformView>,
+    pub(super) track_headers: TemplateChild<gtk::Box>,
+    #[template_child]
+    pub(super) timeline: TemplateChild<TimelineView>,
     #[template_child]
     pub(super) play_button: TemplateChild<gtk::Button>,
     #[template_child]
@@ -35,7 +39,11 @@ pub(crate) struct Window {
     pub(super) duration_label: TemplateChild<gtk::Label>,
 
     pub(super) settings: OnceCell<gio::Settings>,
-    /// The open file's player; `None` until a file is imported.
+    /// The open project (what gets saved).
+    pub(super) project: RefCell<Project>,
+    /// The decoded audio of the project's sources.
+    pub(super) sources: RefCell<LoadedSources>,
+    /// Plays the project's mix; `None` until something is imported.
     pub(super) player: RefCell<Option<Player>>,
     /// Where playback goes (`--silent` sends it nowhere).
     pub(super) audio_output: Cell<AudioOutput>,
@@ -49,8 +57,8 @@ impl ObjectSubclass for Window {
     type ParentType = adw::ApplicationWindow;
 
     fn class_init(klass: &mut Self::Class) {
-        // window.blp uses $TransientWaveformView, so its type must exist first.
-        WaveformView::ensure_type();
+        // window.blp uses $TransientTimelineView, so its type must exist first.
+        TimelineView::ensure_type();
         klass.bind_template();
 
         // `win.import-audio`: used by the header bar button, the empty-state button
@@ -68,10 +76,10 @@ impl ObjectSubclass for Window {
             window.zoom_in();
         });
         klass.install_action("win.zoom-out", None, |window, _, _| {
-            window.imp().waveform.zoom_out();
+            window.imp().timeline.zoom_out();
         });
         klass.install_action("win.zoom-fit", None, |window, _, _| {
-            window.imp().waveform.zoom_to_fit();
+            window.imp().timeline.zoom_to_fit();
         });
     }
 

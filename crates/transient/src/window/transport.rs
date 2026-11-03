@@ -1,5 +1,5 @@
 //! The transport bar: play/pause, go to start, the time display and zoom buttons,
-//! plus seeking by clicking on the waveform.
+//! plus seeking by clicking on the timeline.
 //!
 //! The player runs on GStreamer's threads; the window asks it for the position
 //! a few times per second (`update_transport`) and updates the controls.
@@ -11,7 +11,7 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::glib;
 use tracing::warn;
-use transient_core::time::{Frames, SampleRate, format_position};
+use transient_core::time::{Frames, format_position};
 use transient_engine::player::{Player, PlayerEvent};
 
 use super::Window;
@@ -24,9 +24,9 @@ impl Window {
     pub(super) fn setup_transport(&self) {
         self.set_playback_enabled(false);
 
-        // Clicking or dragging on the waveform seeks.
+        // Clicking or dragging on the timeline seeks.
         let weak = self.downgrade();
-        self.imp().waveform.connect_seek(move |_, frame| {
+        self.imp().timeline.connect_seek(move |_, frame| {
             if let Some(window) = weak.upgrade() {
                 window.seek_to_frame(frame);
             }
@@ -41,16 +41,6 @@ impl Window {
             window.update_transport();
             glib::ControlFlow::Continue
         });
-    }
-
-    /// Prepares the controls for a newly opened file of `frames` length.
-    pub(super) fn reset_transport(&self, frames: Frames, rate: SampleRate) {
-        let imp = self.imp();
-        imp.duration_label
-            .set_label(&format!("/ {}", format_position(frames, rate)));
-        imp.toolbar_view.set_reveal_bottom_bars(true);
-        self.set_playback_enabled(true);
-        self.update_transport();
     }
 
     /// Plays if paused, pauses if playing (the `win.play-pause` action, Space).
@@ -85,7 +75,7 @@ impl Window {
             warn!("seeking failed: {error}");
         }
         // After a deliberate jump, make sure the playhead is in view.
-        self.imp().waveform.set_playhead(frame, true);
+        self.imp().timeline.set_playhead(frame, true);
         self.update_transport();
     }
 
@@ -121,7 +111,7 @@ impl Window {
         imp.position_label
             .set_label(&format_position(position, rate));
         // While playing, the view scrolls along with the playhead.
-        imp.waveform.set_playhead(position, playing);
+        imp.timeline.set_playhead(position, playing);
         let (icon, tooltip) = if playing {
             ("media-playback-pause-symbolic", gettext("Pause"))
         } else {
@@ -131,7 +121,7 @@ impl Window {
         imp.play_button.set_tooltip_text(Some(&tooltip));
     }
 
-    fn set_playback_enabled(&self, enabled: bool) {
+    pub(super) fn set_playback_enabled(&self, enabled: bool) {
         self.action_set_enabled("win.play-pause", enabled);
         self.action_set_enabled("win.go-to-start", enabled);
         self.action_set_enabled("win.zoom-in", enabled);

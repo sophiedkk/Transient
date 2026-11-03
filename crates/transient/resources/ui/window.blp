@@ -78,27 +78,65 @@ template $TransientWindow: Adw.ApplicationWindow {
           };
         }
 
-        // An open file: its waveform, with a scrollbar sharing the visible range.
+        // The project: track headers on the left, the timeline on the right. They
+        // scroll vertically together; the horizontal scrollbar sits under the timeline.
         Adw.ViewStackPage {
-          name: "clip";
+          name: "project";
 
           child: Box {
             orientation: vertical;
 
-            $TransientWaveformView waveform {
+            ScrolledWindow {
               vexpand: true;
-              margin-top: 12;
-              margin-bottom: 12;
-              adjustment: Adjustment view_adjustment {};
+              hscrollbar-policy: never;
 
-              accessibility {
-                label: _("Waveform");
-              }
+              child: Box {
+                Box headers_column {
+                  orientation: vertical;
+                  width-request: 200;
+
+                  styles [
+                    "track-headers",
+                  ]
+
+                  // Leaves room for the time ruler at the top of the timeline.
+                  Box {
+                    height-request: 28;
+                  }
+
+                  Box track_headers {
+                    orientation: vertical;
+                  }
+                }
+
+                Separator {
+                  orientation: vertical;
+                }
+
+                $TransientTimelineView timeline {
+                  hexpand: true;
+                  vexpand: true;
+                  adjustment: Adjustment view_adjustment {};
+
+                  accessibility {
+                    label: _("Timeline");
+                  }
+                }
+              };
             }
 
-            Scrollbar {
-              orientation: horizontal;
-              adjustment: view_adjustment;
+            Box {
+              Box scrollbar_spacer {}
+
+              Separator {
+                orientation: vertical;
+              }
+
+              Scrollbar {
+                hexpand: true;
+                orientation: horizontal;
+                adjustment: view_adjustment;
+              }
             }
           };
         }
@@ -177,4 +215,15 @@ menu primary_menu {
       action: "app.about";
     }
   }
+}
+
+// Keeps the space under the track headers exactly as wide as the headers, so the
+// scrollbar lines up with the timeline.
+SizeGroup {
+  mode: horizontal;
+
+  widgets [
+    headers_column,
+    scrollbar_spacer,
+  ]
 }

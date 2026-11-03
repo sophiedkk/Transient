@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: transient\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 14:06+0100\n"
+"POT-Creation-Date: 2026-11-03 14:29+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -68,7 +68,7 @@ msgstr ""
 
 #: crates/transient/resources/ui/window.blp:31
 #: crates/transient/resources/ui/shortcuts-dialog.blp:47
-#: crates/transient/src/window/import.rs:28
+#: crates/transient/src/window/import.rs:27
 msgid "Import Audio"
 msgstr ""
 
@@ -88,40 +88,40 @@ msgstr ""
 msgid "_Import Audio…"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:95
-msgid "Waveform"
+#: crates/transient/resources/ui/window.blp:122
+msgid "Timeline"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:117
+#: crates/transient/resources/ui/window.blp:155
 #: crates/transient/resources/ui/shortcuts-dialog.blp:19
 msgid "Go to Start"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:123
-#: crates/transient/src/window/transport.rs:128
+#: crates/transient/resources/ui/window.blp:161
+#: crates/transient/src/window/transport.rs:118
 msgid "Play"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:148
+#: crates/transient/resources/ui/window.blp:186
 #: crates/transient/resources/ui/shortcuts-dialog.blp:33
 msgid "Zoom Out"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:154
+#: crates/transient/resources/ui/window.blp:192
 #: crates/transient/resources/ui/shortcuts-dialog.blp:38
 msgid "Zoom to Fit"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:160
+#: crates/transient/resources/ui/window.blp:198
 #: crates/transient/resources/ui/shortcuts-dialog.blp:28
 msgid "Zoom In"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:171
+#: crates/transient/resources/ui/window.blp:209
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:176
+#: crates/transient/resources/ui/window.blp:214
 msgid "_About Transient"
 msgstr ""
 
@@ -158,56 +158,81 @@ msgstr ""
 msgid "translator-credits"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:22
+#: crates/transient/src/window/import.rs:21
 msgid "Audio Files"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:43
+#: crates/transient/src/window/import.rs:42
 msgid "Could not open the file chooser"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:56
-msgid "Only one file can be opened at a time for now"
-msgstr ""
-
-#: crates/transient/src/window/import.rs:59
+#: crates/transient/src/window/import.rs:52
 msgid "Only files on this computer can be opened"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:68
+#: crates/transient/src/window/import.rs:61
 #, rust-format
 msgid "Opening “{}”"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:91
+#: crates/transient/src/window/import.rs:64
+#, rust-format
+msgid "Opening {} File"
+msgid_plural "Opening {} Files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/transient/src/window/import.rs:103
 #, rust-format
 msgid "Could not open “{}”"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:144
+#: crates/transient/src/window/import.rs:107
+#, rust-format
+msgid "Could not open {} file"
+msgid_plural "Could not open {} files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/transient/src/window/import.rs:161
 msgid "Unknown"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:156
+#: crates/transient/src/window/import.rs:173
 msgid "Mono"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:157
+#: crates/transient/src/window/import.rs:174
 msgid "Stereo"
 msgstr ""
 
-#: crates/transient/src/window/import.rs:158
+#: crates/transient/src/window/import.rs:175
 #, rust-format
 msgid "{} channel"
 msgid_plural "{} channels"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/transport.rs:71
-#: crates/transient/src/window/transport.rs:117
+#: crates/transient/src/window/project.rs:53
+msgid "Untitled Project"
+msgstr ""
+
+#: crates/transient/src/window/project.rs:57
+#, rust-format
+msgid "{} track"
+msgid_plural "{} tracks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/transient/src/window/project.rs:90
+msgid "Playback is not available"
+msgstr ""
+
+#: crates/transient/src/window/transport.rs:61
+#: crates/transient/src/window/transport.rs:107
 msgid "Playback failed"
 msgstr ""
 
-#: crates/transient/src/window/transport.rs:126
+#: crates/transient/src/window/transport.rs:116
 msgid "Pause"
 msgstr ""

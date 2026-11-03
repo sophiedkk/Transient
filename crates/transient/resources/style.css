@@ -1,0 +1,9 @@
+/* Transient's own styles. Libadwaita loads this file automatically.
+   Colours use Libadwaita's CSS variables, so light, dark and high-contrast
+   modes all work. https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/css-variables.html */
+
+/* One header per track, as tall as a timeline lane (LANE_HEIGHT in timeline_view). */
+.track-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid alpha(currentColor, 0.08);
+}

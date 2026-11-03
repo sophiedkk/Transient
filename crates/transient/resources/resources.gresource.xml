@@ -5,6 +5,8 @@
 <gresources>
   <gresource prefix="/io/github/sophiedkk/Transient/">
     <file preprocess="xml-stripblanks">ui/window.ui</file>
+    <!-- Libadwaita loads style.css from the resource base path automatically. -->
+    <file>style.css</file>
     <!-- Libadwaita loads this file automatically and adds the app.shortcuts action (Ctrl+?). -->
     <file alias="shortcuts-dialog.ui" preprocess="xml-stripblanks">ui/shortcuts-dialog.ui</file>
   </gresource>

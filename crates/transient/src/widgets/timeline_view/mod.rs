@@ -1,21 +1,27 @@
-//! `WaveformView`: draws a waveform with a playhead, and handles seeking,
-//! scrolling and zooming.
+//! `TimelineView`: the timeline. A time ruler on top, one lane per track below
+//! it with the clips and their waveforms, and a playhead across everything.
 //!
 //! - Click or drag: emits `seek` with the frame under the pointer.
-//! - Scroll: moves through the file. Ctrl+scroll: zooms around the pointer.
+//! - Scroll: moves through the timeline. Ctrl+scroll: zooms around the pointer.
 //! - The visible range lives in a `gtk::Adjustment` (seconds), which a
 //!   `gtk::Scrollbar` can share, giving a scrollbar for free.
 //!
-//! Drawing happens in [`WaveformView::draw`]: the waveform is one filled shape
-//! (top edge along the maxima, back along the minima), in the accent colour.
+//! The lanes line up with the track headers next to the view because both use
+//! [`RULER_HEIGHT`] and [`LANE_HEIGHT`]. Drawing is in `draw.rs`.
 
+mod draw;
 mod imp;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::{gdk, glib, graphene, gsk};
-use transient_core::time::{Frames, frames_from_f64, frames_to_f64};
+use gtk::{gdk, glib};
+use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
 use transient_core::waveform::Waveform;
+
+/// Height of the time ruler, in pixels.
+pub(crate) const RULER_HEIGHT: i32 = 28;
+/// Height of one track lane, in pixels. Track headers use the same height.
+pub(crate) const LANE_HEIGHT: i32 = 96;
 
 /// The furthest zoom in: 16 pixels per frame.
 const MIN_FRAMES_PER_PIXEL: f64 = 1.0 / 16.0;
@@ -23,28 +29,50 @@ const MIN_FRAMES_PER_PIXEL: f64 = 1.0 / 16.0;
 const ZOOM_STEP: f64 = 2.0;
 /// While following the playhead, keep it this far (fraction of the view) from the edge.
 const FOLLOW_MARGIN: f64 = 0.05;
-/// The waveform uses this much of the half-height, leaving a little room.
-const HEADROOM: f32 = 0.95;
+
+/// A clip as the timeline draws it.
+#[derive(Debug, Clone)]
+pub(crate) struct LaneClip {
+    /// Where it starts on the timeline.
+    pub(crate) start: Frames,
+    /// Where in the source it starts.
+    pub(crate) offset: Frames,
+    /// How long it plays.
+    pub(crate) length: Frames,
+    /// The source's waveform overview.
+    pub(crate) waveform: Waveform,
+    /// The label drawn on the clip.
+    pub(crate) name: String,
+}
+
+/// One track's row in the timeline.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Lane {
+    /// The clips on this track.
+    pub(crate) clips: Vec<LaneClip>,
+}
 
 glib::wrapper! {
-    /// Draws a waveform with a playhead.
-    pub(crate) struct WaveformView(ObjectSubclass<imp::WaveformView>)
+    /// The timeline: ruler, track lanes with clips, and the playhead.
+    pub(crate) struct TimelineView(ObjectSubclass<imp::TimelineView>)
         @extends gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-impl WaveformView {
-    /// Shows `waveform` (or nothing), zoomed to fit, with the playhead at the start.
-    pub(crate) fn set_waveform(&self, waveform: Option<Waveform>) {
+impl TimelineView {
+    /// Shows `lanes`. `length` is the end of the last clip. The zoom level and
+    /// scroll position are kept, unless the view was zoomed to fit.
+    pub(crate) fn set_lanes(&self, lanes: Vec<Lane>, sample_rate: SampleRate, length: Frames) {
         let imp = self.imp();
-        imp.waveform.replace(waveform);
-        imp.playhead.set(0);
-        imp.fit.set(true);
-        if let Some(adjustment) = self.adjustment() {
-            adjustment.set_value(0.0);
+        let lane_count_changed = imp.lanes.borrow().len() != lanes.len();
+        imp.lanes.replace(lanes);
+        imp.sample_rate.set(Some(sample_rate));
+        imp.length.set(length);
+        if lane_count_changed {
+            // The height depends on the number of lanes.
+            self.queue_resize();
         }
         self.update_adjustment();
-        self.queue_draw();
     }
 
     /// Moves the playhead. With `follow`, scrolls so that it stays visible.
@@ -73,7 +101,7 @@ impl WaveformView {
         self.zoom_by(ZOOM_STEP, self.zoom_anchor());
     }
 
-    /// Shows the whole file.
+    /// Shows the whole timeline.
     pub(crate) fn zoom_to_fit(&self) {
         self.imp().fit.set(true);
         self.update_adjustment();
@@ -88,36 +116,36 @@ impl WaveformView {
         );
     }
 
-    /// The sample rate and length of the waveform, if one is set.
-    fn rate_and_length(&self) -> Option<(f64, Frames)> {
-        let waveform = self.imp().waveform.borrow();
-        let buffer = waveform.as_ref()?.buffer();
-        Some((f64::from(buffer.sample_rate().hz()), buffer.frames()))
+    /// Frames per second, or `None` while the timeline is empty.
+    fn rate(&self) -> Option<f64> {
+        let imp = self.imp();
+        let rate = imp.sample_rate.get()?;
+        (imp.length.get() > 0).then(|| f64::from(rate.hz()))
     }
 
-    /// The zoom level that shows the whole file in the current width.
+    /// The zoom level that shows the whole timeline in the current width.
     fn fit_frames_per_pixel(&self) -> Option<f64> {
-        let (_, length) = self.rate_and_length()?;
+        self.rate()?;
         let width = f64::from(self.width());
-        (width > 0.0).then(|| (frames_to_f64(length) / width).max(MIN_FRAMES_PER_PIXEL))
+        (width > 0.0)
+            .then(|| (frames_to_f64(self.imp().length.get()) / width).max(MIN_FRAMES_PER_PIXEL))
     }
 
     /// The frame at the left edge (fractional when zoomed in far).
     fn start_frame(&self) -> f64 {
-        let rate = self.rate_and_length().map_or(0.0, |(rate, _)| rate);
+        let rate = self.rate().unwrap_or(0.0);
         self.adjustment().map_or(0.0, |a| a.value()) * rate
     }
 
-    /// Brings the adjustment in line with the waveform, width and zoom level.
+    /// Brings the adjustment in line with the timeline, width and zoom level.
     pub(super) fn update_adjustment(&self) {
         let imp = self.imp();
         let Some(adjustment) = self.adjustment() else {
             return;
         };
-        let (Some((rate, length)), Some(fit)) =
-            (self.rate_and_length(), self.fit_frames_per_pixel())
-        else {
+        let (Some(rate), Some(fit)) = (self.rate(), self.fit_frames_per_pixel()) else {
             adjustment.configure(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            self.queue_draw();
             return;
         };
         let frames_per_pixel = imp.frames_per_pixel.get();
@@ -125,7 +153,7 @@ impl WaveformView {
             imp.frames_per_pixel.set(fit);
             imp.fit.set(true);
         }
-        let duration = frames_to_f64(length) / rate;
+        let duration = frames_to_f64(imp.length.get()) / rate;
         let page = (f64::from(self.width()) * imp.frames_per_pixel.get() / rate).min(duration);
         let value = adjustment.value().clamp(0.0, (duration - page).max(0.0));
         adjustment.configure(value, 0.0, duration, page / 10.0, page * 0.9, page);
@@ -135,11 +163,9 @@ impl WaveformView {
     /// Changes the zoom by `factor`, keeping the frame under `anchor_x` in place.
     fn zoom_by(&self, factor: f64, anchor_x: f64) {
         let imp = self.imp();
-        let (Some(fit), Some((rate, _)), Some(adjustment)) = (
-            self.fit_frames_per_pixel(),
-            self.rate_and_length(),
-            self.adjustment(),
-        ) else {
+        let (Some(fit), Some(rate), Some(adjustment)) =
+            (self.fit_frames_per_pixel(), self.rate(), self.adjustment())
+        else {
             return;
         };
         let old = imp.frames_per_pixel.get();
@@ -165,8 +191,7 @@ impl WaveformView {
 
     /// Scrolls so that `frame` is visible, a little away from the edge.
     fn scroll_to_show(&self, frame: Frames) {
-        let (Some(adjustment), Some((rate, _))) = (self.adjustment(), self.rate_and_length())
-        else {
+        let (Some(adjustment), Some(rate)) = (self.adjustment(), self.rate()) else {
             return;
         };
         let start = adjustment.value() * rate;
@@ -177,15 +202,18 @@ impl WaveformView {
         }
     }
 
-    /// The frame under pixel column `x`, limited to the waveform.
+    /// The frame under pixel column `x`, limited to the timeline.
     fn frame_at(&self, x: f64) -> Frames {
-        let length = self.rate_and_length().map_or(0, |(_, length)| length);
         let frame = self.start_frame() + x.max(0.0) * self.imp().frames_per_pixel.get();
-        frames_from_f64(frame.floor()).unwrap_or(0).min(length)
+        frames_from_f64(frame.floor())
+            .unwrap_or(0)
+            .min(self.imp().length.get())
     }
 
     fn seek_to_x(&self, x: f64) {
-        self.emit_by_name::<()>("seek", &[&self.frame_at(x)]);
+        if self.rate().is_some() {
+            self.emit_by_name::<()>("seek", &[&self.frame_at(x)]);
+        }
     }
 
     /// Mouse and touchpad handling. Called once, from `constructed`.
@@ -223,27 +251,39 @@ impl WaveformView {
         });
         self.add_controller(motion);
 
-        // Scroll: move through the file. Ctrl+scroll: zoom around the pointer.
+        // Horizontal scroll moves through the timeline; Ctrl+scroll zooms around the
+        // pointer. Plain vertical scrolling is left to the scrolled window around the
+        // view, which scrolls through the tracks.
         let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
         let weak = self.downgrade();
         scroll.connect_scroll(move |controller, dx, dy| {
             let Some(view) = weak.upgrade() else {
                 return glib::Propagation::Proceed;
             };
-            if controller
-                .current_event_state()
-                .contains(gdk::ModifierType::CONTROL_MASK)
-            {
+            let state = controller.current_event_state();
+            if state.contains(gdk::ModifierType::CONTROL_MASK) {
                 let anchor = view
                     .imp()
                     .pointer_x
                     .get()
                     .unwrap_or_else(|| f64::from(view.width()) / 2.0);
                 view.zoom_by(ZOOM_STEP.powf(dy), anchor);
-            } else if let Some(adjustment) = view.adjustment() {
-                adjustment.set_value(adjustment.value() + (dx + dy) * adjustment.page_size() / 5.0);
+                return glib::Propagation::Stop;
             }
-            glib::Propagation::Stop
+            // Shift+wheel is the usual way to scroll sideways with a mouse.
+            let sideways = if state.contains(gdk::ModifierType::SHIFT_MASK) {
+                dx + dy
+            } else {
+                dx
+            };
+            match view.adjustment() {
+                Some(adjustment) if sideways != 0.0 => {
+                    adjustment
+                        .set_value(adjustment.value() + sideways * adjustment.page_size() / 5.0);
+                    glib::Propagation::Stop
+                }
+                _ => glib::Propagation::Proceed,
+            }
         });
         self.add_controller(scroll);
 
@@ -262,86 +302,4 @@ impl WaveformView {
             }
         });
     }
-
-    /// Draws the centre line, the waveform and the playhead.
-    fn draw(&self, snapshot: &gtk::Snapshot) {
-        let (width, height) = (pixels(self.width()), pixels(self.height()));
-        if width <= 0.0 || height <= 0.0 {
-            return;
-        }
-        let middle = height / 2.0;
-        let foreground = self.color();
-        let style = adw::StyleManager::default();
-        let accent = style.accent_color().to_standalone_rgba(style.is_dark());
-
-        snapshot.append_color(
-            &foreground.with_alpha(0.15),
-            &graphene::Rect::new(0.0, middle - 0.5, width, 1.0),
-        );
-
-        let frames_per_pixel = self.imp().frames_per_pixel.get();
-        let start = self.start_frame();
-        if let Some(waveform) = self.imp().waveform.borrow().as_ref() {
-            let columns = usize::try_from(self.width()).unwrap_or(0);
-            let peaks = waveform.peaks(start, frames_per_pixel, columns);
-            if let Some(path) = waveform_path(&peaks, middle) {
-                snapshot.append_fill(&path, gsk::FillRule::Winding, &accent);
-            }
-        }
-
-        let playhead_x = (frames_to_f64(self.imp().playhead.get()) - start) / frames_per_pixel;
-        if (0.0..=f64::from(self.width())).contains(&playhead_x) {
-            // Keep the 2-pixel line fully visible at the very start and end.
-            let x = pixels_f64(playhead_x).clamp(1.0, width - 1.0);
-            snapshot.append_color(&foreground, &graphene::Rect::new(x - 1.0, 0.0, 2.0, height));
-        }
-    }
-}
-
-/// The outline of the waveform: along the maxima from left to right, then back
-/// along the minima. `None` if no column has audio.
-fn waveform_path(
-    peaks: &[Option<transient_core::waveform::Peak>],
-    middle: f32,
-) -> Option<gsk::Path> {
-    let to_y = |value: f32| middle - value.clamp(-1.0, 1.0) * middle * HEADROOM;
-    // Every column is at least one pixel tall, so silence still shows as a line.
-    let columns: Vec<(f32, f32, f32)> = peaks
-        .iter()
-        .enumerate()
-        .filter_map(|(column, peak)| {
-            let peak = (*peak)?;
-            let x = pixels_f64(f64::from(u32::try_from(column).ok()?)) + 0.5;
-            let (top, bottom) = (to_y(peak.max), to_y(peak.min));
-            let grow = ((1.0 - (bottom - top)) / 2.0).max(0.0);
-            Some((x, top - grow, bottom + grow))
-        })
-        .collect();
-    let (&(first_x, first_top, _), rest) = columns.split_first()?;
-
-    let builder = gsk::PathBuilder::new();
-    builder.move_to(first_x, first_top);
-    for &(x, top, _) in rest {
-        builder.line_to(x, top);
-    }
-    for &(x, _, bottom) in columns.iter().rev() {
-        builder.line_to(x, bottom);
-    }
-    builder.close();
-    Some(builder.to_path())
-}
-
-/// A widget size in pixels as `f32`, the unit GTK draws in.
-fn pixels(value: i32) -> f32 {
-    pixels_f64(f64::from(value))
-}
-
-fn pixels_f64(value: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "pixel coordinates are small; f32 is what GTK draws with"
-    )]
-    let value = value as f32;
-    value
 }

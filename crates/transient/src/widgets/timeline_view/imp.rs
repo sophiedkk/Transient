@@ -1,4 +1,4 @@
-//! The private side of [`super::WaveformView`].
+//! The private side of [`super::TimelineView`].
 
 // `#[derive(glib::Properties)]` generates `pub fn` getters and setters on the
 // `pub(crate)` wrapper type; that generated code is what this lint reports.
@@ -14,26 +14,31 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::glib::subclass::Signal;
-use transient_core::time::Frames;
-use transient_core::waveform::Waveform;
+use transient_core::time::{Frames, SampleRate};
+
+use super::{LANE_HEIGHT, Lane, RULER_HEIGHT};
 
 /// The view's state.
 ///
 /// `#[derive(Properties)]` turns fields marked `#[property]` into GObject
 /// properties, so Blueprint can set them (see the gtk-rs book, "Properties").
 #[derive(Debug, Default, glib::Properties)]
-#[properties(wrapper_type = super::WaveformView)]
-pub(crate) struct WaveformView {
+#[properties(wrapper_type = super::TimelineView)]
+pub(crate) struct TimelineView {
     /// The visible range, in seconds. Shared with the scrollbar below the view:
     /// `value` is the left edge, `page-size` the visible length.
     #[property(get, set = Self::set_adjustment, nullable)]
     pub(super) adjustment: RefCell<Option<gtk::Adjustment>>,
     adjustment_handler: RefCell<Option<glib::SignalHandlerId>>,
 
-    pub(super) waveform: RefCell<Option<Waveform>>,
+    /// One lane per track, top to bottom.
+    pub(super) lanes: RefCell<Vec<Lane>>,
+    pub(super) sample_rate: Cell<Option<SampleRate>>,
+    /// The length of the timeline (the end of the last clip).
+    pub(super) length: Cell<Frames>,
     /// The zoom level: how many frames one pixel column shows.
     pub(super) frames_per_pixel: Cell<f64>,
-    /// Whether the zoom follows the window size so the whole file is visible.
+    /// Whether the zoom follows the window size so everything is visible.
     pub(super) fit: Cell<bool>,
     pub(super) playhead: Cell<Frames>,
     /// Where the pointer is, so Ctrl+scroll zooms around it.
@@ -43,19 +48,19 @@ pub(crate) struct WaveformView {
 }
 
 #[glib::object_subclass]
-impl ObjectSubclass for WaveformView {
-    const NAME: &'static str = "TransientWaveformView";
-    type Type = super::WaveformView;
+impl ObjectSubclass for TimelineView {
+    const NAME: &'static str = "TransientTimelineView";
+    type Type = super::TimelineView;
     type ParentType = gtk::Widget;
 
     fn class_init(klass: &mut Self::Class) {
-        klass.set_css_name("waveform");
+        klass.set_css_name("timeline");
         klass.set_accessible_role(gtk::AccessibleRole::Img);
     }
 }
 
 #[glib::derived_properties]
-impl ObjectImpl for WaveformView {
+impl ObjectImpl for TimelineView {
     /// `seek(frame)`: the user clicked or dragged to a position.
     fn signals() -> &'static [Signal] {
         static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
@@ -70,18 +75,24 @@ impl ObjectImpl for WaveformView {
 
     fn constructed(&self) {
         self.parent_constructed();
+        // Clips that start before the visible area must not be drawn over the
+        // track headers: cut off everything outside the widget.
+        self.obj().set_overflow(gtk::Overflow::Hidden);
         self.fit.set(true);
         self.obj().setup_controllers();
     }
 }
 
-impl WidgetImpl for WaveformView {
-    /// Minimum and natural size: (minimum, natural, baselines).
+impl WidgetImpl for TimelineView {
+    /// Minimum and natural size: (minimum, natural, baselines). The height is
+    /// exactly the ruler plus all lanes, so a scrolled window can scroll it.
     fn measure(&self, orientation: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
-        match orientation {
-            gtk::Orientation::Horizontal => (100, 600, -1, -1),
-            _ => (64, 240, -1, -1),
+        if orientation == gtk::Orientation::Horizontal {
+            return (100, 600, -1, -1);
         }
+        let lanes = i32::try_from(self.lanes.borrow().len()).unwrap_or(0);
+        let height = RULER_HEIGHT + lanes * LANE_HEIGHT;
+        (height, height, -1, -1)
     }
 
     /// The window was resized: the visible range changes with it.
@@ -95,7 +106,7 @@ impl WidgetImpl for WaveformView {
     }
 }
 
-impl WaveformView {
+impl TimelineView {
     /// Swaps the adjustment, and redraws whenever the new one scrolls.
     fn set_adjustment(&self, adjustment: Option<gtk::Adjustment>) {
         if let (Some(old), Some(handler)) = (self.adjustment.take(), self.adjustment_handler.take())

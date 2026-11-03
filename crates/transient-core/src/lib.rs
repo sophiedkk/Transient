@@ -4,6 +4,8 @@
 //! is plain Rust, which keeps it fast to compile and easy to test.
 
 pub mod audio;
+pub mod mix;
 pub mod project;
+pub mod ruler;
 pub mod time;
 pub mod waveform;

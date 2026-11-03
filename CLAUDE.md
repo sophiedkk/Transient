@@ -9,15 +9,21 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 
 ## Architecture
 
-- `crates/transient-core`: project model (serde JSON project files), timeline maths
-  in frames (`u64`), mixing DSP. **Never depends on GTK or GStreamer.**
+- `crates/transient-core`: project model (sources, tracks, clips with
+  start/offset/length; serde JSON), `Mix` (renders any stretch of the timeline),
+  waveform peak pyramid, ruler maths, time in frames (`u64`).
+  **Never depends on GTK or GStreamer.**
 - `crates/transient-engine`: GStreamer only: decode files into in-memory `f32`
   buffers (48 kHz stereo), play the mix through `appsrc`, export through encoders.
   Our own mixer, not GStreamer Editing Services.
-- `crates/transient-cli`: `transient-cli probe FILE…` — the engine without a window,
-  JSON output. Grows with the engine (render, export).
+- `crates/transient-cli`: `probe FILE…` (decode) and `mix FILE…` (one track per
+  file, render the mix) — the engine without a window, JSON output.
 - `crates/transient`: the GTK app. Blueprint UI in `resources/ui/`, compiled by
   `build.rs`; one GObject subclass per custom widget (`mod.rs` public, `imp.rs` private).
+  The window owns the `Project` plus decoded sources; after every change
+  `Window::project_changed()` rebuilds track headers, timeline lanes, the player's
+  `Mix` and the title. `TimelineView` (ruler, lanes, clips) and the track headers
+  line up via `RULER_HEIGHT`/`LANE_HEIGHT`.
 - Dependencies point downward only: `transient`/`transient-cli` → `transient-engine` →
   `transient-core`.
 - Undo/redo = snapshots of the whole project (clips reference audio via `Arc`).
