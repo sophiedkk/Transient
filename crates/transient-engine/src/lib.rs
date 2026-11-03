@@ -4,11 +4,13 @@
 //! API, so the GTK code never handles GStreamer pipelines directly.
 //!
 //! - [`decode::decode_file`] reads any audio file into an [`AudioBuffer`].
-//! - [`player::Player`] plays an [`AudioBuffer`].
+//! - [`player::Player`] plays a mix.
+//! - [`export::export`] writes a mix to a WAV, FLAC, MP3, Opus or Ogg Vorbis file.
 //!
 //! [`AudioBuffer`]: transient_core::audio::AudioBuffer
 
 pub mod decode;
+pub mod export;
 pub mod player;
 
 use thiserror::Error;

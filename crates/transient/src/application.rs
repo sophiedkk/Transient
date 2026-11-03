@@ -92,6 +92,7 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.open-project", &["<Control>o"]);
     app.set_accels_for_action("win.save", &["<Control>s"]);
     app.set_accels_for_action("win.save-as", &["<Shift><Control>s"]);
+    app.set_accels_for_action("win.export", &["<Control>e"]);
     app.set_accels_for_action("win.play-pause", &["space"]);
     app.set_accels_for_action("win.go-to-start", &["Home"]);
     app.set_accels_for_action("win.undo", &["<Control>z"]);

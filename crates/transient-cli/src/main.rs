@@ -5,11 +5,14 @@
 //! ```sh
 //! transient-cli probe test-audio/*.ogg
 //! transient-cli mix test-audio/drum-loop.wav test-audio/synth-loop.ogg
+//! transient-cli export my-mix.transient --output my-mix.flac
+//! transient-cli export test-audio/*.wav --output both.mp3
 //! ```
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
 use anyhow::Context;
@@ -19,7 +22,9 @@ use transient_core::audio::{AudioBuffer, CHANNELS, to_dbfs};
 use transient_core::mix::{AudioPool, Mix};
 use transient_core::project::Project;
 use transient_core::time::SampleRate;
+
 use transient_engine::decode::decode_file;
+use transient_engine::export::{self, ExportFormat};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Transient's audio engine on the command line")]
@@ -43,6 +48,25 @@ enum Command {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
+    /// Export a saved project (or audio files, one track each) to a file. The
+    /// format follows the output's extension: wav, flac, mp3, opus or ogg.
+    Export {
+        /// A .transient project, or audio files.
+        #[arg(required = true)]
+        input: Vec<PathBuf>,
+        /// The file to write.
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+}
+
+/// The output of `export`.
+#[derive(Debug, Serialize)]
+struct ExportReport {
+    output: PathBuf,
+    format: String,
+    seconds: f64,
+    export_ms: u128,
 }
 
 /// The output of `mix`.
@@ -110,6 +134,13 @@ fn run(cli: Cli) -> anyhow::Result<bool> {
             }
             Ok(all_ok)
         }
+        Command::Export { input, output } => {
+            let report = export(&input, &output)?;
+            let mut stdout = std::io::stdout().lock();
+            serde_json::to_writer(&mut stdout, &report)?;
+            writeln!(stdout)?;
+            Ok(true)
+        }
         Command::Mix { files } => {
             let report = mix(&files)?;
             let mut stdout = std::io::stdout().lock();
@@ -123,24 +154,7 @@ fn run(cli: Cli) -> anyhow::Result<bool> {
 /// Builds a project the way the app does on import, then renders the whole mix
 /// in chunks, the way the player does.
 fn mix(files: &[PathBuf]) -> anyhow::Result<MixReport> {
-    let mut project = Project::default();
-    let mut pool = AudioPool::new();
-    for file in files {
-        let decoded = decode_file(file, project.sample_rate)
-            .with_context(|| format!("decoding {}", file.display()))?;
-        let name = file
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let track = project.import(file.clone(), decoded.buffer.frames(), name);
-        let source = project
-            .track(track)
-            .and_then(|track| track.clips.first())
-            .map(|clip| clip.source)
-            .context("the imported clip is missing")?;
-        pool.insert(source, decoded.buffer);
-    }
-
+    let (project, pool) = import_files(files)?;
     let started = Instant::now();
     let mix = Mix::new(&project, &pool);
     let mut rendered = Vec::new();
@@ -164,6 +178,70 @@ fn mix(files: &[PathBuf]) -> anyhow::Result<MixReport> {
         rms_dbfs: to_dbfs(result.rms()).map(round_db),
         render_ms,
     })
+}
+
+/// Exports a project file, or audio files on one track each.
+fn export(input: &[PathBuf], output: &Path) -> anyhow::Result<ExportReport> {
+    let extension = output
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default();
+    let format = ExportFormat::from_extension(extension)
+        .with_context(|| format!("unknown export format “.{extension}”"))?;
+    let (project, pool) = match input {
+        [file] if file.extension().is_some_and(|ext| ext == "transient") => open_project(file)?,
+        files => import_files(files)?,
+    };
+    let mix = Mix::new(&project, &pool);
+    let started = Instant::now();
+    export::export(&mix, output, format, |_| {}, &AtomicBool::new(false))
+        .with_context(|| format!("exporting to {}", output.display()))?;
+    Ok(ExportReport {
+        output: output.to_owned(),
+        format: format!("{format:?}"),
+        seconds: (mix.sample_rate().frames_to_seconds(mix.length()) * 1000.0).round() / 1000.0,
+        export_ms: started.elapsed().as_millis(),
+    })
+}
+
+/// Opens a saved project and decodes its sources, like the app does.
+fn open_project(file: &Path) -> anyhow::Result<(Project, AudioPool)> {
+    let json =
+        std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
+    let folder = std::path::absolute(file)?
+        .parent()
+        .map(Path::to_owned)
+        .unwrap_or_default();
+    let project = Project::from_json(&json)?.with_paths_resolved_from(&folder);
+    let mut pool = AudioPool::new();
+    for source in &project.sources {
+        let decoded = decode_file(&source.path, project.sample_rate)
+            .with_context(|| format!("decoding {}", source.path.display()))?;
+        pool.insert(source.id, decoded.buffer);
+    }
+    Ok((project, pool))
+}
+
+/// Puts each file on its own track, like importing them in the app.
+fn import_files(files: &[PathBuf]) -> anyhow::Result<(Project, AudioPool)> {
+    let mut project = Project::default();
+    let mut pool = AudioPool::new();
+    for file in files {
+        let decoded = decode_file(file, project.sample_rate)
+            .with_context(|| format!("decoding {}", file.display()))?;
+        let name = file
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let track = project.import(file.clone(), decoded.buffer.frames(), name);
+        let source = project
+            .track(track)
+            .and_then(|track| track.clips.first())
+            .map(|clip| clip.source)
+            .context("the imported clip is missing")?;
+        pool.insert(source, decoded.buffer);
+    }
+    Ok((project, pool))
 }
 
 fn probe(file: &Path) -> ProbeReport {

@@ -129,6 +129,9 @@ impl ObjectSubclass for Window {
         klass.install_action_async("win.save-as", None, |window, _, _| async move {
             window.save_as().await;
         });
+        klass.install_action("win.export", None, |window, _, _| {
+            window.show_export_dialog();
+        });
         klass.install_action("win.undo", None, |window, _, _| window.undo());
         klass.install_action("win.redo", None, |window, _, _| window.redo());
         klass.install_action("win.split", None, |window, _, _| {

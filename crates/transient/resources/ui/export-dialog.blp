@@ -1,0 +1,96 @@
+using Gtk 4.0;
+using Adw 1;
+
+translation-domain "transient";
+
+// The export dialog: choose a format and quality, then a file; then a progress
+// page while exporting. src/widgets/export_dialog.rs does the work.
+template $TransientExportDialog: Adw.Dialog {
+  title: _("Export");
+  content-width: 440;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar header_bar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Button cancel_button {
+        label: _("_Cancel");
+        use-underline: true;
+      }
+
+      [end]
+      Button export_button {
+        label: _("_Export…");
+        use-underline: true;
+
+        styles [
+          "suggested-action",
+        ]
+      }
+    }
+
+    content: Adw.ViewStack stack {
+      Adw.ViewStackPage {
+        name: "settings";
+
+        child: Adw.PreferencesPage {
+          Adw.PreferencesGroup {
+            description: _("The whole project is mixed into one file");
+
+            Adw.ComboRow format_row {
+              title: _("Format");
+
+              model: StringList {
+                strings [
+                  _("WAV (uncompressed)"),
+                  _("FLAC (lossless)"),
+                  "MP3",
+                  "Opus",
+                  "Ogg Vorbis",
+                ]
+              };
+            }
+
+            Adw.ComboRow quality_row {
+              title: _("Quality");
+
+              model: StringList quality_list {};
+            }
+          }
+        };
+      }
+
+      Adw.ViewStackPage {
+        name: "progress";
+
+        child: Adw.StatusPage progress_page {
+          title: _("Exporting");
+
+          child: Box {
+            orientation: vertical;
+            spacing: 24;
+            width-request: 280;
+            halign: center;
+
+            ProgressBar progress_bar {
+              show-text: true;
+            }
+
+            Button stop_button {
+              label: _("_Stop Exporting");
+              use-underline: true;
+              halign: center;
+
+              styles [
+                "pill",
+              ]
+            }
+          };
+        };
+      }
+    };
+  };
+}

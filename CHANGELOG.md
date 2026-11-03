@@ -40,6 +40,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   can be moved. A "•" in the title marks unsaved changes; closing, quitting or
   starting a new project asks to save them. Missing audio files are reported in
   a banner and their clips stay, greyed out.
+- Export (Ctrl+E, header bar button or menu): the whole mix to WAV or FLAC
+  (16/24-bit), MP3, Opus or Ogg Vorbis, with a progress bar and Stop; a toast
+  offers "Show in Folder". `transient-cli export` exports projects or files
+  without a window.
 - Undo and redo for every change (Ctrl+Z, Shift+Ctrl+Z, and buttons in the
   header bar). Deleting shows a toast with an Undo button instead of asking
   for confirmation.
@@ -51,7 +55,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The file's name, format and length are shown in the header bar.
 - Open files from the command line (`transient FILE`) and from "Open With".
 - Command-line options for testing: `--play`, `--silent`, `--screenshot`,
-  `--quit-after`, `--seek`, `--zoom`, `--action`, `--save-to`; `transient-cli probe` decodes files and
+  `--quit-after`, `--seek`, `--zoom`, `--action`, `--save-to`, `--export-to`; `transient-cli probe` decodes files and
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
 - The window remembers its size.

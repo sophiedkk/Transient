@@ -5,12 +5,15 @@ data/io.github.sophiedkk.Transient.gschema.xml
 crates/transient/resources/ui/window.blp
 crates/transient/resources/ui/shortcuts-dialog.blp
 crates/transient/resources/ui/track-header.blp
+crates/transient/resources/ui/export-dialog.blp
 crates/transient/src/application.rs
 crates/transient/src/window/clip_pane.rs
 crates/transient/src/window/edit.rs
+crates/transient/src/window/export.rs
 crates/transient/src/window/file.rs
 crates/transient/src/window/import.rs
 crates/transient/src/window/project.rs
 crates/transient/src/window/transport.rs
 crates/transient/src/widgets/track_header.rs
+crates/transient/src/widgets/export_dialog.rs
 crates/transient/src/widgets/timeline_view/draw.rs

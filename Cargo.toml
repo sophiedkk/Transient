@@ -26,6 +26,8 @@ gtk = { package = "gtk4", version = "0.11", features = ["gnome_49"] }
 adw = { package = "libadwaita", version = "0.9", features = ["v1_8"] }
 glib-build-tools = "0.22"
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
+# Sends messages from background threads to the UI (see the gtk-rs book, "The Main Event Loop").
+async-channel = "2"
 
 # Audio
 gstreamer = "0.25"

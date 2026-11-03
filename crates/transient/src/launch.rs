@@ -49,6 +49,8 @@ pub(crate) struct LaunchOptions {
     pub(crate) actions: Vec<String>,
     /// Save the project to this file after the actions.
     pub(crate) save_to: Option<PathBuf>,
+    /// Export the mix to this file after the actions (format from the extension).
+    pub(crate) export_to: Option<PathBuf>,
 }
 
 impl LaunchOptions {
@@ -112,6 +114,14 @@ impl LaunchOptions {
             Some("FILE"),
         );
         app.add_main_option(
+            "export-to",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::Filename,
+            "Export the mix to FILE (wav, flac, mp3, opus or ogg) after the actions",
+            Some("FILE"),
+        );
+        app.add_main_option(
             "quit-after",
             glib::Char::from(0),
             none,
@@ -144,6 +154,7 @@ impl LaunchOptions {
                 .flatten()
                 .unwrap_or_default(),
             save_to: dict.lookup::<PathBuf>("save-to").ok().flatten(),
+            export_to: dict.lookup::<PathBuf>("export-to").ok().flatten(),
         }
     }
 
@@ -158,6 +169,7 @@ impl LaunchOptions {
             || self.zoom.is_some()
             || !self.actions.is_empty()
             || self.save_to.is_some()
+            || self.export_to.is_some()
     }
 
     /// Carries out the options for a freshly shown window.
@@ -194,6 +206,10 @@ impl LaunchOptions {
         if let Some(path) = &self.save_to {
             let file = gio::File::for_path(std::path::absolute(path).unwrap_or(path.clone()));
             window.write_project(&file).await;
+        }
+        if let Some(path) = &self.export_to {
+            let path = std::path::absolute(path).unwrap_or(path.clone());
+            window.export_to(&path).await;
         }
         if self.play {
             window.toggle_playback();

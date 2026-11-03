@@ -15,6 +15,7 @@
 
 mod clip_pane;
 mod edit;
+mod export;
 mod file;
 mod imp;
 mod import;

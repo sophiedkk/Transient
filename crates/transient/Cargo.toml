@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+async-channel.workspace = true
 transient-core.workspace = true
 transient-engine.workspace = true
 adw.workspace = true

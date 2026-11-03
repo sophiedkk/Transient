@@ -83,6 +83,7 @@ impl Window {
         let has_audio = project.length() > 0;
         imp.toolbar_view.set_reveal_bottom_bars(has_audio);
         self.set_playback_enabled(has_audio);
+        self.action_set_enabled("win.export", has_audio);
         self.update_edit_actions();
         self.update_clip_pane();
     }

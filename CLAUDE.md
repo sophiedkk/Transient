@@ -16,8 +16,12 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 - `crates/transient-engine`: GStreamer only: decode files into in-memory `f32`
   buffers (48 kHz stereo), play the mix through `appsrc`, export through encoders.
   Our own mixer, not GStreamer Editing Services.
-- `crates/transient-cli`: `probe FILE…` (decode) and `mix FILE…` (one track per
-  file, render the mix) — the engine without a window, JSON output.
+- `crates/transient-cli`: `probe FILE…` (decode), `mix FILE…` (one track per
+  file, render the mix) and `export PROJECT|FILES --output OUT.ext` — the engine
+  without a window, JSON output.
+- Export: `transient-engine::export` (appsrc → encoder → filesink, blocking
+  push, progress + cancel, removes unfinished files; round-trip tested for every
+  format). `ExportDialog` runs it on a background thread with an async-channel.
 - `crates/transient`: the GTK app. Blueprint UI in `resources/ui/`, compiled by
   `build.rs`; one GObject subclass per custom widget (`mod.rs` public, `imp.rs` private).
   The window owns the `Project` plus decoded sources; after every change
@@ -111,7 +115,8 @@ just test-audio                                 # decode the whole test collecti
   `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
   `normalize-peak`, `normalize-loudness`, `toggle-clip-pane`, `new-project`,
   `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
-  `.transient` file opens it — together they test a full save/open round trip. With `--play`, the level meter (red = clipping)
+  `.transient` file opens it — together they test a full save/open round trip.
+  `--export-to=FILE.ext` exports through the app's export path. With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
   (unit- and property-tested).

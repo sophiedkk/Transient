@@ -70,6 +70,13 @@ template $TransientWindow: Adw.ApplicationWindow {
         }
 
         [end]
+        Button {
+          icon-name: "document-send-symbolic";
+          tooltip-text: _("Export");
+          action-name: "win.export";
+        }
+
+        [end]
         ToggleButton pane_button {
           icon-name: "sidebar-show-right-symbolic";
           tooltip-text: _("Clip Properties");
@@ -478,6 +485,11 @@ menu primary_menu {
     item {
       label: _("Save _As…");
       action: "win.save-as";
+    }
+
+    item {
+      label: _("_Export…");
+      action: "win.export";
     }
   }
 
