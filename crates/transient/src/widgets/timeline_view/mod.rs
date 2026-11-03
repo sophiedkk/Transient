@@ -33,6 +33,10 @@ pub(crate) const LANE_HEIGHT: i32 = 96;
 const MIN_FRAMES_PER_PIXEL: f64 = 1.0 / 16.0;
 /// Each zoom step halves or doubles the visible length.
 const ZOOM_STEP: f64 = 2.0;
+/// Empty space after the last clip: this fraction of the timeline's length…
+const END_SPACE_FRACTION: f64 = 0.1;
+/// …but at least this many seconds.
+const END_SPACE_MIN_SECONDS: f64 = 2.0;
 /// While following the playhead, keep it this far (fraction of the view) from the edge.
 const FOLLOW_MARGIN: f64 = 0.05;
 
@@ -137,12 +141,20 @@ impl TimelineView {
         (imp.length.get() > 0).then(|| f64::from(rate.hz()))
     }
 
-    /// The zoom level that shows the whole timeline in the current width.
+    /// The scrollable length in frames: the timeline plus some empty space after
+    /// it, so the end of the last clip is never against the window edge and can
+    /// still be dragged further out after trimming it.
+    fn scroll_length(&self) -> f64 {
+        let length = frames_to_f64(self.imp().length.get());
+        let minimum = self.rate().map_or(0.0, |rate| rate * END_SPACE_MIN_SECONDS);
+        length + (length * END_SPACE_FRACTION).max(minimum)
+    }
+
+    /// The zoom level that shows the whole timeline (and the space after it).
     fn fit_frames_per_pixel(&self) -> Option<f64> {
         self.rate()?;
         let width = f64::from(self.width());
-        (width > 0.0)
-            .then(|| (frames_to_f64(self.imp().length.get()) / width).max(MIN_FRAMES_PER_PIXEL))
+        (width > 0.0).then(|| (self.scroll_length() / width).max(MIN_FRAMES_PER_PIXEL))
     }
 
     /// The frame at the left edge (fractional when zoomed in far).
@@ -167,7 +179,7 @@ impl TimelineView {
             imp.frames_per_pixel.set(fit);
             imp.fit.set(true);
         }
-        let duration = frames_to_f64(imp.length.get()) / rate;
+        let duration = self.scroll_length() / rate;
         let page = (f64::from(self.width()) * imp.frames_per_pixel.get() / rate).min(duration);
         let value = adjustment.value().clamp(0.0, (duration - page).max(0.0));
         adjustment.configure(value, 0.0, duration, page / 10.0, page * 0.9, page);
