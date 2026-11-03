@@ -31,6 +31,7 @@ gettext-rs = { version = "0.8", features = ["gettext-system"] }
 gstreamer = "0.25"
 gstreamer-app = "0.25"     # appsrc/appsink: moving audio between Rust and GStreamer
 gstreamer-audio = "0.25"   # audio formats and caps
+ebur128 = "0.1"            # EBU R128 loudness measurement (for normalizing)
 
 # Data and errors
 serde = { version = "1", features = ["derive"] }

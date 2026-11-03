@@ -9,6 +9,7 @@ use transient_core::edit::History;
 use transient_core::project::{ClipId, Project};
 use transient_engine::player::{AudioOutput, Player};
 
+use super::clip_pane::Normalize;
 use super::mixer::MixerControl;
 use super::project::LoadedSources;
 use crate::config;
@@ -47,6 +48,18 @@ pub(crate) struct Window {
     pub(super) right_meter: TemplateChild<gtk::LevelBar>,
     #[template_child]
     pub(super) master_scale: TemplateChild<gtk::Scale>,
+    #[template_child]
+    pub(super) split_view: TemplateChild<adw::OverlaySplitView>,
+    #[template_child]
+    pub(super) pane_stack: TemplateChild<adw::ViewStack>,
+    #[template_child]
+    pub(super) pane_clip_group: TemplateChild<adw::PreferencesGroup>,
+    #[template_child]
+    pub(super) gain_row: TemplateChild<adw::SpinRow>,
+    #[template_child]
+    pub(super) fade_in_row: TemplateChild<adw::SpinRow>,
+    #[template_child]
+    pub(super) fade_out_row: TemplateChild<adw::SpinRow>,
 
     pub(super) settings: OnceCell<gio::Settings>,
     /// The open project (what gets saved).
@@ -101,6 +114,21 @@ impl ObjectSubclass for Window {
             window.delete_selected_clip();
         });
         klass.install_action("win.deselect", None, |window, _, _| window.select(None));
+        klass.install_action("win.toggle-clip-pane", None, |window, _, _| {
+            window.toggle_clip_pane();
+        });
+        klass.install_action_async("win.normalize-peak", None, |window, _, _| async move {
+            window.normalize_selected_clip(Normalize::Peak).await;
+        });
+        klass.install_action_async("win.normalize-loudness", None, |window, _, _| async move {
+            window.normalize_selected_clip(Normalize::Loudness).await;
+        });
+        klass.install_action("win.fade-in-to-playhead", None, |window, _, _| {
+            window.fade_in_to_playhead();
+        });
+        klass.install_action("win.fade-out-from-playhead", None, |window, _, _| {
+            window.fade_out_from_playhead();
+        });
         klass.install_action("win.toggle-mute", None, |window, _, _| window.toggle_mute());
         klass.install_action("win.toggle-solo", None, |window, _, _| window.toggle_solo());
         klass.install_action("win.select-clip-at-playhead", None, |window, _, _| {
@@ -147,6 +175,7 @@ impl ObjectImpl for Window {
         window.setup_transport();
         window.setup_editing();
         window.setup_mixer();
+        window.setup_clip_pane();
     }
 }
 

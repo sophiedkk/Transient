@@ -35,6 +35,7 @@ impl Clip {
             length: self.end() - new_start,
             ..self
         }
+        .with_fades(self.fade_in, self.fade_out)
     }
 
     /// The clip with its right edge dragged to `new_end`, but not past the end of
@@ -45,7 +46,20 @@ impl Clip {
         let length = new_end
             .saturating_sub(self.start)
             .clamp(MIN_CLIP_LENGTH.min(longest), longest);
-        Self { length, ..self }
+        Self { length, ..self }.with_fades(self.fade_in, self.fade_out)
+    }
+
+    /// The clip with these fade lengths, shortened if needed so they fit: the
+    /// fade-in at most the whole clip, the fade-out at most what is left.
+    #[must_use]
+    pub fn with_fades(self, fade_in: Frames, fade_out: Frames) -> Self {
+        let fade_in = fade_in.min(self.length);
+        let fade_out = fade_out.min(self.length - fade_in);
+        Self {
+            fade_in,
+            fade_out,
+            ..self
+        }
     }
 
     /// Splits the clip at timeline frame `at` into two clips that play exactly the
@@ -57,17 +71,20 @@ impl Clip {
             return None;
         }
         let first_length = at - self.start;
+        // The fade-in stays with the first half, the fade-out with the second.
         let first = Self {
             length: first_length,
             ..self
-        };
+        }
+        .with_fades(self.fade_in, 0);
         let second = Self {
             id: new_id,
             start: at,
             offset: self.offset + first_length,
             length: self.length - first_length,
             ..self
-        };
+        }
+        .with_fades(0, self.fade_out);
         Some((first, second))
     }
 }
@@ -207,7 +224,26 @@ mod tests {
             start: 1000,
             offset: 100,
             length: 1000,
+            ..Clip::default()
         }
+    }
+
+    #[test]
+    fn fades_always_fit_in_the_clip() {
+        let faded = clip().with_fades(700, 700);
+        assert_eq!((faded.fade_in, faded.fade_out), (700, 300));
+        // Trimming shorter shrinks the fades with it.
+        let trimmed = faded.trimmed_end(1500, 5000);
+        assert_eq!(trimmed.length, 500);
+        assert_eq!((trimmed.fade_in, trimmed.fade_out), (500, 0));
+    }
+
+    #[test]
+    fn splitting_keeps_each_fade_with_its_end() {
+        let faded = clip().with_fades(100, 200);
+        let (first, second) = faded.split_at(1500, ClipId(2)).unwrap();
+        assert_eq!((first.fade_in, first.fade_out), (100, 0));
+        assert_eq!((second.fade_in, second.fade_out), (0, 200));
     }
 
     #[test]

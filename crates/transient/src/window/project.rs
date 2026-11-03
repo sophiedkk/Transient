@@ -69,6 +69,7 @@ impl Window {
         imp.toolbar_view.set_reveal_bottom_bars(has_audio);
         self.set_playback_enabled(has_audio);
         self.update_edit_actions();
+        self.update_clip_pane();
     }
 
     /// Redraws the timeline lanes (for example after mute or solo changed),

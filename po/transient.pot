@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: transient\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 15:41+0100\n"
+"POT-Creation-Date: 2026-11-03 15:49+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -21,8 +21,8 @@ msgstr ""
 #: data/io.github.sophiedkk.Transient.desktop.in.in:2
 #: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:8
 #: crates/transient/resources/ui/window.blp:8
-#: crates/transient/resources/ui/window.blp:25
-#: crates/transient/src/application.rs:113
+#: crates/transient/resources/ui/window.blp:33
+#: crates/transient/src/application.rs:114
 msgid "Transient"
 msgstr ""
 
@@ -66,82 +66,143 @@ msgstr ""
 msgid "Window maximized"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:31
-#: crates/transient/resources/ui/shortcuts-dialog.blp:100
+#: crates/transient/resources/ui/window.blp:39
+#: crates/transient/resources/ui/shortcuts-dialog.blp:105
 #: crates/transient/src/window/import.rs:27
 msgid "Import Audio"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:45
+#: crates/transient/resources/ui/window.blp:53
 #: crates/transient/resources/ui/shortcuts-dialog.blp:28
 msgid "Undo"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:52
+#: crates/transient/resources/ui/window.blp:60
 #: crates/transient/resources/ui/shortcuts-dialog.blp:33
 msgid "Redo"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:60
+#: crates/transient/resources/ui/window.blp:68
 msgid "Main Menu"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:73
+#: crates/transient/resources/ui/window.blp:75
+msgid "Clip Properties"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:94
+msgid "No Clip Selected"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:95
+msgid "Select a clip to change its gain and fades"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:119
+msgid "Gain"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:120
+msgid "In decibels"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:132
+msgid "Fade In"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:133
+#: crates/transient/resources/ui/window.blp:146
+msgid "In seconds"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:145
+msgid "Fade Out"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:159
+msgid "Fades"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:162
+msgid "Fade In to Playhead"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:167
+msgid "Fade Out from Playhead"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:173
+msgid "Normalize"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:174
+msgid "Set the gain so the clip reaches a standard level"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:177
+msgid "Peak to −1 dB"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:182
+msgid "Loudness to −16 LUFS"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:198
 msgid "Start a New Project"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:74
+#: crates/transient/resources/ui/window.blp:199
 msgid "Import audio files to start mixing"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:77
+#: crates/transient/resources/ui/window.blp:202
 msgid "_Import Audio…"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:152
+#: crates/transient/resources/ui/window.blp:277
 msgid "Timeline"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:185
+#: crates/transient/resources/ui/window.blp:311
 #: crates/transient/resources/ui/shortcuts-dialog.blp:19
 msgid "Go to Start"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:191
+#: crates/transient/resources/ui/window.blp:317
 #: crates/transient/src/window/transport.rs:124
 msgid "Play"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:220
-#: crates/transient/resources/ui/window.blp:235
+#: crates/transient/resources/ui/window.blp:346
+#: crates/transient/resources/ui/window.blp:361
 msgid "Output Level"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:247
-#: crates/transient/resources/ui/window.blp:257
+#: crates/transient/resources/ui/window.blp:373
+#: crates/transient/resources/ui/window.blp:383
 msgid "Master Volume"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:269
-#: crates/transient/resources/ui/shortcuts-dialog.blp:86
+#: crates/transient/resources/ui/window.blp:395
+#: crates/transient/resources/ui/shortcuts-dialog.blp:91
 msgid "Zoom Out"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:275
-#: crates/transient/resources/ui/shortcuts-dialog.blp:91
+#: crates/transient/resources/ui/window.blp:401
+#: crates/transient/resources/ui/shortcuts-dialog.blp:96
 msgid "Zoom to Fit"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:281
-#: crates/transient/resources/ui/shortcuts-dialog.blp:81
+#: crates/transient/resources/ui/window.blp:407
+#: crates/transient/resources/ui/shortcuts-dialog.blp:86
 msgid "Zoom In"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:292
+#: crates/transient/resources/ui/window.blp:418
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/window.blp:297
+#: crates/transient/resources/ui/window.blp:423
 msgid "_About Transient"
 msgstr ""
 
@@ -193,19 +254,23 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:97
+#: crates/transient/resources/ui/shortcuts-dialog.blp:81
+msgid "Show Clip Properties"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:102
 msgid "General"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:105
+#: crates/transient/resources/ui/shortcuts-dialog.blp:110
 msgid "Show Shortcuts"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:110
+#: crates/transient/resources/ui/shortcuts-dialog.blp:115
 msgid "Close Window"
 msgstr ""
 
-#: crates/transient/resources/ui/shortcuts-dialog.blp:115
+#: crates/transient/resources/ui/shortcuts-dialog.blp:120
 msgid "Quit"
 msgstr ""
 
@@ -226,15 +291,23 @@ msgid "Pan"
 msgstr ""
 
 #. Translators: replace with your name and email, one translator per line.
-#: crates/transient/src/application.rs:123
+#: crates/transient/src/application.rs:124
 msgid "translator-credits"
 msgstr ""
 
-#: crates/transient/src/window/edit.rs:97
-msgid "Clip deleted"
+#: crates/transient/src/window/clip_pane.rs:120
+msgid "The clip is silent or too short to normalize"
+msgstr ""
+
+#: crates/transient/src/window/clip_pane.rs:131
+msgid "Kept quieter than the target to avoid clipping"
 msgstr ""
 
 #: crates/transient/src/window/edit.rs:98
+msgid "Clip deleted"
+msgstr ""
+
+#: crates/transient/src/window/edit.rs:99
 msgid "_Undo"
 msgstr ""
 
@@ -304,7 +377,7 @@ msgid_plural "{} tracks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/transient/src/window/project.rs:109
+#: crates/transient/src/window/project.rs:110
 msgid "Playback is not available"
 msgstr ""
 

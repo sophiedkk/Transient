@@ -58,6 +58,7 @@ impl Window {
         self.imp().selected.set(clip);
         self.imp().timeline.set_selection(clip);
         self.update_edit_actions();
+        self.update_clip_pane();
     }
 
     /// Steps back in the history (`win.undo`, Ctrl+Z).
@@ -105,7 +106,7 @@ impl Window {
     /// Splits at the playhead (`win.split`, S): the selected clip if the playhead
     /// is inside it, otherwise every clip under the playhead.
     pub(super) fn split_at_playhead(&self) {
-        let Some(at) = self.playhead() else {
+        let Some(at) = self.playhead_position() else {
             return;
         };
         let selected = self.imp().selected.get();
@@ -125,7 +126,7 @@ impl Window {
 
     /// Selects the topmost clip under the playhead (`win.select-clip-at-playhead`).
     pub(super) fn select_clip_at_playhead(&self) {
-        let Some(at) = self.playhead() else {
+        let Some(at) = self.playhead_position() else {
             return;
         };
         let clip = self.imp().project.borrow().clips_at(at).first().copied();
@@ -196,12 +197,20 @@ impl Window {
         self.action_set_enabled("win.deselect", has_selection);
         self.action_set_enabled("win.toggle-mute", has_selection);
         self.action_set_enabled("win.toggle-solo", has_selection);
+        for action in [
+            "win.normalize-peak",
+            "win.normalize-loudness",
+            "win.fade-in-to-playhead",
+            "win.fade-out-from-playhead",
+        ] {
+            self.action_set_enabled(action, has_selection);
+        }
         self.action_set_enabled("win.split", has_clips);
         self.action_set_enabled("win.select-clip-at-playhead", has_clips);
     }
 
     /// The playhead position, if something is loaded.
-    fn playhead(&self) -> Option<Frames> {
+    pub(super) fn playhead_position(&self) -> Option<Frames> {
         self.imp()
             .player
             .borrow()

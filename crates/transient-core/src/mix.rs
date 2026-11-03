@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use crate::audio::{AudioBuffer, CHANNELS};
 use crate::project::{Project, SourceId};
-use crate::time::{Frames, SampleRate};
+use crate::time::{Frames, SampleRate, frames_to_f64};
 
 /// Decoded audio for each source, by ID.
 pub type AudioPool = HashMap<SourceId, AudioBuffer>;
@@ -26,9 +26,41 @@ struct MixClip {
     start: Frames,
     offset: Frames,
     length: Frames,
-    /// What to multiply the left and right channel by: the track's volume and
-    /// pan, and the master volume.
+    /// What to multiply the left and right channel by: the clip's gain, the
+    /// track's volume and pan, and the master volume.
     gains: [f32; CHANNELS],
+    fade_in: Frames,
+    fade_out: Frames,
+}
+
+/// The shape of a fade: how loud (0 to 1) a fade is at `t`, the fraction of the
+/// fade done (0 = silent end, 1 = full volume end).
+///
+/// A quarter sine: an *equal-power* curve. When one clip fades out while an
+/// overlapping clip fades in, their combined power stays constant, so the
+/// crossfade has no dip in loudness.
+#[must_use]
+pub fn fade_shape(t: f64) -> f64 {
+    (t.clamp(0.0, 1.0) * std::f64::consts::FRAC_PI_2).sin()
+}
+
+/// The fade multiplier at `position` frames into a clip of `length` frames.
+fn fade_gain(position: Frames, length: Frames, fade_in: Frames, fade_out: Frames) -> f32 {
+    let mut gain = 1.0;
+    if position < fade_in {
+        gain *= fade_shape(frames_to_f64(position) / frames_to_f64(fade_in));
+    }
+    let remaining = length.saturating_sub(position);
+    if remaining < fade_out {
+        gain *= fade_shape(frames_to_f64(remaining) / frames_to_f64(fade_out));
+    }
+    #[expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "a gain between 0 and 1 fits an f32"
+    )]
+    let gain = gain as f32;
+    gain
 }
 
 /// Decibels to a multiplier: 0 dB → 1.0, −6 dB → about 0.5, +6 dB → about 2.
@@ -75,10 +107,10 @@ impl Mix {
             .flat_map(|track| {
                 let volume = db_to_gain(track.volume_db) * master;
                 let [left, right] = pan_gains(track.pan);
-                track
-                    .clips
-                    .iter()
-                    .map(move |clip| (clip, [left * volume, right * volume]))
+                track.clips.iter().map(move |clip| {
+                    let gain = volume * db_to_gain(clip.gain_db);
+                    (clip, [left * gain, right * gain])
+                })
             })
             .filter(|(_, gains)| gains.iter().any(|gain| *gain > 0.0))
             .filter_map(|(clip, gains)| {
@@ -88,6 +120,8 @@ impl Mix {
                     offset: clip.offset,
                     length: clip.length,
                     gains,
+                    fade_in: clip.fade_in,
+                    fade_out: clip.fade_out,
                 })
             })
             .collect();
@@ -144,12 +178,20 @@ impl Mix {
             let Some(target) = out.get_mut(out_first * CHANNELS..) else {
                 continue;
             };
-            for (out_frame, frame) in target
+            let first_position = from - clip.start;
+            let fades = clip.fade_in > 0 || clip.fade_out > 0;
+            for ((out_frame, frame), position) in target
                 .chunks_exact_mut(CHANNELS)
                 .zip(samples.chunks_exact(CHANNELS))
+                .zip(first_position..)
             {
+                let fade = if fades {
+                    fade_gain(position, clip.length, clip.fade_in, clip.fade_out)
+                } else {
+                    1.0
+                };
                 for ((out, sample), gain) in out_frame.iter_mut().zip(frame).zip(clip.gains) {
-                    *out += sample * gain;
+                    *out += sample * gain * fade;
                 }
             }
         }
@@ -314,6 +356,47 @@ mod tests {
         // A muted soloed track stays silent.
         project.tracks[1].mute = true;
         assert_close(first_frame(&project, &pool), [0.0, 0.0]);
+    }
+
+    #[test]
+    fn clip_gain_scales_the_clip() {
+        let (mut project, pool) = two_tracks();
+        project.tracks[1].clips[0].gain_db = SILENT_DB;
+        assert_close(first_frame(&project, &pool), [0.5, 0.5]);
+    }
+
+    #[test]
+    fn fades_start_and_end_in_silence() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 100, "a".to_owned());
+        let source = project.track(track).unwrap().clips[0].source;
+        project.tracks[0].clips[0] = project.tracks[0].clips[0].with_fades(10, 20);
+        let pool = AudioPool::from([(source, constant(1.0, 100))]);
+        let mix = Mix::new(&project, &pool);
+        let level = render(&mix, 0, 100);
+
+        assert!(level[0].abs() < 1e-6, "silent at the very start");
+        assert!(
+            (level[5] - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-3,
+            "halfway through the fade-in"
+        );
+        assert!((level[50] - 1.0).abs() < 1e-6, "full volume in the middle");
+        assert!(
+            (level[90] - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-3,
+            "halfway through the fade-out"
+        );
+        assert!(level[99] < 0.08, "nearly silent at the end");
+    }
+
+    #[test]
+    fn an_equal_power_crossfade_keeps_the_power_constant() {
+        for step in 0..=10 {
+            let t = f64::from(step) / 10.0;
+            let fading_in = fade_shape(t);
+            let fading_out = fade_shape(1.0 - t);
+            let power = fading_in.powi(2) + fading_out.powi(2);
+            assert!((power - 1.0).abs() < 1e-9, "at {t}: power {power}");
+        }
     }
 
     #[test]

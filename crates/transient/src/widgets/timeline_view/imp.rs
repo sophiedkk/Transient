@@ -68,8 +68,8 @@ impl ObjectImpl for TimelineView {
     /// The signals the view emits:
     /// - `seek(frame)`: the user clicked or dragged to a position.
     /// - `clip-selected(clip id)`: a clip was clicked; 0 means "nothing".
-    /// - `clip-changed(clip id, start, offset, length, lane)`: a clip was moved or
-    ///   trimmed by dragging.
+    /// - `clip-changed(clip id, start, offset, length, fade in, fade out, lane)`: a
+    ///   clip was moved, trimmed or had its fades changed by dragging.
     fn signals() -> &'static [Signal] {
         static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
         SIGNALS.get_or_init(|| {
@@ -80,7 +80,15 @@ impl ObjectImpl for TimelineView {
                     .param_types([u64_type])
                     .build(),
                 Signal::builder("clip-changed")
-                    .param_types([u64_type, u64_type, u64_type, u64_type, u32::static_type()])
+                    .param_types([
+                        u64_type,
+                        u64_type,
+                        u64_type,
+                        u64_type,
+                        u64_type,
+                        u64_type,
+                        u32::static_type(),
+                    ])
                     .build(),
             ]
         })

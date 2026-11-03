@@ -13,6 +13,7 @@
 //! See the gtk-rs book, chapter "GObject Subclassing":
 //! <https://gtk-rs.org/gtk4-rs/stable/latest/book/g_object_subclassing.html>
 
+mod clip_pane;
 mod edit;
 mod imp;
 mod import;

@@ -29,6 +29,19 @@ pub(crate) const RULER_HEIGHT: i32 = 28;
 /// Height of one track lane, in pixels. Track headers use the same height.
 pub(crate) const LANE_HEIGHT: i32 = 96;
 
+/// Space between a clip and the top and bottom of its lane, in pixels.
+const CLIP_INSET: f32 = 3.0;
+/// Height of the clip name strip (where the fade handles are), in pixels.
+const CLIP_LABEL_HEIGHT: f32 = 18.0;
+/// Fade handles stay at least this far inside the clip edges, in pixels.
+const FADE_HANDLE_INSET: f64 = 9.0;
+
+/// The top of lane `index`, in pixels.
+fn lane_top_f64(index: usize) -> f64 {
+    f64::from(RULER_HEIGHT)
+        + f64::from(LANE_HEIGHT) * f64::from(u32::try_from(index).unwrap_or(u32::MAX))
+}
+
 /// The furthest zoom in: 16 pixels per frame.
 const MIN_FRAMES_PER_PIXEL: f64 = 1.0 / 16.0;
 /// Each zoom step halves or doubles the visible length.
@@ -264,6 +277,8 @@ impl TimelineView {
                                        start: u64,
                                        offset: u64,
                                        length: u64,
+                                       fade_in: u64,
+                                       fade_out: u64,
                                        lane: u32| {
                 let Some(original) = view.find_clip(ClipId(id)).map(|(_, c)| c.clip) else {
                     return;
@@ -273,7 +288,8 @@ impl TimelineView {
                     offset,
                     length,
                     ..original
-                };
+                }
+                .with_fades(fade_in, fade_out);
                 callback(&view, clip, usize::try_from(lane).unwrap_or(0));
             }),
         );

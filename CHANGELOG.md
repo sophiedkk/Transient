@@ -26,6 +26,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clips) are in the bottom bar. Tracks that are not heard are drawn faded.
   M and Shift+M mute and solo the selected clip's track. A slider drag is one
   undo step.
+- Fades and clip gain: drag the round handles on a selected clip, or use the
+  clip pane (F9 or the sidebar button) to set gain, fade-in and fade-out, or
+  fade in to / out from the playhead. Fades use an equal-power curve, so
+  overlapping clips with fades crossfade smoothly. Fades are drawn as shaded
+  curves; waveforms show the clip gain.
+- Normalize a clip: peak to −1 dBFS, or loudness to −16 LUFS (EBU R128) without
+  letting the peak pass −1 dBFS.
 - Undo and redo for every change (Ctrl+Z, Shift+Ctrl+Z, and buttons in the
   header bar). Deleting shows a toast with an Undo button instead of asking
   for confirmation.

@@ -8,21 +8,18 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, graphene, gsk, pango};
+use transient_core::mix::{db_to_gain, fade_shape};
 use transient_core::project::Clip;
 use transient_core::ruler;
 use transient_core::time::frames_to_f64;
 use transient_core::waveform::Peak;
 
-use super::{LANE_HEIGHT, LaneClip, RULER_HEIGHT, TimelineView};
+use super::{CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, RULER_HEIGHT, TimelineView};
 
 /// Labelled ruler ticks are at least this far apart, in pixels.
 const TICK_SPACING: f64 = 90.0;
-/// Space between a clip and the lane's edges.
-const CLIP_INSET: f32 = 3.0;
 /// Rounded corners of clips.
 const CLIP_RADIUS: f32 = 6.0;
-/// Height of the clip name strip at the top of a clip.
-const CLIP_LABEL_HEIGHT: f32 = 18.0;
 /// Clips of tracks that are not heard (muted, or another track is soloed).
 const SILENT_LANE_OPACITY: f64 = 0.4;
 /// The waveform uses this much of its half-height, leaving a little room.
@@ -215,27 +212,68 @@ impl TimelineView {
             view.frames_per_pixel,
             columns,
         );
+        // Drawn with the clip's gain applied, so normalizing visibly changes it.
         if let Some(path) = waveform_path(
             &peaks,
             pixels_f64(first_column),
             wave_top + half_height,
             half_height,
+            db_to_gain(clip.gain_db),
         ) {
             snapshot.append_fill(&path, gsk::FillRule::Winding, &palette.accent);
         }
 
+        // Fades: the part of the waveform a fade takes away is shaded, with the
+        // fade's curve drawn on top.
+        let bottom = top + height;
+        let fade_width = |frames| pixels_f64(frames_to_f64(frames) / view.frames_per_pixel);
+        let (clip_left, clip_right) = (pixels_f64(left), pixels_f64(right));
+        if clip.fade_in > 0 {
+            let end = clip_left + fade_width(clip.fade_in);
+            draw_fade(
+                snapshot,
+                palette,
+                (clip_left, end),
+                (wave_top, bottom),
+                true,
+            );
+        }
+        if clip.fade_out > 0 {
+            let start = clip_right - fade_width(clip.fade_out);
+            draw_fade(
+                snapshot,
+                palette,
+                (start, clip_right),
+                (wave_top, bottom),
+                false,
+            );
+        }
+
         // The name, starting at the visible left edge so it stays readable when scrolled.
         let layout = self.small_text(&drawn.name);
-        layout.set_width(pango_units(box_right - box_left.max(0.0) - 12.0));
+        // On a selected clip the name starts after the fade-in handle.
+        let text_inset = if selected { 18.0 } else { 6.0 };
+        layout.set_width(pango_units(
+            box_right - box_left.max(0.0) - 2.0 * text_inset,
+        ));
         layout.set_ellipsize(pango::EllipsizeMode::End);
         snapshot.save();
-        snapshot.translate(&graphene::Point::new(box_left.max(0.0) + 6.0, top + 1.0));
+        snapshot.translate(&graphene::Point::new(
+            box_left.max(0.0) + text_inset,
+            top + 1.0,
+        ));
         snapshot.append_layout(&layout, &palette.foreground);
         snapshot.restore();
         snapshot.pop();
 
         if selected {
             snapshot.append_border(&rounded, &[2.0; 4], &[palette.accent; 4]);
+            // Fade handles, dragged to change the fades (see interaction.rs).
+            let (fade_in_x, fade_out_x) = self.fade_handle_positions(clip);
+            let y = top + CLIP_LABEL_HEIGHT / 2.0;
+            for x in [fade_in_x, fade_out_x] {
+                draw_handle(snapshot, palette, pixels_f64(x), y);
+            }
         }
     }
 
@@ -249,15 +287,76 @@ impl TimelineView {
     }
 }
 
+/// Points along a fade curve from `x0` to `x1`: the gain from silent (at
+/// `bottom`) to full (at `top`). A fade-in rises, a fade-out falls.
+const FADE_STEPS: u32 = 32;
+
+/// Shades what a fade removes and draws its curve.
+fn draw_fade(
+    snapshot: &gtk::Snapshot,
+    palette: &Palette,
+    (x0, x1): (f32, f32),
+    (top, bottom): (f32, f32),
+    rising: bool,
+) {
+    let curve: Vec<(f32, f32)> = (0..=FADE_STEPS)
+        .map(|step| {
+            let t = f64::from(step) / f64::from(FADE_STEPS);
+            let gain = fade_shape(if rising { t } else { 1.0 - t });
+            let x = x0 + (x1 - x0) * pixels_f64(t);
+            (x, bottom - pixels_f64(gain) * (bottom - top))
+        })
+        .collect();
+    let Some((&(first_x, first_y), rest)) = curve.split_first() else {
+        return;
+    };
+
+    // The shaded area: above the curve, up to the top of the waveform area.
+    let shade = gsk::PathBuilder::new();
+    shade.move_to(first_x, top);
+    for &(x, y) in &curve {
+        shade.line_to(x, y);
+    }
+    shade.line_to(x1, top);
+    shade.close();
+    snapshot.append_fill(
+        &shade.to_path(),
+        gsk::FillRule::Winding,
+        &palette.foreground.with_alpha(0.16),
+    );
+
+    let line = gsk::PathBuilder::new();
+    line.move_to(first_x, first_y);
+    for &(x, y) in rest {
+        line.line_to(x, y);
+    }
+    snapshot.append_stroke(
+        &line.to_path(),
+        &gsk::Stroke::new(1.5),
+        &palette.foreground.with_alpha(0.6),
+    );
+}
+
+/// A round fade handle.
+fn draw_handle(snapshot: &gtk::Snapshot, palette: &Palette, x: f32, y: f32) {
+    let circle = gsk::PathBuilder::new();
+    circle.add_circle(&graphene::Point::new(x, y), 5.0);
+    let path = circle.to_path();
+    snapshot.append_fill(&path, gsk::FillRule::Winding, &gdk::RGBA::WHITE);
+    snapshot.append_stroke(&path, &gsk::Stroke::new(1.5), &palette.accent);
+}
+
 /// The outline of a waveform: along the maxima from left to right, then back
-/// along the minima. Column 0 is drawn at `first_x`. `None` if no column has audio.
+/// along the minima, scaled by `gain`. Column 0 is drawn at `first_x`. `None` if
+/// no column has audio.
 fn waveform_path(
     peaks: &[Option<Peak>],
     first_x: f32,
     middle: f32,
     half_height: f32,
+    gain: f32,
 ) -> Option<gsk::Path> {
-    let to_y = |value: f32| middle - value.clamp(-1.0, 1.0) * half_height * HEADROOM;
+    let to_y = |value: f32| middle - (value * gain).clamp(-1.0, 1.0) * half_height * HEADROOM;
     // Every column is at least one pixel tall, so silence still shows as a line.
     let columns: Vec<(f32, f32, f32)> = peaks
         .iter()

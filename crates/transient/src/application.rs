@@ -91,6 +91,7 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.deselect", &["Escape"]);
     app.set_accels_for_action("win.toggle-mute", &["m"]);
     app.set_accels_for_action("win.toggle-solo", &["<Shift>m"]);
+    app.set_accels_for_action("win.toggle-clip-pane", &["F9"]);
     app.set_accels_for_action("win.nudge-left", &["<Control>Left"]);
     app.set_accels_for_action("win.nudge-right", &["<Control>Right"]);
     app.set_accels_for_action(

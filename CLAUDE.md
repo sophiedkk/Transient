@@ -29,6 +29,10 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 - Undo/redo = snapshots of the whole project (`transient-core::edit::History`).
   Every change goes through `Window::apply_edit`, which records the snapshot.
   The timeline only previews drags and emits `clip-changed` on release.
+- Clips carry `gain_db`, `fade_in`, `fade_out` (`Clip::with_fades` keeps fades
+  inside the clip; trims and splits preserve that). `Mix` applies equal-power
+  fades (`fade_shape`). `transient-core::normalize` computes peak/LUFS gains
+  (ebur128). The clip pane (`window/clip_pane.rs`, F9) edits the selected clip.
 - Mixer settings (track volume/pan/mute/solo, master volume) live on `Track`/
   `Project`; `Mix` applies them (balance pan law). Slider changes go through
   `Window::apply_mixer_change`: coalesced undo steps and `update_mix()` only,
@@ -98,7 +102,8 @@ just test-audio                                 # decode the whole test collecti
   `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead), and
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
   `select-clip-at-playhead`, `nudge-right`, `delete-clip`, `toggle-mute`,
-  `toggle-solo`) to script edits. With `--play`, the level meter (red = clipping)
+  `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
+  `normalize-peak`, `normalize-loudness`, `toggle-clip-pane`) to script edits. With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
   (unit- and property-tested).

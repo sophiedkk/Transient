@@ -6,6 +6,7 @@ crates/transient/resources/ui/window.blp
 crates/transient/resources/ui/shortcuts-dialog.blp
 crates/transient/resources/ui/track-header.blp
 crates/transient/src/application.rs
+crates/transient/src/window/clip_pane.rs
 crates/transient/src/window/edit.rs
 crates/transient/src/window/import.rs
 crates/transient/src/window/project.rs

@@ -12,6 +12,14 @@ template $TransientWindow: Adw.ApplicationWindow {
   width-request: 640;
   height-request: 400;
 
+  Adw.Breakpoint {
+    condition ("max-width: 900sp")
+
+    setters {
+      split_view.collapsed: true;
+    }
+  }
+
   content: Adw.ToastOverlay toast_overlay {
     child: Adw.ToolbarView toolbar_view {
       bottom-bar-style: raised;
@@ -60,116 +68,234 @@ template $TransientWindow: Adw.ApplicationWindow {
           tooltip-text: _("Main Menu");
           menu-model: primary_menu;
         }
+
+        [end]
+        ToggleButton pane_button {
+          icon-name: "sidebar-show-right-symbolic";
+          tooltip-text: _("Clip Properties");
+          active: bind split_view.show-sidebar bidirectional;
+        }
       }
 
       // One page is visible at a time; the code switches by name.
-      content: Adw.ViewStack stack {
-        // Before anything is imported.
-        Adw.ViewStackPage {
-          name: "empty";
+      // The clip pane (F9) is a utility pane on the right; on narrow windows it
+      // slides over the timeline instead of beside it.
+      content: Adw.OverlaySplitView split_view {
+        sidebar-position: end;
+        show-sidebar: false;
+        max-sidebar-width: 320;
 
-          child: Adw.StatusPage {
-            icon-name: "audio-x-generic-symbolic";
-            title: _("Start a New Project");
-            description: _("Import audio files to start mixing");
+        sidebar: Adw.ViewStack pane_stack {
+          Adw.ViewStackPage {
+            name: "none";
 
-            child: Button {
-              label: _("_Import Audio…");
-              use-underline: true;
-              halign: center;
-              action-name: "win.import-audio";
+            child: Adw.StatusPage {
+              icon-name: "audio-x-generic-symbolic";
+              title: _("No Clip Selected");
+              description: _("Select a clip to change its gain and fades");
 
               styles [
-                "pill",
-                "suggested-action",
+                "compact",
               ]
             };
-          };
-        }
+          }
 
-        // While a file is being decoded.
-        Adw.ViewStackPage {
-          name: "loading";
+          Adw.ViewStackPage {
+            name: "clip";
 
-          child: Adw.StatusPage loading_page {
-            child: Adw.Spinner {
-              height-request: 48;
-              width-request: 48;
-            };
-          };
-        }
-
-        // The project: track headers on the left, the timeline on the right. They
-        // scroll vertically together; the horizontal scrollbar sits under the timeline.
-        Adw.ViewStackPage {
-          name: "project";
-
-          child: Box {
-            orientation: vertical;
-
-            ScrolledWindow {
-              vexpand: true;
+            child: ScrolledWindow {
               hscrollbar-policy: never;
 
               child: Box {
-                // The clamp keeps the headers 200 pixels wide: sliders would
-                // otherwise ask for much more. `hexpand: false` stops the volume
-                // sliders' hexpand from spreading up and widening the column.
-                Adw.Clamp headers_column {
-                  hexpand: false;
-                  maximum-size: 200;
-                  tightening-threshold: 200;
+                orientation: vertical;
+                spacing: 24;
+                margin-top: 18;
+                margin-bottom: 18;
+                margin-start: 12;
+                margin-end: 12;
 
-                  child: Box {
-                    orientation: vertical;
-                    width-request: 200;
+                Adw.PreferencesGroup pane_clip_group {
+                  Adw.SpinRow gain_row {
+                    title: _("Gain");
+                    subtitle: _("In decibels");
+                    digits: 1;
 
-                    styles [
-                      "track-headers",
-                    ]
+                    adjustment: Adjustment {
+                      lower: -60;
+                      upper: 24;
+                      step-increment: 0.5;
+                      page-increment: 6;
+                    };
+                  }
 
-                    // Leaves room for the time ruler at the top of the timeline.
-                    Box {
-                      height-request: 28;
-                    }
+                  Adw.SpinRow fade_in_row {
+                    title: _("Fade In");
+                    subtitle: _("In seconds");
+                    digits: 2;
 
-                    Box track_headers {
-                      orientation: vertical;
-                    }
-                  };
+                    adjustment: Adjustment {
+                      lower: 0;
+                      upper: 3600;
+                      step-increment: 0.1;
+                      page-increment: 1;
+                    };
+                  }
+
+                  Adw.SpinRow fade_out_row {
+                    title: _("Fade Out");
+                    subtitle: _("In seconds");
+                    digits: 2;
+
+                    adjustment: Adjustment {
+                      lower: 0;
+                      upper: 3600;
+                      step-increment: 0.1;
+                      page-increment: 1;
+                    };
+                  }
                 }
+
+                Adw.PreferencesGroup {
+                  title: _("Fades");
+
+                  Adw.ButtonRow {
+                    title: _("Fade In to Playhead");
+                    action-name: "win.fade-in-to-playhead";
+                  }
+
+                  Adw.ButtonRow {
+                    title: _("Fade Out from Playhead");
+                    action-name: "win.fade-out-from-playhead";
+                  }
+                }
+
+                Adw.PreferencesGroup {
+                  title: _("Normalize");
+                  description: _("Set the gain so the clip reaches a standard level");
+
+                  Adw.ButtonRow {
+                    title: _("Peak to −1 dB");
+                    action-name: "win.normalize-peak";
+                  }
+
+                  Adw.ButtonRow {
+                    title: _("Loudness to −16 LUFS");
+                    action-name: "win.normalize-loudness";
+                  }
+                }
+              };
+            };
+          }
+        };
+
+        content: Adw.ViewStack stack {
+          // Before anything is imported.
+          Adw.ViewStackPage {
+            name: "empty";
+
+            child: Adw.StatusPage {
+              icon-name: "audio-x-generic-symbolic";
+              title: _("Start a New Project");
+              description: _("Import audio files to start mixing");
+
+              child: Button {
+                label: _("_Import Audio…");
+                use-underline: true;
+                halign: center;
+                action-name: "win.import-audio";
+
+                styles [
+                  "pill",
+                  "suggested-action",
+                ]
+              };
+            };
+          }
+
+          // While a file is being decoded.
+          Adw.ViewStackPage {
+            name: "loading";
+
+            child: Adw.StatusPage loading_page {
+              child: Adw.Spinner {
+                height-request: 48;
+                width-request: 48;
+              };
+            };
+          }
+
+          // The project: track headers on the left, the timeline on the right. They
+          // scroll vertically together; the horizontal scrollbar sits under the timeline.
+          Adw.ViewStackPage {
+            name: "project";
+
+            child: Box {
+              orientation: vertical;
+
+              ScrolledWindow {
+                vexpand: true;
+                hscrollbar-policy: never;
+
+                child: Box {
+                  // The clamp keeps the headers 200 pixels wide: sliders would
+                  // otherwise ask for much more. `hexpand: false` stops the volume
+                  // sliders' hexpand from spreading up and widening the column.
+                  Adw.Clamp headers_column {
+                    hexpand: false;
+                    maximum-size: 200;
+                    tightening-threshold: 200;
+
+                    child: Box {
+                      orientation: vertical;
+                      width-request: 200;
+
+                      styles [
+                        "track-headers",
+                      ]
+
+                      // Leaves room for the time ruler at the top of the timeline.
+                      Box {
+                        height-request: 28;
+                      }
+
+                      Box track_headers {
+                        orientation: vertical;
+                      }
+                    };
+                  }
+
+                  Separator {
+                    orientation: vertical;
+                  }
+
+                  $TransientTimelineView timeline {
+                    hexpand: true;
+                    vexpand: true;
+                    adjustment: Adjustment view_adjustment {};
+
+                    accessibility {
+                      label: _("Timeline");
+                    }
+                  }
+                };
+              }
+
+              Box {
+                Box scrollbar_spacer {}
 
                 Separator {
                   orientation: vertical;
                 }
 
-                $TransientTimelineView timeline {
+                Scrollbar {
                   hexpand: true;
-                  vexpand: true;
-                  adjustment: Adjustment view_adjustment {};
-
-                  accessibility {
-                    label: _("Timeline");
-                  }
+                  orientation: horizontal;
+                  adjustment: view_adjustment;
                 }
-              };
-            }
-
-            Box {
-              Box scrollbar_spacer {}
-
-              Separator {
-                orientation: vertical;
               }
-
-              Scrollbar {
-                hexpand: true;
-                orientation: horizontal;
-                adjustment: view_adjustment;
-              }
-            }
-          };
-        }
+            };
+          }
+        };
       };
 
       [bottom]

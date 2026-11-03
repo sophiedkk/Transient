@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use transient_core::project::{Project, TrackId};
+use transient_core::project::{ClipId, Project, TrackId};
 
 use super::Window;
 use crate::widgets::track_header::TrackSettings;
@@ -29,6 +29,12 @@ pub(super) enum MixerControl {
     Volume(TrackId),
     /// A track's pan.
     Pan(TrackId),
+    /// A clip's gain (in the clip pane).
+    ClipGain(ClipId),
+    /// A clip's fade-in length (in the clip pane).
+    FadeIn(ClipId),
+    /// A clip's fade-out length (in the clip pane).
+    FadeOut(ClipId),
 }
 
 impl Window {
@@ -82,7 +88,7 @@ impl Window {
 
     /// Changes a mixer setting. `control` says which slider, for coalescing undo
     /// steps; `None` always makes a separate step.
-    fn apply_mixer_change(
+    pub(super) fn apply_mixer_change(
         &self,
         control: Option<MixerControl>,
         change: impl FnOnce(&mut Project) -> bool,

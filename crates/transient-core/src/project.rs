@@ -64,8 +64,11 @@ pub struct Source {
     pub frames: Frames,
 }
 
-/// A part of a source, placed on the timeline.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// A part of a source, placed on the timeline, with its own gain and fades.
+///
+/// The derived `Default` is also the right start for gain and fades: 0 dB,
+/// no fades.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Clip {
     /// Identifies the clip.
@@ -78,6 +81,12 @@ pub struct Clip {
     pub offset: Frames,
     /// How long it plays.
     pub length: Frames,
+    /// The clip's own volume in decibels (set by normalizing, for example).
+    pub gain_db: f32,
+    /// How long it takes to fade in from silence at the start.
+    pub fade_in: Frames,
+    /// How long it takes to fade out to silence at the end.
+    pub fade_out: Frames,
 }
 
 impl Clip {
@@ -228,8 +237,8 @@ impl Project {
             id,
             source,
             start,
-            offset: 0,
             length,
+            ..Clip::default()
         });
         Some(id)
     }
@@ -306,7 +315,10 @@ mod tests {
                   "source": 1,
                   "start": 0,
                   "offset": 0,
-                  "length": 96000
+                  "length": 96000,
+                  "gain_db": 0.0,
+                  "fade_in": 0,
+                  "fade_out": 0
                 }
               ],
               "volume_db": 0.0,
