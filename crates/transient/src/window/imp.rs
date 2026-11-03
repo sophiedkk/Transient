@@ -9,6 +9,7 @@ use transient_core::edit::History;
 use transient_core::project::{ClipId, Project};
 use transient_engine::player::{AudioOutput, Player};
 
+use super::mixer::MixerControl;
 use super::project::LoadedSources;
 use crate::config;
 use crate::widgets::timeline_view::TimelineView;
@@ -38,6 +39,14 @@ pub(crate) struct Window {
     pub(super) position_label: TemplateChild<gtk::Label>,
     #[template_child]
     pub(super) duration_label: TemplateChild<gtk::Label>,
+    #[template_child]
+    pub(super) level_meter: TemplateChild<gtk::Box>,
+    #[template_child]
+    pub(super) left_meter: TemplateChild<gtk::LevelBar>,
+    #[template_child]
+    pub(super) right_meter: TemplateChild<gtk::LevelBar>,
+    #[template_child]
+    pub(super) master_scale: TemplateChild<gtk::Scale>,
 
     pub(super) settings: OnceCell<gio::Settings>,
     /// The open project (what gets saved).
@@ -48,6 +57,10 @@ pub(crate) struct Window {
     pub(super) history: RefCell<History>,
     /// The selected clip, if any.
     pub(super) selected: Cell<Option<ClipId>>,
+    /// The last mixer slider change and when, to coalesce a drag into one undo step.
+    pub(super) last_mixer_change: RefCell<Option<(MixerControl, std::time::Instant)>>,
+    /// True while the code sets mixer controls, so that is not taken as a change.
+    pub(super) updating_controls: Cell<bool>,
     /// The "Clip deleted" toast, closed when the deletion is undone.
     pub(super) undo_toast: RefCell<Option<adw::Toast>>,
     /// Plays the project's mix; `None` until something is imported.
@@ -88,6 +101,8 @@ impl ObjectSubclass for Window {
             window.delete_selected_clip();
         });
         klass.install_action("win.deselect", None, |window, _, _| window.select(None));
+        klass.install_action("win.toggle-mute", None, |window, _, _| window.toggle_mute());
+        klass.install_action("win.toggle-solo", None, |window, _, _| window.toggle_solo());
         klass.install_action("win.select-clip-at-playhead", None, |window, _, _| {
             window.select_clip_at_playhead();
         });
@@ -131,6 +146,7 @@ impl ObjectImpl for Window {
 
         window.setup_transport();
         window.setup_editing();
+        window.setup_mixer();
     }
 }
 

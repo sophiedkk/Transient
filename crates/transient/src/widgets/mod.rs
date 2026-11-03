@@ -2,3 +2,4 @@
 //! (as `$TransientTimelineView`, for example) once its type is registered.
 
 pub(crate) mod timeline_view;
+pub(crate) mod track_header;

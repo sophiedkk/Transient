@@ -96,10 +96,16 @@ impl Window {
                 return;
             };
             let events = player.poll_events();
-            let state = (player.position(), player.sample_rate(), player.is_playing());
+            let state = (
+                player.position(),
+                player.sample_rate(),
+                player.is_playing(),
+                player.levels(),
+            );
             (state, events)
         };
-        let (position, rate, playing) = state;
+        let (position, rate, playing, levels) = state;
+        self.update_level_meter(levels);
 
         for event in events {
             if let PlayerEvent::Error(message) = event {

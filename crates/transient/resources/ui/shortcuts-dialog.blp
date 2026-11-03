@@ -61,6 +61,20 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("Mixing");
+
+    Adw.ShortcutsItem {
+      title: _("Mute Track of Selected Clip");
+      action-name: "win.toggle-mute";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Solo Track of Selected Clip");
+      action-name: "win.toggle-solo";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("View");
 
     Adw.ShortcutsItem {

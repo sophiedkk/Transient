@@ -47,6 +47,7 @@ impl Window {
         let before = imp.project.borrow().clone();
         let changed = edit(&mut imp.project.borrow_mut());
         if changed {
+            self.end_mixer_coalescing();
             imp.history.borrow_mut().record(before);
             self.project_changed();
         }
@@ -151,6 +152,28 @@ impl Window {
         });
     }
 
+    /// Mutes or unmutes the selected clip's track (`win.toggle-mute`, M).
+    pub(super) fn toggle_mute(&self) {
+        self.toggle_selected_track(|track| track.mute = !track.mute);
+    }
+
+    /// Solos or unsolos the selected clip's track (`win.toggle-solo`, Shift+M).
+    pub(super) fn toggle_solo(&self) {
+        self.toggle_selected_track(|track| track.solo = !track.solo);
+    }
+
+    fn toggle_selected_track(&self, toggle: impl FnOnce(&mut transient_core::project::Track)) {
+        let Some(clip) = self.imp().selected.get() else {
+            return;
+        };
+        self.apply_edit(|project| {
+            let Some(track) = project.clip(clip).map(|(track, _)| track) else {
+                return false;
+            };
+            project.track_mut(track).map(toggle).is_some()
+        });
+    }
+
     /// Enables the edit actions that make sense right now. Called after every
     /// change, selection and undo/redo.
     pub(super) fn update_edit_actions(&self) {
@@ -171,6 +194,8 @@ impl Window {
         self.action_set_enabled("win.nudge-left", has_selection);
         self.action_set_enabled("win.nudge-right", has_selection);
         self.action_set_enabled("win.deselect", has_selection);
+        self.action_set_enabled("win.toggle-mute", has_selection);
+        self.action_set_enabled("win.toggle-solo", has_selection);
         self.action_set_enabled("win.split", has_clips);
         self.action_set_enabled("win.select-clip-at-playhead", has_clips);
     }

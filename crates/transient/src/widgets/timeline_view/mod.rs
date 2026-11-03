@@ -56,6 +56,9 @@ pub(crate) struct LaneClip {
 pub(crate) struct Lane {
     /// The clips on this track.
     pub(crate) clips: Vec<LaneClip>,
+    /// False when the track is muted or silenced by another track's solo;
+    /// its clips are then drawn faded.
+    pub(crate) audible: bool,
 }
 
 glib::wrapper! {

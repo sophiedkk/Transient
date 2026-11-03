@@ -15,6 +15,10 @@ use crate::time::{Frames, SampleRate};
 /// Decoded audio for each source, by ID.
 pub type AudioPool = HashMap<SourceId, AudioBuffer>;
 
+/// Volumes at or below this many decibels are silent (the bottom of the
+/// volume sliders).
+pub const SILENT_DB: f32 = -60.0;
+
 /// One clip, ready to mix.
 #[derive(Debug, Clone)]
 struct MixClip {
@@ -22,6 +26,30 @@ struct MixClip {
     start: Frames,
     offset: Frames,
     length: Frames,
+    /// What to multiply the left and right channel by: the track's volume and
+    /// pan, and the master volume.
+    gains: [f32; CHANNELS],
+}
+
+/// Decibels to a multiplier: 0 dB → 1.0, −6 dB → about 0.5, +6 dB → about 2.
+#[must_use]
+pub fn db_to_gain(db: f32) -> f32 {
+    if db <= SILENT_DB {
+        0.0
+    } else {
+        10_f32.powf(db / 20.0)
+    }
+}
+
+/// Left and right multipliers for a balance of `pan` (−1 left … 1 right).
+///
+/// A *balance* law: in the centre both channels stay unchanged; panning right
+/// turns the left channel down (and the other way around). That suits stereo
+/// recordings, which already have their own left and right.
+#[must_use]
+pub fn pan_gains(pan: f32) -> [f32; CHANNELS] {
+    let pan = pan.clamp(-1.0, 1.0);
+    [(1.0 - pan).min(1.0), (1.0 + pan).min(1.0)]
 }
 
 /// A project's clips with their audio, ready to render.
@@ -33,20 +61,33 @@ pub struct Mix {
 }
 
 impl Mix {
-    /// Collects every clip of `project` whose audio is in `pool`.
-    /// Clips whose source is missing from the pool are left out (silent).
+    /// Collects every audible clip of `project` whose audio is in `pool`, with
+    /// its track's mixer settings. Muted tracks, tracks silenced by another
+    /// track's solo, and clips whose source is missing are left out.
     #[must_use]
     pub fn new(project: &Project, pool: &AudioPool) -> Self {
+        let any_solo = project.tracks.iter().any(|track| track.solo);
+        let master = db_to_gain(project.master_volume_db);
         let clips = project
             .tracks
             .iter()
-            .flat_map(|track| &track.clips)
-            .filter_map(|clip| {
+            .filter(|track| !track.mute && (track.solo || !any_solo))
+            .flat_map(|track| {
+                let volume = db_to_gain(track.volume_db) * master;
+                let [left, right] = pan_gains(track.pan);
+                track
+                    .clips
+                    .iter()
+                    .map(move |clip| (clip, [left * volume, right * volume]))
+            })
+            .filter(|(_, gains)| gains.iter().any(|gain| *gain > 0.0))
+            .filter_map(|(clip, gains)| {
                 Some(MixClip {
                     audio: pool.get(&clip.source)?.clone(),
                     start: clip.start,
                     offset: clip.offset,
                     length: clip.length,
+                    gains,
                 })
             })
             .collect();
@@ -103,8 +144,13 @@ impl Mix {
             let Some(target) = out.get_mut(out_first * CHANNELS..) else {
                 continue;
             };
-            for (out_sample, sample) in target.iter_mut().zip(samples) {
-                *out_sample += sample;
+            for (out_frame, frame) in target
+                .chunks_exact_mut(CHANNELS)
+                .zip(samples.chunks_exact(CHANNELS))
+            {
+                for ((out, sample), gain) in out_frame.iter_mut().zip(frame).zip(clip.gains) {
+                    *out += sample * gain;
+                }
             }
         }
     }
@@ -192,6 +238,82 @@ mod tests {
 
         assert_eq!(render(&mix, 97, 5), [97.0, 98.0, 99.0, 0.0, 0.0]);
         assert_eq!(render(&mix, 1000, 2), [0.0, 0.0]);
+    }
+
+    /// Two tracks of constant 0.5, for the mixer setting tests.
+    fn two_tracks() -> (Project, AudioPool) {
+        let mut project = Project::default();
+        let a = project.import("a.wav".into(), 4, "a".to_owned());
+        let b = project.import("b.wav".into(), 4, "b".to_owned());
+        let pool = [a, b]
+            .iter()
+            .map(|track| {
+                (
+                    project.track(*track).unwrap().clips[0].source,
+                    constant(0.5, 4),
+                )
+            })
+            .collect();
+        (project, pool)
+    }
+
+    /// The first frame of the mix, both channels.
+    fn first_frame(project: &Project, pool: &AudioPool) -> [f32; 2] {
+        let mut out = [0.0; 2];
+        Mix::new(project, pool).render(0, &mut out);
+        out
+    }
+
+    fn assert_close(actual: [f32; 2], expected: [f32; 2]) {
+        for (a, e) in actual.iter().zip(expected) {
+            assert!(
+                (a - e).abs() < 1e-4,
+                "expected {expected:?}, got {actual:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn decibels_become_multipliers() {
+        assert!((db_to_gain(0.0) - 1.0).abs() < f32::EPSILON);
+        assert!((db_to_gain(-6.0) - 0.501).abs() < 0.001);
+        assert!((db_to_gain(6.0) - 1.995).abs() < 0.001);
+        assert!(db_to_gain(SILENT_DB).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn volume_and_master_volume_scale_the_mix() {
+        let (mut project, pool) = two_tracks();
+        assert_close(first_frame(&project, &pool), [1.0, 1.0]);
+        project.tracks[0].volume_db = SILENT_DB;
+        assert_close(first_frame(&project, &pool), [0.5, 0.5]);
+        project.master_volume_db = -6.0;
+        assert_close(first_frame(&project, &pool), [0.2506, 0.2506]);
+    }
+
+    #[test]
+    fn pan_moves_a_track_between_left_and_right() {
+        let (mut project, pool) = two_tracks();
+        project.tracks[0].pan = -1.0; // first track: left only
+        project.tracks[1].pan = 0.5; // second: right, left at half
+        assert_close(first_frame(&project, &pool), [0.5 + 0.25, 0.5]);
+    }
+
+    #[test]
+    fn mute_silences_a_track() {
+        let (mut project, pool) = two_tracks();
+        project.tracks[1].mute = true;
+        assert_close(first_frame(&project, &pool), [0.5, 0.5]);
+    }
+
+    #[test]
+    fn solo_silences_every_other_track() {
+        let (mut project, pool) = two_tracks();
+        project.tracks[1].solo = true;
+        assert_close(first_frame(&project, &pool), [0.5, 0.5]);
+        // A muted soloed track stays silent.
+        project.tracks[1].mute = true;
+        assert_close(first_frame(&project, &pool), [0.0, 0.0]);
     }
 
     #[test]

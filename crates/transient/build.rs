@@ -13,9 +13,10 @@ use std::process::Command;
 
 /// Blueprint files, relative to this crate. Add new `.blp` files here
 /// and in `resources/resources.gresource.xml`.
-const BLUEPRINTS: [&str; 2] = [
+const BLUEPRINTS: [&str; 3] = [
     "resources/ui/window.blp",
     "resources/ui/shortcuts-dialog.blp",
+    "resources/ui/track-header.blp",
 ];
 
 /// Build settings and their defaults for development builds.

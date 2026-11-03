@@ -4,6 +4,15 @@
 
 /* One header per track, as tall as a timeline lane (LANE_HEIGHT in timeline_view). */
 .track-header {
-  padding: 8px 12px;
+  padding: 6px 8px 6px 12px;
   border-bottom: 1px solid alpha(currentColor, 0.08);
+}
+
+/* The output level meter: plain accent bars, red while the mix clips. */
+.level-meter levelbar block.filled {
+  background-color: var(--accent-bg-color);
+}
+
+.level-meter.clipping levelbar block.filled {
+  background-color: var(--destructive-bg-color);
 }

@@ -23,6 +23,8 @@ const CLIP_INSET: f32 = 3.0;
 const CLIP_RADIUS: f32 = 6.0;
 /// Height of the clip name strip at the top of a clip.
 const CLIP_LABEL_HEIGHT: f32 = 18.0;
+/// Clips of tracks that are not heard (muted, or another track is soloed).
+const SILENT_LANE_OPACITY: f64 = 0.4;
 /// The waveform uses this much of its half-height, leaving a little room.
 const HEADROOM: f32 = 0.92;
 
@@ -80,6 +82,9 @@ impl TimelineView {
                 &palette.foreground.with_alpha(0.08),
                 &graphene::Rect::new(0.0, top + pixels(LANE_HEIGHT) - 1.0, width, 1.0),
             );
+            if !lane.audible {
+                snapshot.push_opacity(SILENT_LANE_OPACITY);
+            }
             for clip in &lane.clips {
                 if preview.is_some_and(|(_, moved)| moved.id == clip.clip.id) {
                     dragged = Some(clip);
@@ -95,6 +100,9 @@ impl TimelineView {
                     top,
                     is_selected,
                 );
+            }
+            if !lane.audible {
+                snapshot.pop();
             }
         }
         if let (Some(clip), Some((lane, moved))) = (dragged, preview) {

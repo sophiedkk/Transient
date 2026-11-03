@@ -88,8 +88,11 @@ impl Clip {
     }
 }
 
-/// A row in the timeline, holding clips.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// A row in the timeline, holding clips, with its mixer settings.
+///
+/// The derived `Default` is also the right starting point for the mixer
+/// settings: 0 dB (unchanged), centred, not muted, not soloed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Track {
     /// Identifies the track.
@@ -98,6 +101,15 @@ pub struct Track {
     pub name: String,
     /// The clips, in no particular order.
     pub clips: Vec<Clip>,
+    /// Volume in decibels: 0 is unchanged, −6 about half, at or below
+    /// [`crate::mix::SILENT_DB`] silent.
+    pub volume_db: f32,
+    /// Balance from −1 (left only) through 0 (centre) to 1 (right only).
+    pub pan: f32,
+    /// A muted track is not heard.
+    pub mute: bool,
+    /// When any track is soloed, only soloed tracks are heard.
+    pub solo: bool,
 }
 
 /// A Transient project.
@@ -117,6 +129,8 @@ pub struct Project {
     pub sources: Vec<Source>,
     /// The tracks, top to bottom.
     pub tracks: Vec<Track>,
+    /// The volume of the whole mix, in decibels.
+    pub master_volume_db: f32,
     /// The next unused ID (shared by sources, tracks and clips).
     pub next_id: u64,
 }
@@ -129,6 +143,7 @@ impl Default for Project {
             sample_rate: SampleRate::default(),
             sources: Vec::new(),
             tracks: Vec::new(),
+            master_volume_db: 0.0,
             next_id: 1,
         }
     }
@@ -199,7 +214,7 @@ impl Project {
         self.tracks.push(Track {
             id,
             name,
-            clips: Vec::new(),
+            ..Track::default()
         });
         id
     }
@@ -293,9 +308,14 @@ mod tests {
                   "offset": 0,
                   "length": 96000
                 }
-              ]
+              ],
+              "volume_db": 0.0,
+              "pan": 0.0,
+              "mute": false,
+              "solo": false
             }
           ],
+          "master_volume_db": 0.0,
           "next_id": 4
         }
         "#);

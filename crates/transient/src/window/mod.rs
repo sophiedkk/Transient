@@ -16,6 +16,7 @@
 mod edit;
 mod imp;
 mod import;
+mod mixer;
 mod project;
 mod transport;
 

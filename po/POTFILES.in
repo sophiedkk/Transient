@@ -4,8 +4,10 @@ data/io.github.sophiedkk.Transient.metainfo.xml.in.in
 data/io.github.sophiedkk.Transient.gschema.xml
 crates/transient/resources/ui/window.blp
 crates/transient/resources/ui/shortcuts-dialog.blp
+crates/transient/resources/ui/track-header.blp
 crates/transient/src/application.rs
 crates/transient/src/window/edit.rs
 crates/transient/src/window/import.rs
 crates/transient/src/window/project.rs
 crates/transient/src/window/transport.rs
+crates/transient/src/widgets/track_header.rs

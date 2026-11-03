@@ -21,6 +21,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   drag its edges to trim it; edges snap to other clips, the playhead and the
   start. Split at the playhead (S), delete (Delete), nudge (Ctrl+Left/Right),
   deselect (Escape).
+- Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
+  sliders; a master volume and a stereo output level meter (red when the mix
+  clips) are in the bottom bar. Tracks that are not heard are drawn faded.
+  M and Shift+M mute and solo the selected clip's track. A slider drag is one
+  undo step.
 - Undo and redo for every change (Ctrl+Z, Shift+Ctrl+Z, and buttons in the
   header bar). Deleting shows a toast with an Undo button instead of asking
   for confirmation.

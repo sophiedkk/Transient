@@ -29,6 +29,12 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 - Undo/redo = snapshots of the whole project (`transient-core::edit::History`).
   Every change goes through `Window::apply_edit`, which records the snapshot.
   The timeline only previews drags and emits `clip-changed` on release.
+- Mixer settings (track volume/pan/mute/solo, master volume) live on `Track`/
+  `Project`; `Mix` applies them (balance pan law). Slider changes go through
+  `Window::apply_mixer_change`: coalesced undo steps and `update_mix()` only,
+  so headers are never rebuilt mid-drag. `TrackHeader` (Blueprint template) must
+  stay exactly `LANE_HEIGHT` tall; the header column is clamped to 200 px with
+  `hexpand: false` (slider hexpand would otherwise spread up).
 
 ## UI rules (GNOME HIG)
 
@@ -91,7 +97,9 @@ just test-audio                                 # decode the whole test collecti
   (no sound output, still real time), `--screenshot=FILE`, `--quit-after=SECONDS`,
   `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead), and
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
-  `select-clip-at-playhead`, `nudge-right`, `delete-clip`) to script edits.
+  `select-clip-at-playhead`, `nudge-right`, `delete-clip`, `toggle-mute`,
+  `toggle-solo`) to script edits. With `--play`, the level meter (red = clipping)
+  shows whether the mix is as loud as expected.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
   (unit- and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.

@@ -3,7 +3,7 @@
 //! The pipeline:
 //!
 //! ```text
-//! appsrc → audioconvert → audioresample → autoaudiosink (or fakesink)
+//! appsrc → audioconvert → level → audioresample → autoaudiosink (or fakesink)
 //! ```
 //!
 //! `appsrc` is GStreamer's door for data coming *from* our code. Whenever the
@@ -14,6 +14,9 @@
 //!
 //! After an edit, [`Player::set_mix`] swaps in the new mix; playback continues
 //! with it from the next chunk on.
+//!
+//! The `level` element measures the output 20 times a second and posts the
+//! result on the bus; [`Player::poll_events`] picks it up for the level meter.
 
 use std::sync::{Arc, Mutex};
 
@@ -27,6 +30,8 @@ use crate::{EngineError, make_element};
 
 /// How many frames to hand to GStreamer at a time (about 85 ms at 48 kHz).
 const CHUNK_FRAMES: usize = 4096;
+/// How often the level meter is updated.
+const LEVEL_INTERVAL: gstreamer::ClockTime = gstreamer::ClockTime::from_mseconds(50);
 
 /// Where the sound goes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -66,6 +71,8 @@ pub struct Player {
     /// A seek GStreamer has not finished yet. Seeks complete asynchronously, and
     /// until then the pipeline still reports the old position.
     pending_seek: Option<Frames>,
+    /// The latest output level per channel, in dBFS (see [`Player::levels`]).
+    levels: Option<[f64; CHANNELS]>,
 }
 
 impl Player {
@@ -96,6 +103,9 @@ impl Player {
 
         let convert = make_element("audioconvert")?;
         let resample = make_element("audioresample")?;
+        let level = make_element("level")?;
+        level.set_property("interval", LEVEL_INTERVAL.nseconds());
+        level.set_property("post-messages", true);
         let sink = match output {
             AudioOutput::Speakers => make_element("autoaudiosink")?,
             AudioOutput::Silent => {
@@ -106,8 +116,9 @@ impl Player {
         };
 
         let pipeline = gstreamer::Pipeline::new();
-        pipeline.add_many([appsrc.upcast_ref(), &convert, &resample, &sink])?;
-        gstreamer::Element::link_many([appsrc.upcast_ref(), &convert, &resample, &sink])?;
+        let elements = [appsrc.upcast_ref(), &convert, &level, &resample, &sink];
+        pipeline.add_many(elements)?;
+        gstreamer::Element::link_many(elements)?;
         pipeline.set_state(gstreamer::State::Paused)?;
 
         Ok(Self {
@@ -117,6 +128,7 @@ impl Player {
             duration,
             playing: false,
             pending_seek: None,
+            levels: None,
         })
     }
 
@@ -187,6 +199,13 @@ impl Player {
         }
     }
 
+    /// The output level per channel (left, right) in dBFS: 0 is full scale,
+    /// above 0 clips. `None` until the first measurement, and while not playing.
+    #[must_use]
+    pub fn levels(&self) -> Option<[f64; CHANNELS]> {
+        self.levels.filter(|_| self.playing)
+    }
+
     /// The length of the audio in frames.
     #[must_use]
     pub fn duration(&self) -> Frames {
@@ -211,10 +230,16 @@ impl Player {
             gstreamer::MessageType::Eos,
             gstreamer::MessageType::Error,
             gstreamer::MessageType::AsyncDone,
+            gstreamer::MessageType::Element,
         ]) {
             match message.view() {
                 // A seek (or start-up) finished: the pipeline's position is right again.
                 gstreamer::MessageView::AsyncDone(_) => self.pending_seek = None,
+                gstreamer::MessageView::Element(element) => {
+                    if let Some(levels) = element.structure().and_then(read_levels) {
+                        self.levels = Some(levels);
+                    }
+                }
                 gstreamer::MessageView::Eos(_) => {
                     if let Err(error) = self.pause() {
                         tracing::warn!("could not pause at the end: {error}");
@@ -238,6 +263,20 @@ impl Drop for Player {
             tracing::warn!("could not stop the player: {error}");
         }
     }
+}
+
+/// Reads a `level` message: the "decay" field holds the peak level per channel in
+/// dBFS, falling back slowly after a peak, which makes a calm meter.
+fn read_levels(structure: &gstreamer::StructureRef) -> Option<[f64; CHANNELS]> {
+    if structure.name() != "level" {
+        return None;
+    }
+    let decay = structure.get::<gstreamer::glib::ValueArray>("decay").ok()?;
+    let mut levels = [f64::NEG_INFINITY; CHANNELS];
+    for (level, value) in levels.iter_mut().zip(decay.iter()) {
+        *level = value.get::<f64>().ok()?;
+    }
+    Some(levels)
 }
 
 /// The appsrc callbacks: hand out audio, and move the read position on seeks.
@@ -338,6 +377,12 @@ mod tests {
         }
 
         assert_eq!(events, vec![PlayerEvent::Finished]);
+        // A constant 0.1 is −20 dBFS; the meter must have seen it.
+        let levels = player.levels.unwrap();
+        assert!(
+            levels.iter().all(|db| (db + 20.0).abs() < 0.5),
+            "levels {levels:?}"
+        );
         assert!(!player.is_playing());
         assert_eq!(player.position(), player.duration());
     }

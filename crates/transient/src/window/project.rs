@@ -19,7 +19,8 @@ use transient_engine::decode::SourceFormat;
 use transient_engine::player::Player;
 
 use super::Window;
-use crate::widgets::timeline_view::{LANE_HEIGHT, Lane, LaneClip};
+use crate::widgets::timeline_view::{Lane, LaneClip};
+use crate::widgets::track_header::TrackHeader;
 
 /// A source's decoded audio, with what the window shows about it.
 #[derive(Debug, Clone)]
@@ -37,10 +38,11 @@ impl Window {
     /// Updates everything that depends on the project. Call after every change.
     pub(super) fn project_changed(&self) {
         let imp = self.imp();
+        self.update_mix();
+        self.end_mixer_coalescing();
+        self.show_master_volume();
         let project = imp.project.borrow().clone();
         let sources = imp.sources.borrow();
-
-        self.update_mix(&project, &sources);
         self.rebuild_track_headers(&project, &sources);
         imp.timeline.set_lanes(
             lanes(&project, &sources),
@@ -69,13 +71,29 @@ impl Window {
         self.update_edit_actions();
     }
 
-    /// Gives the player the new mix, creating the player the first time.
-    fn update_mix(&self, project: &Project, sources: &LoadedSources) {
+    /// Redraws the timeline lanes (for example after mute or solo changed),
+    /// without touching the track headers.
+    pub(super) fn refresh_lanes(&self) {
+        let imp = self.imp();
+        let project = imp.project.borrow();
+        imp.timeline.set_lanes(
+            lanes(&project, &imp.sources.borrow()),
+            project.sample_rate,
+            project.length(),
+        );
+    }
+
+    /// Gives the player the project's current mix, creating the player the first
+    /// time. Enough after a mixer change; structural changes use `project_changed`.
+    pub(super) fn update_mix(&self) {
+        let imp = self.imp();
+        let project = imp.project.borrow();
+        let sources = imp.sources.borrow();
         let pool: AudioPool = sources
             .iter()
             .map(|(id, source)| (*id, source.waveform.buffer().clone()))
             .collect();
-        let mix = Mix::new(project, &pool);
+        let mix = Mix::new(&project, &pool);
         let mut player = self.imp().player.borrow_mut();
         if let Some(player) = player.as_mut() {
             player.set_mix(mix);
@@ -93,25 +111,36 @@ impl Window {
         }
     }
 
-    /// One header per track, next to its lane in the timeline.
+    /// One header per track, next to its lane in the timeline. Existing headers
+    /// are reused when the number of tracks is the same, so a slider being
+    /// dragged is never replaced under the pointer.
     fn rebuild_track_headers(&self, project: &Project, sources: &LoadedSources) {
         let container = &self.imp().track_headers;
-        while let Some(child) = container.first_child() {
-            container.remove(&child);
+        let mut existing = Vec::new();
+        let mut child = container.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if let Ok(header) = widget.downcast::<TrackHeader>() {
+                existing.push(header);
+            }
         }
-        for track in &project.tracks {
-            let header = gtk::Box::builder()
-                .orientation(gtk::Orientation::Vertical)
-                .height_request(LANE_HEIGHT)
-                .spacing(2)
-                .css_classes(["track-header"])
-                .build();
-            let name = gtk::Label::builder()
-                .label(&track.name)
-                .xalign(0.0)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .css_classes(["heading"])
-                .build();
+        if existing.len() != project.tracks.len() {
+            for header in existing.drain(..) {
+                container.remove(&header);
+            }
+            for _ in &project.tracks {
+                let header = TrackHeader::new();
+                let weak = self.downgrade();
+                header.connect_changed(move |track, settings| {
+                    if let Some(window) = weak.upgrade() {
+                        window.apply_track_settings(track, settings);
+                    }
+                });
+                container.append(&header);
+                existing.push(header);
+            }
+        }
+        for (header, track) in existing.iter().zip(&project.tracks) {
             // The format of the track's first clip, for example "44.1 kHz · Stereo".
             let format = track
                 .clips
@@ -119,25 +148,19 @@ impl Window {
                 .and_then(|clip| sources.get(&clip.source))
                 .map(|source| super::import::describe_format(source.format))
                 .unwrap_or_default();
-            let details = gtk::Label::builder()
-                .label(&format)
-                .xalign(0.0)
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .css_classes(["caption", "dimmed"])
-                .build();
-            header.append(&name);
-            header.append(&details);
-            container.append(&header);
+            header.set_track(track, &format);
         }
     }
 }
 
 /// The timeline's view of the project: one lane per track.
 fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
+    let any_solo = project.tracks.iter().any(|track| track.solo);
     project
         .tracks
         .iter()
         .map(|track| Lane {
+            audible: !track.mute && (track.solo || !any_solo),
             clips: track
                 .clips
                 .iter()
