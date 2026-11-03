@@ -1,0 +1,5 @@
+# rustup reads this file and installs exactly this toolchain for the project.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
+profile = "default"

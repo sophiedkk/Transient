@@ -1,0 +1,59 @@
+{
+    "id": "io.github.sophiedkk.Transient.Devel",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "51",
+    "sdk": "org.gnome.Sdk",
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
+    "command": "transient",
+    "finish-args": [
+        "--share=ipc",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--device=dri",
+        "--socket=pulseaudio",
+        "--env=RUST_LOG=transient=debug,info",
+        "--env=RUST_BACKTRACE=1"
+    ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "build-args": [
+            "--share=network"
+        ],
+        "env": {
+            "CARGO_HOME": "/run/build/transient/cargo",
+            "CARGO_REGISTRIES_CRATES_IO_PROTOCOL": "sparse"
+        }
+    },
+    "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/share/man",
+        "*.a",
+        "*.la"
+    ],
+    "modules": [
+        {
+            "name": "transient",
+            "buildsystem": "meson",
+            "config-opts": [
+                "-Dprofile=development"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "..",
+                    "skip": [
+                        "target",
+                        "_build",
+                        "_flatpak",
+                        ".flatpak-builder",
+                        ".git",
+                        ".idea"
+                    ]
+                }
+            ]
+        }
+    ]
+}

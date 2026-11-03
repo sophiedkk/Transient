@@ -1,0 +1,47 @@
+using Gtk 4.0;
+using Adw 1;
+
+translation-domain "transient";
+
+// Libadwaita shows this dialog for the app.shortcuts action (Ctrl+?).
+// The object id must be `shortcuts_dialog`. Keep this list in sync with
+// the accelerators set in src/application.rs.
+Adw.ShortcutsDialog shortcuts_dialog {
+  Adw.ShortcutsSection {
+    title: _("Playback");
+
+    Adw.ShortcutsItem {
+      title: _("Play or Pause");
+      action-name: "win.play-pause";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Go to Start");
+      action-name: "win.go-to-start";
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: _("General");
+
+    Adw.ShortcutsItem {
+      title: _("Import Audio");
+      action-name: "win.import-audio";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Show Shortcuts");
+      action-name: "app.shortcuts";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Close Window");
+      action-name: "window.close";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Quit");
+      action-name: "app.quit";
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Transient
+Comment=Mix and trim audio files
+# Translators: search terms for finding this app. Do NOT translate or localize the semicolons.
+Keywords=audio;sound;mixer;editor;trim;cut;fade;waveform;music;podcast;
+Exec=transient %U
+Icon=@APP_ID@
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;AudioVideoEditing;GTK;
+StartupNotify=true
+MimeType=audio/mpeg;audio/flac;audio/x-wav;audio/ogg;audio/opus;

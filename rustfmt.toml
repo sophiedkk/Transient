@@ -1,0 +1,5 @@
+edition = "2024"
+# Pinned so `rustfmt` run by an IDE formats the same way as `cargo fmt`.
+style_edition = "2024"
+max_width = 100
+newline_style = "Unix"

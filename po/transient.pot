@@ -1,0 +1,205 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the transient package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: transient\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-03 13:47+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: data/io.github.sophiedkk.Transient.desktop.in.in:2
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:8
+#: crates/transient/resources/ui/window.blp:8
+#: crates/transient/src/application.rs:98
+msgid "Transient"
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.desktop.in.in:3
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:9
+msgid "Mix and trim audio files"
+msgstr ""
+
+#. Translators: search terms for finding this app. Do NOT translate or localize the semicolons.
+#: data/io.github.sophiedkk.Transient.desktop.in.in:5
+msgid "audio;sound;mixer;editor;trim;cut;fade;waveform;music;podcast;"
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:11
+msgid ""
+"Transient is a simple multitrack audio editor. Put audio files on tracks, "
+"trim and arrange them, balance their volume, and export the result."
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:15
+msgid "Transient is in early development and cannot edit audio yet."
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:21
+msgid "Sophie de Klerk"
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.metainfo.xml.in.in:49
+msgid "Project setup: an empty window, ready for the first features."
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.gschema.xml:7
+msgid "Window width"
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.gschema.xml:11
+msgid "Window height"
+msgstr ""
+
+#: data/io.github.sophiedkk.Transient.gschema.xml:15
+msgid "Window maximized"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:26
+#: crates/transient/resources/ui/shortcuts-dialog.blp:28
+#: crates/transient/src/window/import.rs:27
+msgid "Import Audio"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:34
+msgid "Main Menu"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:47
+msgid "Start a New Project"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:48
+msgid "Import audio files to start mixing"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:51
+msgid "_Import Audio…"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:88
+msgid "Length"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:96
+msgid "Original Format"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:104
+msgid "Location"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:126
+#: crates/transient/resources/ui/shortcuts-dialog.blp:19
+msgid "Go to Start"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:132
+#: crates/transient/src/window/transport.rs:130
+msgid "Play"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:155
+msgid "Playback Position"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:175
+msgid "_Keyboard Shortcuts"
+msgstr ""
+
+#: crates/transient/resources/ui/window.blp:180
+msgid "_About Transient"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:11
+msgid "Playback"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:14
+msgid "Play or Pause"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:25
+msgid "General"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:33
+msgid "Show Shortcuts"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:38
+msgid "Close Window"
+msgstr ""
+
+#: crates/transient/resources/ui/shortcuts-dialog.blp:43
+msgid "Quit"
+msgstr ""
+
+#. Translators: replace with your name and email, one translator per line.
+#: crates/transient/src/application.rs:108
+msgid "translator-credits"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:21
+msgid "Audio Files"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:42
+msgid "Could not open the file chooser"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:55
+msgid "Only one file can be opened at a time for now"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:58
+msgid "Only files on this computer can be opened"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:67
+#, rust-format
+msgid "Opening “{}”"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:85
+#, rust-format
+msgid "Could not open “{}”"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:138
+msgid "Unknown"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:150
+msgid "Mono"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:151
+msgid "Stereo"
+msgstr ""
+
+#: crates/transient/src/window/import.rs:152
+#, rust-format
+msgid "{} channel"
+msgid_plural "{} channels"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/transient/src/window/transport.rs:76
+#: crates/transient/src/window/transport.rs:119
+msgid "Playback failed"
+msgstr ""
+
+#: crates/transient/src/window/transport.rs:128
+msgid "Pause"
+msgstr ""

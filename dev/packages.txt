@@ -1,0 +1,40 @@
+# Fedora packages for the Transient development environment.
+# Read by dev/Containerfile (the toolbox image) and by CI, so local and CI builds match.
+# One package per line; lines starting with '#' are ignored.
+
+# Compilers and build tools
+gcc
+pkgconf-pkg-config
+meson
+ninja-build
+just
+git
+
+# GTK / Libadwaita
+gtk4-devel
+libadwaita-devel
+blueprint-compiler
+glib2-devel
+
+# GStreamer: development headers plus the plugins needed to decode and play audio
+gstreamer1-devel
+gstreamer1-plugins-base-devel
+gstreamer1-plugins-good
+gstreamer1-plugins-bad-free
+gstreamer1-plugin-libav
+pipewire-gstreamer
+
+# Translations and metadata validation
+gettext
+desktop-file-utils
+appstream
+
+# Headless testing: an invisible GNOME compositor for screenshots (dev/headless.sh)
+mutter
+dbus-daemon
+
+# Libraries RustRover (a Java app) needs when it runs inside the toolbox
+fontconfig
+libXtst
+libXi
+libXrender

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Actions are pinned to a full commit hash (with the version as a comment), so a
+# moved tag cannot change what runs. Checked with `zizmor .github/workflows`.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The same checks as `just check`, in the same Fedora environment as the toolbox
+  # (packages from dev/packages.txt, Rust from rust-toolchain.toml).
+  check:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Fedora packages
+        run: dnf -y install rustup $(grep -v -e '^#' -e '^$' dev/packages.txt)
+
+      - name: Install Rust
+        run: |
+          rustup-init -y --default-toolchain none --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" toolchain install
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
+        with:
+          tool: cargo-nextest,cargo-deny
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo nextest run --workspace --profile ci
+
+      - name: Dependencies (advisories, licences)
+        run: cargo deny check
+
+      - name: App metadata (desktop file, metainfo, settings schema)
+        run: |
+          meson setup _build -Dprofile=development
+          meson test -C _build --print-errorlogs
+
+  # Builds the Flatpak exactly as users get it, and uploads it as a downloadable bundle.
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          bundle: transient-devel.flatpak
+          manifest-path: build-aux/io.github.sophiedkk.Transient.Devel.json
+          cache-key: flatpak-builder-${{ github.sha }}

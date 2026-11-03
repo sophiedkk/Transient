@@ -1,0 +1,16 @@
+# Opens a weekly pull request when a dependency or a pinned action has a new version.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # gtk-rs and GStreamer crates must be updated together.
+      gtk-rs:
+        patterns: ["gtk4", "libadwaita", "glib*", "gstreamer*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

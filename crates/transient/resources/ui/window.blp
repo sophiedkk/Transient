@@ -1,0 +1,184 @@
+using Gtk 4.0;
+using Adw 1;
+
+translation-domain "transient";
+
+// The main window. `$TransientWindow` is the Rust type in src/window/imp.rs.
+template $TransientWindow: Adw.ApplicationWindow {
+  title: _("Transient");
+  default-width: 1200;
+  default-height: 720;
+  // The smallest size the layout must work at. Breakpoints are added later.
+  width-request: 640;
+  height-request: 400;
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.ToolbarView toolbar_view {
+      bottom-bar-style: raised;
+      // The transport bar appears once a file is open.
+      reveal-bottom-bars: false;
+
+      [top]
+      Adw.HeaderBar {
+        [start]
+        Button {
+          icon-name: "list-add-symbolic";
+          tooltip-text: _("Import Audio");
+          action-name: "win.import-audio";
+        }
+
+        [end]
+        MenuButton {
+          primary: true;
+          icon-name: "open-menu-symbolic";
+          tooltip-text: _("Main Menu");
+          menu-model: primary_menu;
+        }
+      }
+
+      // One page is visible at a time; the code switches by name.
+      content: Adw.ViewStack stack {
+        // Before anything is imported.
+        Adw.ViewStackPage {
+          name: "empty";
+
+          child: Adw.StatusPage {
+            icon-name: "audio-x-generic-symbolic";
+            title: _("Start a New Project");
+            description: _("Import audio files to start mixing");
+
+            child: Button {
+              label: _("_Import Audio…");
+              use-underline: true;
+              halign: center;
+              action-name: "win.import-audio";
+
+              styles [
+                "pill",
+                "suggested-action",
+              ]
+            };
+          };
+        }
+
+        // While a file is being decoded.
+        Adw.ViewStackPage {
+          name: "loading";
+
+          child: Adw.StatusPage loading_page {
+            child: Adw.Spinner {
+              height-request: 48;
+              width-request: 48;
+            };
+          };
+        }
+
+        // An open file. The waveform replaces this in milestone 2.
+        Adw.ViewStackPage {
+          name: "clip";
+
+          child: Adw.Clamp {
+            maximum-size: 600;
+            valign: center;
+            margin-start: 12;
+            margin-end: 12;
+
+            child: Adw.PreferencesGroup clip_group {
+              Adw.ActionRow length_row {
+                title: _("Length");
+
+                styles [
+                  "property",
+                ]
+              }
+
+              Adw.ActionRow format_row {
+                title: _("Original Format");
+
+                styles [
+                  "property",
+                ]
+              }
+
+              Adw.ActionRow location_row {
+                title: _("Location");
+                subtitle-selectable: true;
+
+                styles [
+                  "property",
+                ]
+              }
+            };
+          };
+        }
+      };
+
+      [bottom]
+      Box {
+        spacing: 6;
+
+        styles [
+          "toolbar",
+        ]
+
+        Button {
+          icon-name: "media-skip-backward-symbolic";
+          tooltip-text: _("Go to Start");
+          action-name: "win.go-to-start";
+        }
+
+        Button play_button {
+          icon-name: "media-playback-start-symbolic";
+          tooltip-text: _("Play");
+          action-name: "win.play-pause";
+        }
+
+        Label position_label {
+          label: "0:00.000";
+
+          styles [
+            "numeric",
+          ]
+        }
+
+        Scale position_scale {
+          hexpand: true;
+
+          adjustment: Adjustment {
+            lower: 0;
+            upper: 1;
+            step-increment: 1;
+            page-increment: 10;
+          };
+
+          accessibility {
+            label: _("Playback Position");
+          }
+        }
+
+        Label duration_label {
+          label: "0:00.000";
+
+          styles [
+            "numeric",
+            "dimmed",
+          ]
+        }
+      }
+    };
+  };
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "app.shortcuts";
+    }
+
+    item {
+      label: _("_About Transient");
+      action: "app.about";
+    }
+  }
+}

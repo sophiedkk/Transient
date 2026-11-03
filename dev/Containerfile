@@ -1,0 +1,15 @@
+# Development image for Transient, used as a Toolbx container.
+#
+# Build and create the toolbox with `dev/setup.sh` (runs on the host, no sudo).
+# Rust itself is NOT installed here: Toolbx shares your home directory, so the
+# rustup toolchain in ~/.cargo is used, pinned by rust-toolchain.toml.
+FROM registry.fedoraproject.org/fedora-toolbox:44
+
+LABEL com.github.containers.toolbox="true" \
+      name="transient-dev" \
+      summary="Development environment for Transient (GTK 4, Libadwaita, GStreamer)"
+
+COPY packages.txt /tmp/packages.txt
+RUN dnf -y install $(grep -v -e '^#' -e '^$' /tmp/packages.txt) \
+ && dnf clean all \
+ && rm /tmp/packages.txt

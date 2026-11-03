@@ -1,0 +1,15 @@
+# Lint LEVELS live in the root Cargo.toml ([workspace.lints]); this file only
+# tunes behaviour. Reference: https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# Panicking shortcuts are fine (and idiomatic) inside tests.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# Words that clippy::doc_markdown should not ask to put in `backticks`.
+doc-valid-idents = [
+    "..", "GStreamer", "GNOME", "Libadwaita", "PipeWire", "Flatpak", "Toolbx",
+    "GObject", "GResource", "GSettings", "GtkBuilder", "GApplication", "GApplication",
+]

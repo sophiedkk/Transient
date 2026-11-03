@@ -1,0 +1,23 @@
+[package]
+name = "transient-engine"
+description = "Transient's audio input and output: decoding, playback and export with GStreamer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+transient-core.workspace = true
+gstreamer.workspace = true
+gstreamer-app.workspace = true
+gstreamer-audio.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

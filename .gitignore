@@ -1,0 +1,21 @@
+# Cargo
+/target/
+
+# Meson
+/_build/
+
+# Flatpak
+/_flatpak/
+/.flatpak-builder/
+*.flatpak
+
+# Snapshot tests: pending (not yet accepted) snapshots
+*.snap.new
+*.pending-snap
+
+# Editors
+/.idea/
+/.vscode/
+
+# Test audio, downloaded by dev/fetch-test-audio.sh
+/test-audio/

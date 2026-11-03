@@ -1,0 +1,104 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+# Shared package metadata; each crate inherits it with `<key>.workspace = true`.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# The oldest Rust that can build Transient (gtk4 0.11 and gstreamer 0.25 need 1.92).
+# Day-to-day development uses the newer toolchain pinned in rust-toolchain.toml;
+# the Flatpak SDK's rust-stable extension only has to satisfy this minimum.
+rust-version = "1.92"
+license = "MIT"
+repository = "https://github.com/sophiedkk/Transient"
+
+# Every external dependency is declared ONCE here, with its version.
+# A crate uses one with `name.workspace = true` in its own Cargo.toml.
+[workspace.dependencies]
+# Our own crates
+transient-core = { path = "crates/transient-core" }
+transient-engine = { path = "crates/transient-engine" }
+
+# UI. The feature flags set the oldest platform we support: GNOME 49
+# (GTK 4.20 + Libadwaita 1.8, which adds AdwShortcutsDialog).
+gtk = { package = "gtk4", version = "0.11", features = ["gnome_49"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_8"] }
+glib-build-tools = "0.22"
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
+
+# Audio
+gstreamer = "0.25"
+gstreamer-app = "0.25"     # appsrc/appsink: moving audio between Rust and GStreamer
+gstreamer-audio = "0.25"   # audio formats and caps
+
+# Data and errors
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+
+# Command line (transient-cli)
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Testing (dev-dependencies only)
+insta = { version = "1", features = ["json"] }
+proptest = "1"
+tempfile = "3"
+
+# Lints are configured once here and inherited by every crate (`[lints] workspace = true`).
+# Clippy groups sit at priority -1 so the individual lints below can override them.
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# No panics in application code: a panic inside a GTK callback aborts the whole app.
+# Return a `Result` instead. (clippy.toml allows these in tests.)
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"   # use `tracing` for logging
+print_stderr = "deny"
+
+# Audio code converts between number types constantly. Warn (not deny) on `as`
+# and on panicking indexing, and prefer iterators, `TryFrom` or a commented `#[expect]`.
+as_conversions = "warn"
+indexing_slicing = "warn"
+
+# Don't throw away information silently.
+map_err_ignore = "warn"
+unused_result_ok = "deny"
+float_cmp_const = "deny"
+lossy_float_literal = "deny"
+
+[workspace.lints.rust]
+# No unsafe code anywhere. `forbid` cannot be overridden by an `#[allow]` further down.
+unsafe_code = "forbid"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+let_underscore_drop = "deny"
+non_ascii_idents = "forbid"
+unexpected_cfgs = "deny"
+
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies are optimised even in debug builds: audio decoding and mixing are
+# far too slow unoptimised, while our own code still compiles fast.
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+overflow-checks = true

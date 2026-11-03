@@ -1,0 +1,20 @@
+[package]
+name = "transient-cli"
+description = "Command-line tools for Transient: inspect and process audio without the GUI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+transient-core.workspace = true
+transient-engine.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

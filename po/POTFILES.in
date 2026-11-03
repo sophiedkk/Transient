@@ -1,0 +1,9 @@
+# Files containing translatable strings. Keep this list up to date.
+data/io.github.sophiedkk.Transient.desktop.in.in
+data/io.github.sophiedkk.Transient.metainfo.xml.in.in
+data/io.github.sophiedkk.Transient.gschema.xml
+crates/transient/resources/ui/window.blp
+crates/transient/resources/ui/shortcuts-dialog.blp
+crates/transient/src/application.rs
+crates/transient/src/window/import.rs
+crates/transient/src/window/transport.rs

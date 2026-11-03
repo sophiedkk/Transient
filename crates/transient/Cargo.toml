@@ -1,0 +1,24 @@
+[package]
+name = "transient"
+description = "A simple multitrack audio editor for GNOME"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+transient-core.workspace = true
+transient-engine.workspace = true
+adw.workspace = true
+gtk.workspace = true
+gettext-rs.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+glib-build-tools.workspace = true
+
+[lints]
+workspace = true

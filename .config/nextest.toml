@@ -1,0 +1,8 @@
+# cargo-nextest configuration: https://nexte.st/docs/configuration/
+[profile.default]
+# Show the output of failing tests at the end of the run, after the summary.
+failure-output = "final"
+
+[profile.ci]
+failure-output = "immediate-final"
+fail-fast = false

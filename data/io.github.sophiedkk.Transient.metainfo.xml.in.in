@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: https://www.freedesktop.org/software/appstream/docs/ -->
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Transient</name>
+  <summary>Mix and trim audio files</summary>
+  <description>
+    <p>
+      Transient is a simple multitrack audio editor. Put audio files on tracks,
+      trim and arrange them, balance their volume, and export the result.
+    </p>
+    <p>
+      Transient is in early development and cannot edit audio yet.
+    </p>
+  </description>
+
+  <developer id="io.github.sophiedkk">
+    <name>Sophie de Klerk</name>
+  </developer>
+
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+  <translation type="gettext">transient</translation>
+
+  <url type="homepage">https://github.com/sophiedkk/Transient</url>
+  <url type="bugtracker">https://github.com/sophiedkk/Transient/issues</url>
+  <url type="vcs-browser">https://github.com/sophiedkk/Transient</url>
+
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">640</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f6d32d</color>
+    <color type="primary" scheme_preference="dark">#241f31</color>
+  </branding>
+
+  <releases>
+    <release version="0.1.0" date="2026-11-03" type="development">
+      <description>
+        <p>Project setup: an empty window, ready for the first features.</p>
+      </description>
+    </release>
+  </releases>
+</component>
