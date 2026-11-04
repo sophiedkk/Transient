@@ -61,6 +61,9 @@ mkdir -p "$appdir/usr/share/icons"
 cp -r /usr/share/icons/Adwaita "$appdir/usr/share/icons/"
 
 # 2. Copy in the libraries, GTK's and GStreamer's files.
+# linuxdeploy's own strip is too old for Fedora's libraries (it fails on their
+# .relr.dyn sections); they are stripped already, so skip it.
+export NO_STRIP=1
 export DEPLOY_GTK_VERSION=4
 export GSTREAMER_PLUGINS_DIR=/usr/lib64/gstreamer-1.0
 export GSTREAMER_HELPERS_DIR=/usr/libexec/gstreamer-1.0
