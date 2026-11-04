@@ -21,6 +21,7 @@ mod imp;
 mod import;
 mod mixer;
 mod project;
+mod selection;
 mod transport;
 
 use std::path::Path;

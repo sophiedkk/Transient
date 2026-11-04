@@ -5,14 +5,19 @@
 //!
 //! | Under the pointer          | Drag does                       |
 //! |----------------------------|---------------------------------|
-//! | the ruler or an empty lane | moves the playhead              |
-//! | the middle of a clip       | moves the clip (also to another lane) |
+//! | the ruler                  | moves the playhead              |
+//! | a clip's name strip (top)  | moves the clip (also to another lane, or below the last one) |
+//! | a clip's waveform, or an empty lane | selects time, over the lanes dragged across |
 //! | a clip's left/right edge   | trims the clip                  |
 //! | a fade handle (selected clip, top corners) | changes the fade |
 //!
+//! A click (no drag) selects the clip under the pointer (or nothing) and moves
+//! the playhead there.
+//!
 //! While dragging, only a *preview* changes (drawn by `draw.rs`). The project
 //! changes once, on release, through the `clip-changed` signal, so one drag is
-//! one undo step. Edges snap to other clips' edges, the playhead and the start.
+//! one undo step; a time selection is reported with `range-selected`. Edges
+//! snap to other clips' edges, the playhead and the start.
 //!
 //! A drag is measured in frames, not pixels: the clip follows the audio under the
 //! pointer. That keeps the preview right while the view scrolls by itself
@@ -26,11 +31,12 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, glib};
 use transient_core::edit::{snap, visible_parts};
 use transient_core::project::{Clip, ClipId};
+use transient_core::range::TimeRange;
 use transient_core::time::{Frames, frames_from_f64, frames_to_f64};
 use transient_core::view::autoscroll_speed;
 
 use super::gestures::microseconds_to_seconds;
-use super::{LANE_HEIGHT, LaneClip, RULER_HEIGHT, TimelineView};
+use super::{LANE_HEIGHT, LaneClip, LaneRange, RULER_HEIGHT, TimelineView};
 
 /// How close (in pixels) an edge has to come to a snap point to snap to it.
 const SNAP_DISTANCE: f64 = 8.0;
@@ -62,7 +68,10 @@ const TOUCH_GRAB: Grab = Grab {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Zone {
     LeftEdge,
-    Body,
+    /// The name strip along the top: grab it to move the clip.
+    Strip,
+    /// The waveform: drag over it to select time.
+    Waveform,
     RightEdge,
     FadeInHandle,
     FadeOutHandle,
@@ -73,8 +82,8 @@ enum Zone {
 enum Hit {
     /// The time ruler, or below the last lane.
     Ruler,
-    /// A lane, but no clip.
-    Empty,
+    /// A lane (this one), but no clip.
+    Empty(usize),
     /// A clip (its lane index, its data and which part of it).
     Clip(usize, Box<LaneClip>, Zone),
 }
@@ -83,6 +92,7 @@ enum Hit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DragKind {
     Seek,
+    Select,
     Move,
     TrimStart,
     TrimEnd,
@@ -107,6 +117,11 @@ pub(crate) struct Drag {
     original: Option<(usize, LaneClip)>,
     /// Where the clip would end up if released now, and in which lane.
     pub(super) preview: Option<(usize, Clip)>,
+    /// For a time selection: the lane it started in, the (snapped) frame it
+    /// started at, and the selection if released now.
+    start_lane: usize,
+    select_from: Frames,
+    pub(super) range_preview: Option<LaneRange>,
     /// The other clips' edges, the playhead and the start.
     snap_points: Vec<Frames>,
     /// Whether the pointer moved far enough to count as a drag.
@@ -127,8 +142,8 @@ impl TimelineView {
                 .current_event_device()
                 .is_some_and(|device| device.source() == gdk::InputSource::Touchscreen);
             if view.drag_begin(x, y, touch) {
-                // A clip is being dragged: claim the touch, so the scrolled window
-                // around the view does not scroll the tracks instead.
+                // A clip or a selection is being dragged: claim the touch, so the
+                // scrolled window around the view does not scroll the tracks instead.
                 gesture.set_state(gtk::EventSequenceState::Claimed);
             }
         });
@@ -163,7 +178,8 @@ impl TimelineView {
         }
     }
 
-    /// Shows a resize cursor over clip edges.
+    /// Shows what a drag would do: resize over edges, a hand over a clip's name
+    /// strip (move), a text cursor where dragging selects time.
     pub(super) fn update_cursor(&self, x: f64, y: f64) {
         let cursor = match self.hit(x, y, POINTER_GRAB) {
             Hit::Clip(
@@ -171,7 +187,9 @@ impl TimelineView {
                 _,
                 Zone::LeftEdge | Zone::RightEdge | Zone::FadeInHandle | Zone::FadeOutHandle,
             ) => Some("col-resize"),
-            _ => None,
+            Hit::Clip(_, _, Zone::Strip) => Some("grab"),
+            Hit::Clip(_, _, Zone::Waveform) | Hit::Empty(_) => Some("text"),
+            Hit::Ruler => None,
         };
         self.set_cursor_from_name(cursor);
     }
@@ -248,12 +266,14 @@ impl TimelineView {
                 Zone::LeftEdge
             } else if part.end() == clip.clip.end() && right - x < edge {
                 Zone::RightEdge
+            } else if y <= strip_bottom {
+                Zone::Strip
             } else {
-                Zone::Body
+                Zone::Waveform
             };
             return Hit::Clip(lane, Box::new(clip.clone()), zone);
         }
-        Hit::Empty
+        Hit::Empty(lane)
     }
 
     /// Starts a drag at (`x`, `y`). Returns true when it grabbed a clip.
@@ -261,20 +281,29 @@ impl TimelineView {
         self.stop_glide();
         let grab = if touch { TOUCH_GRAB } else { POINTER_GRAB };
         let hit = self.hit(x, y, grab);
+        let mut start_lane = 0;
         let (kind, original) = match hit {
             Hit::Ruler => (DragKind::Seek, None),
-            Hit::Empty => {
+            Hit::Empty(lane) => {
+                // Clicking empty space selects nothing; dragging selects time.
                 self.emit_by_name::<()>("clip-selected", &[&0_u64]);
-                (DragKind::Seek, None)
+                start_lane = lane;
+                (DragKind::Select, None)
+            }
+            Hit::Clip(lane, clip, Zone::Waveform) => {
+                // A click selects the clip; a drag turns into a time selection.
+                self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0]);
+                start_lane = lane;
+                (DragKind::Select, None)
             }
             Hit::Clip(lane, clip, zone) => {
                 self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0]);
                 let kind = match zone {
                     Zone::LeftEdge => DragKind::TrimStart,
-                    Zone::Body => DragKind::Move,
                     Zone::RightEdge => DragKind::TrimEnd,
                     Zone::FadeInHandle => DragKind::FadeIn,
                     Zone::FadeOutHandle => DragKind::FadeOut,
+                    Zone::Strip | Zone::Waveform => DragKind::Move,
                 };
                 (kind, Some((lane, *clip)))
             }
@@ -283,7 +312,11 @@ impl TimelineView {
             self.seek_to_x(x);
         }
         let except = original.as_ref().map(|(_, clip)| clip.clip.id);
-        let grabs_clip = original.is_some();
+        let claims = kind != DragKind::Seek;
+        let snap_points = self.snap_points(except);
+        let frames_per_pixel = self.imp().frames_per_pixel.get();
+        let tolerance = frames_from_f64(SNAP_DISTANCE * frames_per_pixel).unwrap_or(0);
+        let select_from = snap(self.frame_at(x), &snap_points, tolerance);
         let drag = Drag {
             kind,
             start_x: x,
@@ -292,13 +325,16 @@ impl TimelineView {
             last_dx: 0.0,
             last_dy: 0.0,
             click_slop: grab.click_slop,
-            snap_points: self.snap_points(except),
+            snap_points,
             original,
             preview: None,
+            start_lane,
+            select_from,
+            range_preview: None,
             moved: false,
         };
         self.imp().drag.replace(Some(drag));
-        grabs_clip
+        claims
     }
 
     fn drag_update(&self, dx: f64, dy: f64) {
@@ -328,6 +364,30 @@ impl TimelineView {
         let shift =
             |frame: Frames| frames_from_f64((frames_to_f64(frame) + delta).max(0.0)).unwrap_or(0);
 
+        if drag.kind == DragKind::Select {
+            // The selection runs from where the drag began to the pointer (both
+            // snapped), over the lanes from the first to the one under the pointer.
+            let lanes = self.imp().lanes.borrow().len();
+            let to = snap(
+                self.frame_at(drag.start_x + dx),
+                &drag.snap_points,
+                tolerance,
+            );
+            let y = drag.start_y + dy;
+            let lane = self.lane_at(y).unwrap_or(if y < f64::from(RULER_HEIGHT) {
+                0
+            } else {
+                lanes.saturating_sub(1)
+            });
+            drag.range_preview = Some(LaneRange {
+                range: TimeRange::between(drag.select_from, to),
+                first_lane: lane.min(drag.start_lane),
+                last_lane: lane.max(drag.start_lane),
+            });
+            drop(drag_slot);
+            self.queue_draw();
+            return;
+        }
         let Some((lane, original)) = &drag.original else {
             // A seek drag: follow the pointer.
             let x = drag.start_x + dx;
@@ -382,7 +442,7 @@ impl TimelineView {
                     clip.with_fades(clip.fade_in, clip.end().saturating_sub(start)),
                 )
             }
-            DragKind::Seek => return,
+            DragKind::Seek | DragKind::Select => return,
         });
         drop(drag_slot);
         self.queue_draw();
@@ -395,10 +455,25 @@ impl TimelineView {
         };
         self.queue_draw();
         if !drag.moved {
-            // A click on a clip: select it (done in drag_begin) and move the playhead.
-            if drag.original.is_some() {
+            // A click: the clip (or nothing) was selected in drag_begin; move the
+            // playhead here too. (On the ruler it already moved on press.)
+            if drag.kind != DragKind::Seek {
                 self.seek_to_x(drag.start_x);
             }
+            return;
+        }
+        if let Some(selection) = drag.range_preview.filter(|s| !s.range.is_empty()) {
+            let lanes = [selection.first_lane, selection.last_lane]
+                .map(|lane| u32::try_from(lane).unwrap_or(0));
+            self.emit_by_name::<()>(
+                "range-selected",
+                &[
+                    &selection.range.start,
+                    &selection.range.end,
+                    &lanes[0],
+                    &lanes[1],
+                ],
+            );
             return;
         }
         let (Some((lane, clip)), Some((old_lane, original))) = (drag.preview, drag.original) else {

@@ -90,6 +90,8 @@ pub(crate) struct Window {
     pub(super) updating_controls: Cell<bool>,
     /// The "Clip deleted" toast, closed when the deletion is undone.
     pub(super) undo_toast: RefCell<Option<adw::Toast>>,
+    /// The time selection (see selection.rs).
+    pub(super) time_selection: RefCell<Option<super::selection::TimeSelection>>,
     /// Plays the project's mix; `None` until something is imported.
     pub(super) player: RefCell<Option<Player>>,
     /// Where playback goes (`--silent` sends it nowhere).
@@ -142,7 +144,11 @@ impl ObjectSubclass for Window {
         klass.install_action("win.delete-clip", None, |window, _, _| {
             window.delete_selected_clip();
         });
-        klass.install_action("win.deselect", None, |window, _, _| window.select(None));
+        klass.install_action("win.deselect", None, |window, _, _| window.deselect_all());
+        klass.install_action("win.select-all", None, |window, _, _| window.select_all());
+        klass.install_action("win.ripple-delete", None, |window, _, _| {
+            window.ripple_delete();
+        });
         klass.install_action("win.move-to-new-track", None, |window, _, _| {
             window.move_selected_clip_to_new_track();
         });
@@ -211,6 +217,7 @@ impl ObjectImpl for Window {
 
         window.setup_transport();
         window.setup_editing();
+        window.setup_time_selection();
         window.setup_mixer();
         window.setup_clip_pane();
         window.update_recent_projects();

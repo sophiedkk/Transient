@@ -28,6 +28,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clip is dragged to another track is removed; Remove Track in a track's menu
   removes one yourself (with an Undo toast). Dragging a clip below the last
   track, or Move to New Track in the clip pane, gives it a track of its own.
+- Time selection: drag over a clip's waveform (or empty space) to select a
+  stretch of time on the tracks you drag across; drag a clip by its name strip
+  to move it. Delete cuts the selection, Ctrl+Delete ("Delete and Close Gap")
+  cuts it and moves everything after it to the left on all tracks, S splits at
+  both of its ends, Ctrl+A selects everything and Escape clears it.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

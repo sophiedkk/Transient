@@ -8,6 +8,7 @@ pub mod edit;
 pub mod mix;
 pub mod normalize;
 pub mod project;
+pub mod range;
 pub mod ruler;
 pub mod time;
 pub mod view;

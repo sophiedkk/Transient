@@ -23,6 +23,8 @@ impl Window {
         let weak = self.downgrade();
         timeline.connect_clip_selected(move |_, clip| {
             if let Some(window) = weak.upgrade() {
+                // A click selects a clip or nothing; either way, not a stretch of time.
+                window.set_time_selection(None);
                 window.select(clip);
             }
         });
@@ -60,6 +62,10 @@ impl Window {
 
     /// Selects a clip (or nothing).
     pub(crate) fn select(&self, clip: Option<ClipId>) {
+        // A clip selection and a time selection never exist at the same time.
+        if clip.is_some() && self.imp().time_selection.take().is_some() {
+            self.show_time_selection();
+        }
         self.imp().selected.set(clip);
         self.imp().timeline.set_selection(clip);
         self.update_edit_actions();
@@ -92,20 +98,24 @@ impl Window {
         }
     }
 
-    /// Deletes the selected clip (`win.delete-clip`, Delete), with an Undo toast.
+    /// Deletes the time selection, or else the selected clip (`win.delete-clip`,
+    /// Delete), with an Undo toast.
     pub(super) fn delete_selected_clip(&self) {
+        if self.delete_time_selection() {
+            return;
+        }
         let Some(clip) = self.imp().selected.get() else {
             return;
         };
         self.apply_edit(|project| project.remove_clip(clip).is_some());
         self.select(None);
-        let toast = adw::Toast::builder()
-            .title(gettext("Clip deleted"))
-            .button_label(gettext("_Undo"))
-            .action_name("win.undo")
-            .build();
-        self.imp().toast_overlay.add_toast(toast.clone());
-        self.imp().undo_toast.replace(Some(toast));
+        self.show_undo_toast(&gettext("Clip deleted"));
+    }
+
+    /// Clears the clip and the time selection (`win.deselect`, Escape).
+    pub(super) fn deselect_all(&self) {
+        self.set_time_selection(None);
+        self.select(None);
     }
 
     /// Moves the selected clip to a new track of its own (`win.move-to-new-track`,
@@ -125,16 +135,9 @@ impl Window {
 
     /// Removes a track (the header's Remove Track), with an Undo toast.
     pub(super) fn remove_track(&self, track: TrackId) {
-        if !self.apply_edit(|project| project.remove_track(track).is_some()) {
-            return;
+        if self.apply_edit(|project| project.remove_track(track).is_some()) {
+            self.show_undo_toast(&gettext("Track removed"));
         }
-        let toast = adw::Toast::builder()
-            .title(gettext("Track removed"))
-            .button_label(gettext("_Undo"))
-            .action_name("win.undo")
-            .build();
-        self.imp().toast_overlay.add_toast(toast.clone());
-        self.imp().undo_toast.replace(Some(toast));
     }
 
     /// Removes the selected clip's track (`win.remove-track`).
@@ -156,6 +159,10 @@ impl Window {
     /// Splits at the playhead (`win.split`, S): the selected clip if the playhead
     /// is inside it, otherwise every clip under the playhead.
     pub(super) fn split_at_playhead(&self) {
+        // With a time selection, S splits at both of its ends instead.
+        if self.split_time_selection() {
+            return;
+        }
         let Some(at) = self.playhead_position() else {
             return;
         };
@@ -236,18 +243,23 @@ impl Window {
             imp.selected.set(None);
             imp.timeline.set_selection(None);
         }
-        let has_selection = imp.selected.get().is_some();
+        let has_clip = imp.selected.get().is_some();
+        let has_time = imp.time_selection.borrow().is_some();
+        let has_selection = has_clip || has_time;
         let has_clips = imp.project.borrow().length() > 0;
         let history = imp.history.borrow();
         self.action_set_enabled("win.undo", history.can_undo());
         self.action_set_enabled("win.redo", history.can_redo());
         self.action_set_enabled("win.delete-clip", has_selection);
-        self.action_set_enabled("win.remove-track", has_selection);
-        self.action_set_enabled("win.nudge-left", has_selection);
-        self.action_set_enabled("win.nudge-right", has_selection);
+        self.action_set_enabled("win.ripple-delete", has_selection);
         self.action_set_enabled("win.deselect", has_selection);
-        self.action_set_enabled("win.toggle-mute", has_selection);
-        self.action_set_enabled("win.toggle-solo", has_selection);
+        self.action_set_enabled("win.select-all", has_clips);
+        // These act on the selected clip only.
+        self.action_set_enabled("win.remove-track", has_clip);
+        self.action_set_enabled("win.nudge-left", has_clip);
+        self.action_set_enabled("win.nudge-right", has_clip);
+        self.action_set_enabled("win.toggle-mute", has_clip);
+        self.action_set_enabled("win.toggle-solo", has_clip);
         for action in [
             "win.move-to-new-track",
             "win.normalize-peak",
@@ -255,7 +267,7 @@ impl Window {
             "win.fade-in-to-playhead",
             "win.fade-out-from-playhead",
         ] {
-            self.action_set_enabled(action, has_selection);
+            self.action_set_enabled(action, has_clip);
         }
         self.action_set_enabled("win.split", has_clips);
         self.action_set_enabled("win.select-clip-at-playhead", has_clips);

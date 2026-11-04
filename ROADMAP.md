@@ -52,15 +52,18 @@ dialog, dark mode (Libadwaita), error toasts.
 
 Inspired by Audacity 4's clip editing, kept GNOME-simple (no tool modes).
 
-- [ ] **Time selection.** Drag over empty lane space or the ruler to select a time
-      range, as well as selecting a clip. Delete removes only that range, leaving
-      a gap. The maths (two splits, then remove the piece in between) lives in
-      `transient-core::edit`, covered by property tests.
-- [ ] **Ripple delete** (Ctrl+Delete, "Delete and Close Gap"): remove the
-      selection and shift everything after it left on all tracks, so the tracks
-      stay in sync.
-- [ ] **Split at the mouse**: hold S (or Ctrl) and click inside a clip to split it
-      there. S on its own keeps splitting at the playhead.
+- [x] **Time selection** (decided 2026-11-04, like Audacity 4): drag over a
+      clip's waveform or empty lane space to select time over the lanes dragged
+      across; a clip's name strip moves it. Ctrl+A selects everything, Escape
+      clears. Delete cuts the selection, leaving a gap (`transient-core::range`,
+      property-tested).
+- [x] **Ripple delete** (Ctrl+Delete, "Delete and Close Gap"): cuts the
+      selection and moves everything after it left on all tracks; tracks outside
+      the selection are moved, not cut.
+- [x] **Split a selection**: S splits at both ends of the time selection (no
+      separate split-at-the-mouse gesture: click, then press S).
+- [ ] **Show the selection's start, end and length** in the bottom bar, like the
+      playhead position (Audacity shows these too).
 
 ## 11 · Tracks
 

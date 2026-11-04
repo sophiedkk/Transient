@@ -109,17 +109,19 @@ just test-audio                                 # decode the whole test collecti
   Dark mode: prefix with `ADW_DEBUG_COLOR_SCHEME=prefer-dark`.
 - App options (`transient --help`): `FILE…` opens files, `--play`, `--silent`
   (no sound output, still real time), `--screenshot=FILE`, `--quit-after=SECONDS`,
-  `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead), and
+  `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead),
+  `--select=START..END` (seconds, every track; runs before the actions), and
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
-  `select-clip-at-playhead`, `nudge-right`, `delete-clip`, `toggle-mute`,
+  `select-clip-at-playhead`, `select-all`, `nudge-right`, `delete-clip`
+  (deletes the time selection if there is one), `ripple-delete`, `toggle-mute`,
   `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
-  `normalize-peak`, `normalize-loudness`, `toggle-clip-pane`, `new-project`,
-  `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
+  `normalize-peak`, `normalize-loudness`, `move-to-new-track`, `remove-track`,
+  `toggle-clip-pane`, `new-project`, `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
   `.transient` file opens it — together they test a full save/open round trip.
   `--export-to=FILE.ext` exports through the app's export path. With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
-  (unit- and property-tested).
+  and `transient-core::range` (unit- and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.
 - Never play audio through the speakers in automated runs: always pass `--silent`.
 - `test-audio/` is downloaded by `dev/fetch-test-audio.sh` from `dev/test-audio.tsv`

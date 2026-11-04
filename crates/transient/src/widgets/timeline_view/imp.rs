@@ -19,7 +19,7 @@ use transient_core::time::{Frames, SampleRate};
 
 use super::gestures::Pinch;
 use super::interaction::Drag;
-use super::{LANE_HEIGHT, Lane, RULER_HEIGHT};
+use super::{LANE_HEIGHT, Lane, LaneRange, RULER_HEIGHT};
 
 /// The view's state.
 ///
@@ -48,6 +48,8 @@ pub(crate) struct TimelineView {
     pub(super) pointer_x: Cell<Option<f64>>,
     /// The selected clip, drawn highlighted.
     pub(super) selected: Cell<Option<ClipId>>,
+    /// The time selection, drawn as a highlighted stretch over its lanes.
+    pub(super) time_selection: Cell<Option<LaneRange>>,
     /// The drag in progress, if any.
     pub(super) drag: RefCell<Option<Drag>>,
     /// The pinch in progress, if any.
@@ -77,6 +79,7 @@ impl ObjectImpl for TimelineView {
     /// - `clip-selected(clip id)`: a clip was clicked; 0 means "nothing".
     /// - `clip-changed(clip id, start, offset, length, fade in, fade out, lane)`: a
     ///   clip was moved, trimmed or had its fades changed by dragging.
+    /// - `range-selected(start, end, first lane, last lane)`: time was selected.
     fn signals() -> &'static [Signal] {
         static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
         SIGNALS.get_or_init(|| {
@@ -85,6 +88,9 @@ impl ObjectImpl for TimelineView {
                 Signal::builder("seek").param_types([u64_type]).build(),
                 Signal::builder("clip-selected")
                     .param_types([u64_type])
+                    .build(),
+                Signal::builder("range-selected")
+                    .param_types([u64_type, u64_type, u32::static_type(), u32::static_type()])
                     .build(),
                 Signal::builder("clip-changed")
                     .param_types([

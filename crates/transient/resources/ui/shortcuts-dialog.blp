@@ -35,13 +35,23 @@ Adw.ShortcutsDialog shortcuts_dialog {
     }
 
     Adw.ShortcutsItem {
-      title: _("Split at Playhead");
+      title: _("Split at Playhead or Selection");
       action-name: "win.split";
     }
 
     Adw.ShortcutsItem {
-      title: _("Delete Clip");
+      title: _("Delete Clip or Selection");
       action-name: "win.delete-clip";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Delete and Close Gap");
+      action-name: "win.ripple-delete";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Select All");
+      action-name: "win.select-all";
     }
 
     Adw.ShortcutsItem {

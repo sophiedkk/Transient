@@ -13,10 +13,12 @@ use transient_core::edit::visible_parts;
 use transient_core::mix::{db_to_gain, fade_shape};
 use transient_core::project::Clip;
 use transient_core::ruler;
-use transient_core::time::frames_to_f64;
+use transient_core::time::{Frames, frames_to_f64};
 use transient_core::waveform::Peak;
 
-use super::{CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, RULER_HEIGHT, TimelineView};
+use super::{
+    CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, LaneRange, RULER_HEIGHT, TimelineView,
+};
 
 /// Labelled ruler ticks are at least this far apart, in pixels.
 const TICK_SPACING: f64 = 90.0;
@@ -128,6 +130,15 @@ impl TimelineView {
                 snapshot.pop();
             }
         }
+        // The time selection: the one being dragged, or else the current one.
+        let selection = drag
+            .as_ref()
+            .and_then(|drag| drag.range_preview)
+            .or(imp.time_selection.get());
+        if let Some(selection) = selection {
+            draw_time_selection(snapshot, &view, &palette, selection);
+        }
+
         // Dragged below the last lane: the clip is drawn where its new track will be,
         // over a faint band that shows the track to come.
         if let (Some(drawn), Some((lane, moved))) = (dragged, preview)
@@ -155,15 +166,7 @@ impl TimelineView {
         }
 
         if self.rate().is_some() {
-            let x = view.x(frames_to_f64(imp.playhead.get()));
-            if (0.0..=f64::from(width)).contains(&x) {
-                // Keep the 2-pixel line fully visible at the very start and end.
-                let x = pixels_f64(x).clamp(1.0, width - 1.0);
-                snapshot.append_color(
-                    &palette.foreground,
-                    &graphene::Rect::new(x - 1.0, 0.0, 2.0, height),
-                );
-            }
+            draw_playhead(snapshot, &view, &palette, imp.playhead.get(), height);
         }
     }
 
@@ -341,6 +344,57 @@ impl TimelineView {
 const FADE_STEPS: u32 = 32;
 
 /// Shades what a fade removes and draws its curve.
+/// Draws the playhead at `frame`: a 2-pixel line over the whole height.
+fn draw_playhead(
+    snapshot: &gtk::Snapshot,
+    view: &View,
+    palette: &Palette,
+    frame: Frames,
+    height: f32,
+) {
+    let x = view.x(frames_to_f64(frame));
+    if (0.0..=f64::from(view.width)).contains(&x) {
+        // Keep the 2-pixel line fully visible at the very start and end.
+        let x = pixels_f64(x).clamp(1.0, view.width - 1.0);
+        snapshot.append_color(
+            &palette.foreground,
+            &graphene::Rect::new(x - 1.0, 0.0, 2.0, height),
+        );
+    }
+}
+
+/// Draws a time selection: a highlighted stretch over its lanes with a line at
+/// each end, and a band on the ruler.
+fn draw_time_selection(
+    snapshot: &gtk::Snapshot,
+    view: &View,
+    palette: &Palette,
+    selection: LaneRange,
+) {
+    if selection.range.is_empty() {
+        return;
+    }
+    let left = pixels_f64(view.x(frames_to_f64(selection.range.start)));
+    let right = pixels_f64(view.x(frames_to_f64(selection.range.end)));
+    let top = lane_top(selection.first_lane);
+    let bottom = lane_top(selection.last_lane + 1);
+    let span = (right - left).max(1.0);
+    snapshot.append_color(
+        &palette.accent.with_alpha(0.18),
+        &graphene::Rect::new(left, top, span, bottom - top),
+    );
+    snapshot.append_color(
+        &palette.accent.with_alpha(0.3),
+        &graphene::Rect::new(left, 0.0, span, pixels(RULER_HEIGHT)),
+    );
+    for x in [left, right] {
+        snapshot.append_color(
+            &palette.accent,
+            &graphene::Rect::new(x - 0.5, top, 1.0, bottom - top),
+        );
+    }
+}
+
 fn draw_fade(
     snapshot: &gtk::Snapshot,
     palette: &Palette,

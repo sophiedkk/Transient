@@ -49,6 +49,7 @@ impl Window {
             project.sample_rate,
             project.length(),
         );
+        self.show_time_selection();
 
         let length = format_position(project.length(), project.sample_rate);
         let tracks = project.tracks.len();

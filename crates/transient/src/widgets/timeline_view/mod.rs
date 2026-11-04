@@ -2,9 +2,10 @@
 //! it with the clips and their waveforms, and a playhead across everything.
 //!
 //! - Click on the ruler or an empty lane: emits `seek` with the frame there.
-//! - Click a clip: selects it (`clip-selected`). Drag it to move it, also to
-//!   another lane or below the last one (a new track); drag its left or right
-//!   edge to trim it. While dragging, the
+//! - Click a clip: selects it (`clip-selected`). Drag its name strip to move it,
+//!   also to another lane or below the last one (a new track); drag its left or
+//!   right edge to trim it. Drag over its waveform (or empty lane space) to
+//!   select time over the lanes dragged across (`range-selected`). While dragging, the
 //!   view shows a preview; on release it emits `clip-changed` (see `interaction.rs`).
 //! - Shift+scroll (or a touchpad): moves through the timeline, gliding on after
 //!   a swipe. Ctrl+scroll: zooms around the pointer. Pinch: zooms around the
@@ -25,6 +26,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
 use transient_core::project::{Clip, ClipId};
+use transient_core::range::TimeRange;
 use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
 use transient_core::view::start_keeping_anchor;
 use transient_core::waveform::Waveform;
@@ -74,6 +76,15 @@ pub(crate) struct LaneClip {
     pub(crate) name: String,
 }
 
+/// A time selection as the timeline shows it: a stretch of time over a run of
+/// lanes (from `first_lane` down to `last_lane`, both included).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LaneRange {
+    pub(crate) range: TimeRange,
+    pub(crate) first_lane: usize,
+    pub(crate) last_lane: usize,
+}
+
 /// One track's row in the timeline.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Lane {
@@ -105,6 +116,34 @@ impl TimelineView {
             self.queue_resize();
         }
         self.update_adjustment();
+    }
+
+    /// Shows the time selection (or none).
+    pub(crate) fn set_time_selection(&self, selection: Option<LaneRange>) {
+        if self.imp().time_selection.replace(selection) != selection {
+            self.queue_draw();
+        }
+    }
+
+    /// Calls `callback` with the time selection the user dragged.
+    pub(crate) fn connect_range_selected<F: Fn(&Self, LaneRange) + 'static>(&self, callback: F) {
+        self.connect_closure(
+            "range-selected",
+            false,
+            glib::closure_local!(
+                move |view: Self, start: u64, end: u64, first: u32, last: u32| {
+                    let lane = |index: u32| usize::try_from(index).unwrap_or(0);
+                    callback(
+                        &view,
+                        LaneRange {
+                            range: TimeRange { start, end },
+                            first_lane: lane(first),
+                            last_lane: lane(last),
+                        },
+                    );
+                }
+            ),
+        );
     }
 
     /// Highlights the selected clip (or none).

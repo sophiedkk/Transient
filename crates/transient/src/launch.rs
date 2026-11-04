@@ -7,6 +7,7 @@
 //! transient --play --quit-after=5 song.flac # quit after five seconds
 //! transient --seek=30 --zoom=4 song.flac    # zoom in around 0:30
 //! transient --seek=5 --action=split a.flac  # run window actions (repeatable)
+//! transient --select=2..4 --action=ripple-delete a.flac  # cut 0:02–0:04, close the gap
 //! transient a.flac --save-to=mix.transient  # save the project afterwards
 //! transient mix.transient                   # open a project
 //! ```
@@ -45,6 +46,8 @@ pub(crate) struct LaunchOptions {
     pub(crate) seek: Option<f64>,
     /// Zoom in this many steps (around the playhead) after opening.
     pub(crate) zoom: Option<u32>,
+    /// Select this stretch of time (seconds, on every track) before the actions.
+    pub(crate) select: Option<(f64, f64)>,
     /// Window actions to run after opening, in order (for example "split").
     pub(crate) actions: Vec<String>,
     /// Save the project to this file after the actions.
@@ -98,6 +101,14 @@ impl LaunchOptions {
             Some("STEPS"),
         );
         app.add_main_option(
+            "select",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::String,
+            "Select START..END seconds on every track before the actions",
+            Some("START..END"),
+        );
+        app.add_main_option(
             "action",
             glib::Char::from(0),
             none,
@@ -148,6 +159,11 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .and_then(|steps| u32::try_from(steps).ok()),
+            select: dict
+                .lookup::<String>("select")
+                .ok()
+                .flatten()
+                .and_then(|text| parse_range(&text)),
             actions: dict
                 .lookup::<Vec<String>>("action")
                 .ok()
@@ -167,6 +183,7 @@ impl LaunchOptions {
             || self.quit_after.is_some()
             || self.seek.is_some()
             || self.zoom.is_some()
+            || self.select.is_some()
             || !self.actions.is_empty()
             || self.save_to.is_some()
             || self.export_to.is_some()
@@ -191,6 +208,9 @@ impl LaunchOptions {
         }
         for _ in 0..self.zoom.unwrap_or(0) {
             window.zoom_in();
+        }
+        if let Some((start, end)) = self.select {
+            window.select_seconds(start, end);
         }
         for action in &self.actions {
             let name = if action.contains('.') {
@@ -254,5 +274,24 @@ async fn save_screenshot_when_drawn(window: &Window, path: &Path) {
     match result {
         Ok(()) => info!("screenshot saved to {}", path.display()),
         Err(err) => error!("could not save the screenshot: {err}"),
+    }
+}
+
+/// Reads "START..END" (seconds, for example "1.5..3"), as `--select` takes it.
+fn parse_range(text: &str) -> Option<(f64, f64)> {
+    let (start, end) = text.split_once("..")?;
+    Some((start.trim().parse().ok()?, end.trim().parse().ok()?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_range;
+
+    #[test]
+    fn a_range_is_two_numbers_with_dots_between() {
+        assert_eq!(parse_range("1.5..3"), Some((1.5, 3.0)));
+        assert_eq!(parse_range(" 2 .. 4 "), Some((2.0, 4.0)));
+        assert_eq!(parse_range("2-4"), None);
+        assert_eq!(parse_range("a..4"), None);
     }
 }
