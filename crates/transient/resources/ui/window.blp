@@ -390,16 +390,18 @@ template $TransientWindow: Adw.ApplicationWindow {
           ]
         }
 
-        // The output level, left and right. Turns red when the mix clips.
+        // The output level: two thin bars (left and right) read as one meter.
+        // Turns red when the mix clips, and is dimmed while nothing plays.
         Box level_meter {
           orientation: vertical;
-          spacing: 3;
+          spacing: 2;
           valign: center;
           width-request: 120;
           tooltip-text: _("Output Level");
 
           styles [
             "level-meter",
+            "dimmed",
           ]
 
           LevelBar left_meter {

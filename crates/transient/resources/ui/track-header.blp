@@ -27,8 +27,10 @@ template $TransientTrackHeader: Box {
       ]
     }
 
+    // The icon shows the track's state (speaker, or crossed-out speaker when
+    // muted), like the volume icons elsewhere in GNOME; see `update_tooltips`.
     ToggleButton mute_button {
-      icon-name: "audio-volume-muted-symbolic";
+      icon-name: "audio-volume-high-symbolic";
       tooltip-text: _("Mute");
       valign: center;
 
@@ -41,6 +43,20 @@ template $TransientTrackHeader: Box {
     ToggleButton solo_button {
       icon-name: "audio-headphones-symbolic";
       tooltip-text: _("Solo");
+      valign: center;
+
+      styles [
+        "flat",
+        "circular",
+      ]
+    }
+
+    // More track commands (for now Remove Track). The menu's actions are the
+    // header's own ("track.…", see track_header.rs).
+    MenuButton {
+      icon-name: "view-more-symbolic";
+      tooltip-text: _("Track Menu");
+      menu-model: track_menu;
       valign: center;
 
       styles [
@@ -84,6 +100,15 @@ template $TransientTrackHeader: Box {
       accessibility {
         label: _("Pan");
       }
+    }
+  }
+}
+
+menu track_menu {
+  section {
+    item {
+      label: _("_Remove Track");
+      action: "track.remove";
     }
   }
 }

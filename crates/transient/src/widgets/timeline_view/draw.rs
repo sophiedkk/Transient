@@ -9,6 +9,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gdk, graphene, gsk, pango};
+use transient_core::edit::visible_parts;
 use transient_core::mix::{db_to_gain, fade_shape};
 use transient_core::project::Clip;
 use transient_core::ruler;
@@ -68,12 +69,22 @@ impl TimelineView {
 
         self.draw_ruler(snapshot, &view, &palette);
 
-        // A clip being dragged is drawn at its preview position, on top of the rest.
+        // A clip being dragged is drawn at its preview position, on top of the
+        // clips in the lane it is over. Only the visible parts of clips are drawn
+        // (where clips overlap you see, and hear, the top one), worked out again
+        // with the preview so the clip underneath reappears while dragging.
         let drag = imp.drag.borrow();
         let preview = drag.as_ref().and_then(|drag| drag.preview);
         let selected = imp.selected.get();
         let lanes = imp.lanes.borrow();
-        let mut dragged = None;
+        let dragged = preview.and_then(|(_, moved)| {
+            lanes
+                .iter()
+                .flat_map(|lane| &lane.clips)
+                .find(|clip| clip.clip.id == moved.id)
+        });
+        // The selected clip (as a whole) and its lane's top, for its fade handles.
+        let mut selected_clip = None;
         for (index, lane) in lanes.iter().enumerate() {
             let top = lane_top(index);
             snapshot.append_color(
@@ -83,36 +94,51 @@ impl TimelineView {
             if !lane.audible {
                 snapshot.push_opacity(SILENT_LANE_OPACITY);
             }
-            for clip in &lane.clips {
-                if preview.is_some_and(|(_, moved)| moved.id == clip.clip.id) {
-                    dragged = Some(clip);
+            // This lane's clips as they would be if the drag ended now.
+            let mut stack: Vec<Clip> = lane
+                .clips
+                .iter()
+                .map(|clip| clip.clip)
+                .filter(|clip| preview.is_none_or(|(_, moved)| moved.id != clip.id))
+                .collect();
+            if let Some((_, moved)) = preview.filter(|(lane, _)| *lane == index) {
+                stack.push(moved);
+            }
+            let parts = visible_parts(&stack);
+            for &part in &parts {
+                // The waveform and name come from the lane's clip (or the dragged one).
+                let Some(drawn) = lane
+                    .clips
+                    .iter()
+                    .chain(dragged)
+                    .find(|clip| clip.clip.id == part.id)
+                else {
                     continue;
+                };
+                let is_selected = selected == Some(part.id);
+                if is_selected {
+                    selected_clip = stack
+                        .iter()
+                        .find(|clip| clip.id == part.id)
+                        .map(|whole| (*whole, top, parts.clone()));
                 }
-                let is_selected = selected == Some(clip.clip.id);
-                self.draw_clip(
-                    snapshot,
-                    &view,
-                    &palette,
-                    clip,
-                    &clip.clip,
-                    top,
-                    is_selected,
-                );
+                self.draw_clip(snapshot, &view, &palette, drawn, &part, top, is_selected);
             }
             if !lane.audible {
                 snapshot.pop();
             }
         }
-        if let (Some(clip), Some((lane, moved))) = (dragged, preview) {
-            self.draw_clip(
-                snapshot,
-                &view,
-                &palette,
-                clip,
-                &moved,
-                lane_top(lane),
-                true,
-            );
+        // Fade handles, dragged to change the fades (see interaction.rs). They
+        // belong to the whole clip, so they are drawn once, even when other clips
+        // hide parts of it.
+        if let Some((clip, lane_top, parts)) = selected_clip {
+            let (fade_in_x, fade_out_x) = self.fade_handle_positions(&clip);
+            let y = lane_top + CLIP_INSET + CLIP_LABEL_HEIGHT / 2.0;
+            for x in [fade_in_x, fade_out_x] {
+                if self.is_visible_at(&parts, clip.id, x) {
+                    draw_handle(snapshot, &palette, pixels_f64(x), y);
+                }
+            }
         }
 
         if self.rate().is_some() {
@@ -165,6 +191,8 @@ impl TimelineView {
         clippy::too_many_arguments,
         reason = "drawing state is passed explicitly rather than hidden in a struct"
     )]
+    /// Draws `clip`: a whole clip, or the visible part of one that other clips
+    /// partly cover (see `visible_parts`). `drawn` has its waveform and name.
     fn draw_clip(
         &self,
         snapshot: &gtk::Snapshot,
@@ -282,12 +310,6 @@ impl TimelineView {
 
         if selected {
             snapshot.append_border(&rounded, &[2.0; 4], &[palette.accent; 4]);
-            // Fade handles, dragged to change the fades (see interaction.rs).
-            let (fade_in_x, fade_out_x) = self.fade_handle_positions(clip);
-            let y = top + CLIP_LABEL_HEIGHT / 2.0;
-            for x in [fade_in_x, fade_out_x] {
-                draw_handle(snapshot, palette, pixels_f64(x), y);
-            }
         }
     }
 

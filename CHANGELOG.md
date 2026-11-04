@@ -20,10 +20,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Editing: click a clip to select it, drag it to move it (also to another track),
   drag its edges to trim it; edges snap to other clips, the playhead and the
   start. Split at the playhead (S), delete (Delete), nudge (Ctrl+Left/Right),
-  deselect (Escape).
+  deselect (Escape). Clips on one track stack: a moved clip goes on top, and
+  where clips overlap you see and hear only the top one. Nothing is cut, so
+  moving the top clip away brings the clip underneath back whole. Where the top
+  clip fades in or out, the clip underneath fades the other way, so they
+  crossfade. Clips are labelled with the file they play. A track whose last
+  clip is dragged to another track is removed; Remove Track in a track's menu
+  removes one yourself (with an Undo toast).
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
-  sliders; a master volume and a stereo output level meter (red when the mix
-  clips) are in the bottom bar. Tracks that are not heard are drawn faded.
+  sliders; the mute button shows whether the track is heard. The bottom bar
+  has a master volume and a slim stereo output level meter (red when the mix
+  clips, dimmed while nothing plays). Tracks that are not heard are drawn faded.
   M and Shift+M mute and solo the selected clip's track. A slider drag is one
   undo step.
 - Fades and clip gain: drag the round handles on a selected clip, or use the
@@ -47,10 +54,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Undo and redo for every change (Ctrl+Z, Shift+Ctrl+Z, and buttons in the
   header bar). Deleting shows a toast with an Undo button instead of asking
   for confirmation.
-- Zoom and scroll the timeline: click or drag to move the playhead,
+- Zoom and scroll the timeline (with a little space before 0:00, so the
+  playhead and the first clip's edge are clear of the track headers): click or
+  drag to move the playhead,
   Shift+scroll or a touchpad to move sideways, Ctrl+scroll,
   Ctrl+plus/minus/0 or the zoom buttons to zoom. The view follows the playhead
   while playing.
+- Touch and touchpad: pinch to zoom around your fingers (moving both fingers
+  also scrolls), the timeline glides on after a quick sideways swipe, and
+  touchpad scrolling follows the fingers exactly. On a touchscreen, clip edges
+  and fade handles are easier to grab.
+- Dragging a clip, a clip edge, a fade handle or the playhead near the left or
+  right edge of the timeline scrolls it, faster the closer you get.
 - Transport bar: play/pause (Space), go to start (Home) and the current time.
   The file's name, format and length are shown in the header bar.
 - Open files from the command line (`transient FILE`) and from "Open With".

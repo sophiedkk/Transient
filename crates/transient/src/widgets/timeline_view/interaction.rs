@@ -13,23 +13,50 @@
 //! While dragging, only a *preview* changes (drawn by `draw.rs`). The project
 //! changes once, on release, through the `clip-changed` signal, so one drag is
 //! one undo step. Edges snap to other clips' edges, the playhead and the start.
+//!
+//! A drag is measured in frames, not pixels: the clip follows the audio under the
+//! pointer. That keeps the preview right while the view scrolls by itself
+//! because the pointer is near an edge (auto-scroll), or zooms during a drag.
+//! On a touchscreen, edges and fade handles are easier to grab.
+
+use std::cell::Cell;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use transient_core::edit::snap;
+use gtk::{gdk, glib};
+use transient_core::edit::{snap, visible_parts};
 use transient_core::project::{Clip, ClipId};
 use transient_core::time::{Frames, frames_from_f64, frames_to_f64};
+use transient_core::view::autoscroll_speed;
 
+use super::gestures::microseconds_to_seconds;
 use super::{LANE_HEIGHT, LaneClip, RULER_HEIGHT, TimelineView};
 
-/// How close (in pixels) to a clip's edge counts as grabbing the edge.
-const EDGE_GRAB: f64 = 6.0;
 /// How close (in pixels) an edge has to come to a snap point to snap to it.
 const SNAP_DISTANCE: f64 = 8.0;
-/// How close (in pixels) to a fade handle counts as grabbing it.
-const HANDLE_GRAB: f64 = 8.0;
-/// A press that moves less than this (in pixels) is a click, not a drag.
-const CLICK_SLOP: f64 = 3.0;
+
+/// How easy things are to grab. A fingertip is much less precise than a mouse
+/// pointer, so touchscreens get larger zones.
+#[derive(Debug, Clone, Copy)]
+struct Grab {
+    /// How close (in pixels) to a clip's edge counts as grabbing the edge.
+    edge: f64,
+    /// How close (in pixels) to a fade handle counts as grabbing it.
+    handle: f64,
+    /// A press that moves less than this (in pixels) is a click, not a drag.
+    click_slop: f64,
+}
+
+const POINTER_GRAB: Grab = Grab {
+    edge: 6.0,
+    handle: 8.0,
+    click_slop: 3.0,
+};
+const TOUCH_GRAB: Grab = Grab {
+    edge: 16.0,
+    handle: 20.0,
+    click_slop: 8.0,
+};
 
 /// The part of a clip under the pointer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +96,13 @@ pub(crate) struct Drag {
     kind: DragKind,
     start_x: f64,
     start_y: f64,
+    /// The (fractional) frame under the pointer when the drag began.
+    grab_frame: f64,
+    /// How far the pointer has moved since then, in pixels (as GTK reports it).
+    last_dx: f64,
+    last_dy: f64,
+    /// A press that moves less than this is a click (larger for touch).
+    click_slop: f64,
     /// The clip as it was when the drag began, and its lane.
     original: Option<(usize, LaneClip)>,
     /// Where the clip would end up if released now, and in which lane.
@@ -80,13 +114,22 @@ pub(crate) struct Drag {
 }
 
 impl TimelineView {
-    /// Sets up the drag gesture. Called once, from `setup_controllers`.
-    pub(super) fn setup_drag(&self) {
+    /// Creates the drag gesture (the caller adds it to the view). Called once,
+    /// from `setup_controllers`.
+    pub(super) fn drag_gesture(&self) -> gtk::GestureDrag {
         let drag = gtk::GestureDrag::new();
         let weak = self.downgrade();
-        drag.connect_drag_begin(move |_, x, y| {
-            if let Some(view) = weak.upgrade() {
-                view.drag_begin(x, y);
+        drag.connect_drag_begin(move |gesture, x, y| {
+            let Some(view) = weak.upgrade() else {
+                return;
+            };
+            let touch = gesture
+                .current_event_device()
+                .is_some_and(|device| device.source() == gdk::InputSource::Touchscreen);
+            if view.drag_begin(x, y, touch) {
+                // A clip is being dragged: claim the touch, so the scrolled window
+                // around the view does not scroll the tracks instead.
+                gesture.set_state(gtk::EventSequenceState::Claimed);
             }
         });
         let weak = self.downgrade();
@@ -101,12 +144,28 @@ impl TimelineView {
                 view.drag_end();
             }
         });
-        self.add_controller(drag);
+        // Something else took over the touch (a pinch, or the scrolled window):
+        // forget the drag without changing anything.
+        let weak = self.downgrade();
+        drag.connect_cancel(move |_, _| {
+            if let Some(view) = weak.upgrade() {
+                view.cancel_drag();
+            }
+        });
+        drag
+    }
+
+    /// Drops the drag in progress (and its preview) without changing the clip.
+    pub(super) fn cancel_drag(&self) {
+        self.stop_autoscroll();
+        if self.imp().drag.take().is_some() {
+            self.queue_draw();
+        }
     }
 
     /// Shows a resize cursor over clip edges.
     pub(super) fn update_cursor(&self, x: f64, y: f64) {
-        let cursor = match self.hit(x, y) {
+        let cursor = match self.hit(x, y, POINTER_GRAB) {
             Hit::Clip(
                 _,
                 _,
@@ -128,8 +187,9 @@ impl TimelineView {
         usize::try_from(index).ok().filter(|&index| index < lanes)
     }
 
-    /// What is at (`x`, `y`). Later clips are drawn on top, so they win.
-    fn hit(&self, x: f64, y: f64) -> Hit {
+    /// What is at (`x`, `y`): what you see there. Only the visible parts of clips
+    /// count (see `visible_parts`), and later parts are drawn on top, so they win.
+    fn hit(&self, x: f64, y: f64, grab: Grab) -> Hit {
         let Some(lane) = self.lane_at(y) else {
             return Hit::Ruler;
         };
@@ -139,31 +199,43 @@ impl TimelineView {
         };
         let start = self.start_frame();
         let frames_per_pixel = self.imp().frames_per_pixel.get();
-        for clip in clips.iter().rev() {
-            let left = (frames_to_f64(clip.clip.start) - start) / frames_per_pixel;
-            let right = (frames_to_f64(clip.clip.end()) - start) / frames_per_pixel;
+        let to_x = |frame: Frames| (frames_to_f64(frame) - start) / frames_per_pixel;
+
+        // The selected clip's fade handles are drawn above everything, in its name
+        // strip, and win over the edges, so a fade can be dragged even when it is zero.
+        let strip_top = super::lane_top_f64(lane) + f64::from(super::CLIP_INSET);
+        let strip_bottom = strip_top + f64::from(super::CLIP_LABEL_HEIGHT);
+        let stack: Vec<Clip> = clips.iter().map(|clip| clip.clip).collect();
+        let parts = visible_parts(&stack);
+        let selected = self.imp().selected.get();
+        if (strip_top..=strip_bottom).contains(&y)
+            && let Some(clip) = clips.iter().find(|clip| Some(clip.clip.id) == selected)
+        {
+            let (fade_in_x, fade_out_x) = self.fade_handle_positions(&clip.clip);
+            let visible = |x| self.is_visible_at(&parts, clip.clip.id, x);
+            if (x - fade_in_x).abs() <= grab.handle && visible(fade_in_x) {
+                return Hit::Clip(lane, Box::new(clip.clone()), Zone::FadeInHandle);
+            }
+            if (x - fade_out_x).abs() <= grab.handle && visible(fade_out_x) {
+                return Hit::Clip(lane, Box::new(clip.clone()), Zone::FadeOutHandle);
+            }
+        }
+
+        for part in parts.iter().rev() {
+            let (left, right) = (to_x(part.start), to_x(part.end()));
             if x < left || x > right {
                 continue;
             }
-            // The selected clip's fade handles sit in its name strip and win over
-            // the edges, so a fade can be dragged even when it is zero.
-            if self.imp().selected.get() == Some(clip.clip.id) {
-                let strip_top = super::lane_top_f64(lane) + f64::from(super::CLIP_INSET);
-                let strip_bottom = strip_top + f64::from(super::CLIP_LABEL_HEIGHT);
-                let in_strip = (strip_top..=strip_bottom).contains(&y);
-                let (fade_in_x, fade_out_x) = self.fade_handle_positions(&clip.clip);
-                if in_strip && (x - fade_in_x).abs() <= HANDLE_GRAB {
-                    return Hit::Clip(lane, Box::new(clip.clone()), Zone::FadeInHandle);
-                }
-                if in_strip && (x - fade_out_x).abs() <= HANDLE_GRAB {
-                    return Hit::Clip(lane, Box::new(clip.clone()), Zone::FadeOutHandle);
-                }
-            }
-            // Narrow clips: keep a grabbable middle by shrinking the edge zones.
-            let grab = EDGE_GRAB.min((right - left) / 3.0);
-            let zone = if x - left < grab {
+            let Some(clip) = clips.iter().find(|clip| clip.clip.id == part.id) else {
+                continue;
+            };
+            // Narrow parts: keep a grabbable middle by shrinking the edge zones.
+            // Only the clip's own edges trim it; where another clip covers it, the
+            // edge of the visible part is not an edge of the clip.
+            let edge = grab.edge.min((right - left) / 3.0);
+            let zone = if part.start == clip.clip.start && x - left < edge {
                 Zone::LeftEdge
-            } else if right - x < grab {
+            } else if part.end() == clip.clip.end() && right - x < edge {
                 Zone::RightEdge
             } else {
                 Zone::Body
@@ -173,8 +245,11 @@ impl TimelineView {
         Hit::Empty
     }
 
-    fn drag_begin(&self, x: f64, y: f64) {
-        let hit = self.hit(x, y);
+    /// Starts a drag at (`x`, `y`). Returns true when it grabbed a clip.
+    fn drag_begin(&self, x: f64, y: f64, touch: bool) -> bool {
+        self.stop_glide();
+        let grab = if touch { TOUCH_GRAB } else { POINTER_GRAB };
+        let hit = self.hit(x, y, grab);
         let (kind, original) = match hit {
             Hit::Ruler => (DragKind::Seek, None),
             Hit::Empty => {
@@ -197,32 +272,50 @@ impl TimelineView {
             self.seek_to_x(x);
         }
         let except = original.as_ref().map(|(_, clip)| clip.clip.id);
+        let grabs_clip = original.is_some();
         let drag = Drag {
             kind,
             start_x: x,
             start_y: y,
+            grab_frame: self.start_frame() + x * self.imp().frames_per_pixel.get(),
+            last_dx: 0.0,
+            last_dy: 0.0,
+            click_slop: grab.click_slop,
             snap_points: self.snap_points(except),
             original,
             preview: None,
             moved: false,
         };
         self.imp().drag.replace(Some(drag));
+        grabs_clip
     }
 
     fn drag_update(&self, dx: f64, dy: f64) {
+        self.update_preview(dx, dy);
+        self.update_autoscroll();
+    }
+
+    /// Works out where the dragged clip (or the playhead) goes with the pointer
+    /// `dx`, `dy` pixels from where the drag began.
+    fn update_preview(&self, dx: f64, dy: f64) {
         let mut drag_slot = self.imp().drag.borrow_mut();
         let Some(drag) = drag_slot.as_mut() else {
             return;
         };
-        if !drag.moved && dx.abs() < CLICK_SLOP && dy.abs() < CLICK_SLOP {
+        if !drag.moved && dx.abs() < drag.click_slop && dy.abs() < drag.click_slop {
             return;
         }
         drag.moved = true;
+        drag.last_dx = dx;
+        drag.last_dy = dy;
         let frames_per_pixel = self.imp().frames_per_pixel.get();
         let tolerance = frames_from_f64(SNAP_DISTANCE * frames_per_pixel).unwrap_or(0);
-        let shift = |frame: Frames| {
-            frames_from_f64((frames_to_f64(frame) + dx * frames_per_pixel).max(0.0)).unwrap_or(0)
-        };
+        // How far the audio under the pointer is from where it was grabbed. This
+        // also counts any scrolling or zooming since the drag began.
+        let pointer_frame = self.start_frame() + (drag.start_x + dx) * frames_per_pixel;
+        let delta = pointer_frame - drag.grab_frame;
+        let shift =
+            |frame: Frames| frames_from_f64((frames_to_f64(frame) + delta).max(0.0)).unwrap_or(0);
 
         let Some((lane, original)) = &drag.original else {
             // A seek drag: follow the pointer.
@@ -285,6 +378,7 @@ impl TimelineView {
     }
 
     fn drag_end(&self) {
+        self.stop_autoscroll();
         let Some(drag) = self.imp().drag.take() else {
             return;
         };
@@ -315,6 +409,75 @@ impl TimelineView {
                 &lane,
             ],
         );
+    }
+
+    /// How fast the view should scroll for the drag in progress (pixels per
+    /// second), or `None` when there is no drag that has started moving.
+    fn autoscroll_speed_now(&self) -> Option<f64> {
+        let drag = self.imp().drag.borrow();
+        let drag = drag.as_ref().filter(|drag| drag.moved)?;
+        Some(autoscroll_speed(
+            drag.start_x + drag.last_dx,
+            f64::from(self.width()),
+        ))
+    }
+
+    /// Starts auto-scrolling when the dragging pointer is near an edge. The
+    /// per-frame callback scrolls, updates the preview, and stops by itself when
+    /// the pointer leaves the edge zone or the drag ends.
+    fn update_autoscroll(&self) {
+        let imp = self.imp();
+        if imp.autoscroll_tick.borrow().is_some()
+            || self
+                .autoscroll_speed_now()
+                .is_none_or(|speed| speed.abs() < f64::EPSILON)
+        {
+            return;
+        }
+        let last_frame_time = Cell::new(None);
+        let id = self.add_tick_callback(move |view, clock| {
+            let Some(speed) = view
+                .autoscroll_speed_now()
+                .filter(|speed| speed.abs() >= f64::EPSILON)
+            else {
+                // The callback is finished: forget its id, there is nothing to remove.
+                view.imp().autoscroll_tick.take();
+                return glib::ControlFlow::Break;
+            };
+            let now = clock.frame_time();
+            if let Some(before) = last_frame_time.replace(Some(now)) {
+                view.scroll_by_pixels(speed * microseconds_to_seconds(now - before));
+                // The pointer did not move, but the audio under it did.
+                let (dx, dy) = view
+                    .imp()
+                    .drag
+                    .borrow()
+                    .as_ref()
+                    .map_or((0.0, 0.0), |drag| (drag.last_dx, drag.last_dy));
+                view.update_preview(dx, dy);
+            }
+            glib::ControlFlow::Continue
+        });
+        imp.autoscroll_tick.replace(Some(id));
+    }
+
+    fn stop_autoscroll(&self) {
+        if let Some(id) = self.imp().autoscroll_tick.take() {
+            id.remove();
+        }
+    }
+
+    /// Whether clip `id` is visible at pixel column `x`, given a lane's visible
+    /// `parts`. A fade handle where another clip covers the clip is not shown
+    /// (that part is not heard anyway).
+    pub(super) fn is_visible_at(&self, parts: &[Clip], id: ClipId, x: f64) -> bool {
+        let start = self.start_frame();
+        let frames_per_pixel = self.imp().frames_per_pixel.get();
+        let to_x = |frame: Frames| (frames_to_f64(frame) - start) / frames_per_pixel;
+        parts
+            .iter()
+            .filter(|part| part.id == id)
+            .any(|part| (to_x(part.start)..=to_x(part.end())).contains(&x))
     }
 
     /// Where a clip's fade-in and fade-out handles are drawn, in pixels: at the end

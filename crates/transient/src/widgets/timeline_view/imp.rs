@@ -17,6 +17,7 @@ use gtk::glib::subclass::Signal;
 use transient_core::project::ClipId;
 use transient_core::time::{Frames, SampleRate};
 
+use super::gestures::Pinch;
 use super::interaction::Drag;
 use super::{LANE_HEIGHT, Lane, RULER_HEIGHT};
 
@@ -49,6 +50,12 @@ pub(crate) struct TimelineView {
     pub(super) selected: Cell<Option<ClipId>>,
     /// The drag in progress, if any.
     pub(super) drag: RefCell<Option<Drag>>,
+    /// The pinch in progress, if any.
+    pub(super) pinch: Cell<Option<Pinch>>,
+    /// The per-frame callback that glides on after a swipe, while it runs.
+    pub(super) glide_tick: RefCell<Option<gtk::TickCallbackId>>,
+    /// The per-frame callback that scrolls while dragging near an edge, while it runs.
+    pub(super) autoscroll_tick: RefCell<Option<gtk::TickCallbackId>>,
 }
 
 #[glib::object_subclass]

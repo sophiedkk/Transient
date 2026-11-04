@@ -24,11 +24,11 @@ dialog, dark mode (Libadwaita), error toasts.
 
 ## 9 · Polish ("usable every day")
 
-- [ ] **Touch and touchpad gestures** (requested): pinch to zoom
+- [x] **Touch and touchpad gestures** (requested): pinch to zoom
       (`GtkGestureZoom`, anchored at the point between the fingers), kinetic
       scrolling, dragging on a touchscreen. Two-finger sideways scroll and
       Ctrl+scroll zoom already work.
-- [ ] **Auto-scroll** while dragging a clip or clip edge near the edge of the view.
+- [x] **Auto-scroll** while dragging a clip or clip edge near the edge of the view.
 - [ ] **Application icon.** Replace the placeholder
       (`data/icons/hicolor/scalable/apps/`) with an icon that follows the
       [GNOME HIG app icon guidelines](https://developer.gnome.org/hig/guidelines/app-icons.html):
@@ -70,10 +70,12 @@ when needed instead of being managed by hand.
 - [ ] **New track by dropping** a clip below the last track (drag maths in
       `transient-core::edit`, unit-tested).
 - [ ] **Import onto the selected track** at the playhead, or onto a new track as now.
-- [ ] **Rename** (double-click the name), **Remove Track** (Undo toast, no
-      confirmation), **reorder** (drag the header, plus a keyboard shortcut).
-- [ ] Empty tracks stay until removed. No mono/stereo track types: everything is
-      stereo, and pan covers left/right.
+- [ ] **Rename** (double-click the name) and **reorder** (drag the header, plus
+      a keyboard shortcut), in the track menu next to Remove Track.
+- [x] **Remove Track** in the track menu (Undo toast, no confirmation). A track
+      whose last clip is dragged to another track is removed automatically
+      (decided 2026-11-04: tracks come from imported files).
+- No mono/stereo track types: everything is stereo, and pan covers left/right.
 
 ## 12 · Clipboard and multiple selection
 
@@ -87,6 +89,8 @@ when needed instead of being managed by hand.
 - Recording
 - Effects (the model leaves room for per-track effects)
 - Volume automation
+- Level meters per track, in the track headers (the master meter is under the
+  master volume)
 - Clip names and colours (a fixed set that works in light and dark themes)
 - Markers and regions, and exporting one file per region
 - GitHub issue-based workflow instead of this file (not yet)
@@ -96,9 +100,11 @@ individual samples, workspaces, plugin hosting.
 
 ## Open questions and known gaps
 
-- Clips on one track may overlap: they are added together, and overlap plus
-  fades makes a crossfade. Audacity 4 lets the top clip overwrite instead.
-  Current choice: keep adding them (non-destructive).
+- Clips on one track stack (decided 2026-11-04, like Ardour): where they
+  overlap, only the top one is seen and heard; nothing is cut. Fades on the
+  top clip make a crossfade. A clip covered completely is hidden and cannot be
+  clicked until the clip on top is moved away; it may need a marker, or a
+  "Bring to Front"/"Send to Back" command.
 - Mouse interaction (dragging clips, trim and fade handles, header sliders,
   spin rows, file choosers) is not covered by automation, only the maths behind
   it and the scripted actions. Needs testing by hand.

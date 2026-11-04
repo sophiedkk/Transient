@@ -1,4 +1,4 @@
-//! Mixing: adding all clips together into one stereo signal.
+//! Mixing: adding all tracks together into one stereo signal.
 //!
 //! A [`Mix`] is a ready-to-play snapshot of a project: every clip with its audio.
 //! The player asks it for any stretch of the timeline with [`Mix::render`].
@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 
 use crate::audio::{AudioBuffer, CHANNELS};
+use crate::edit::visible_parts;
 use crate::project::{Project, SourceId};
 use crate::time::{Frames, SampleRate, frames_to_f64};
 
@@ -107,7 +108,8 @@ impl Mix {
             .flat_map(|track| {
                 let volume = db_to_gain(track.volume_db) * master;
                 let [left, right] = pan_gains(track.pan);
-                track.clips.iter().map(move |clip| {
+                // Where clips on a track overlap, only the top one plays.
+                visible_parts(&track.clips).into_iter().map(move |clip| {
                     let gain = volume * db_to_gain(clip.gain_db);
                     (clip, [left * gain, right * gain])
                 })
@@ -155,7 +157,8 @@ impl Mix {
     }
 
     /// Fills `out` (interleaved stereo) with the mix from frame `start` on.
-    /// Places without clips are silent; overlapping clips are added together.
+    /// Places without clips are silent; overlapping tracks are added together
+    /// (on one track, only the visible parts of clips play).
     pub fn render(&self, start: Frames, out: &mut [f32]) {
         out.fill(0.0);
         let frames = Frames::try_from(out.len() / CHANNELS).unwrap_or(0);

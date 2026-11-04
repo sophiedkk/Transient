@@ -141,6 +141,14 @@ impl Window {
         } else {
             imp.level_meter.remove_css_class("clipping");
         }
+        // No levels means nothing is playing: dim the empty meter, so it reads as
+        // "resting" rather than as two empty progress bars. `dimmed` is
+        // Libadwaita's own style class for this.
+        if levels.is_some() {
+            imp.level_meter.remove_css_class("dimmed");
+        } else {
+            imp.level_meter.add_css_class("dimmed");
+        }
     }
 }
 

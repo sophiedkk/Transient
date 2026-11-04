@@ -8,7 +8,7 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use transient_core::project::{Clip, ClipId, Project};
+use transient_core::project::{Clip, ClipId, Project, TrackId};
 use transient_core::time::Frames;
 
 use super::Window;
@@ -33,7 +33,9 @@ impl Window {
                     let Some(track) = project.tracks.get(lane).map(|track| track.id) else {
                         return false;
                     };
-                    project.update_clip(clip, track)
+                    // The moved clip goes on top of the clips it overlaps; a track
+                    // left empty goes away (in the same undo step).
+                    project.move_clip(clip, track)
                 });
             }
         });
@@ -41,8 +43,8 @@ impl Window {
     }
 
     /// Changes the project with `edit`, which returns whether it changed anything.
-    /// If it did, the old project goes into the undo history.
-    pub(super) fn apply_edit(&self, edit: impl FnOnce(&mut Project) -> bool) {
+    /// If it did, the old project goes into the undo history. Returns whether it did.
+    pub(super) fn apply_edit(&self, edit: impl FnOnce(&mut Project) -> bool) -> bool {
         let imp = self.imp();
         let before = imp.project.borrow().clone();
         let changed = edit(&mut imp.project.borrow_mut());
@@ -51,6 +53,7 @@ impl Window {
             imp.history.borrow_mut().record(before);
             self.project_changed();
         }
+        changed
     }
 
     /// Selects a clip (or nothing).
@@ -103,6 +106,36 @@ impl Window {
         self.imp().undo_toast.replace(Some(toast));
     }
 
+    /// Removes a track (the header's Remove Track), with an Undo toast.
+    pub(super) fn remove_track(&self, track: TrackId) {
+        if !self.apply_edit(|project| project.remove_track(track).is_some()) {
+            return;
+        }
+        let toast = adw::Toast::builder()
+            .title(gettext("Track removed"))
+            .button_label(gettext("_Undo"))
+            .action_name("win.undo")
+            .build();
+        self.imp().toast_overlay.add_toast(toast.clone());
+        self.imp().undo_toast.replace(Some(toast));
+    }
+
+    /// Removes the selected clip's track (`win.remove-track`).
+    pub(super) fn remove_selected_track(&self) {
+        let Some(clip) = self.imp().selected.get() else {
+            return;
+        };
+        let track = self
+            .imp()
+            .project
+            .borrow()
+            .clip(clip)
+            .map(|(track, _)| track);
+        if let Some(track) = track {
+            self.remove_track(track);
+        }
+    }
+
     /// Splits at the playhead (`win.split`, S): the selected clip if the playhead
     /// is inside it, otherwise every clip under the playhead.
     pub(super) fn split_at_playhead(&self) {
@@ -149,7 +182,7 @@ impl Window {
             } else {
                 clip.start.saturating_add(step)
             };
-            start != clip.start && project.update_clip(Clip::moved_to(clip, start), track)
+            start != clip.start && project.place_clip(Clip::moved_to(clip, start), track)
         });
     }
 
@@ -192,6 +225,7 @@ impl Window {
         self.action_set_enabled("win.undo", history.can_undo());
         self.action_set_enabled("win.redo", history.can_redo());
         self.action_set_enabled("win.delete-clip", has_selection);
+        self.action_set_enabled("win.remove-track", has_selection);
         self.action_set_enabled("win.nudge-left", has_selection);
         self.action_set_enabled("win.nudge-right", has_selection);
         self.action_set_enabled("win.deselect", has_selection);

@@ -10,4 +10,5 @@ pub mod normalize;
 pub mod project;
 pub mod ruler;
 pub mod time;
+pub mod view;
 pub mod waveform;

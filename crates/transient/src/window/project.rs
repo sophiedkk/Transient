@@ -153,6 +153,12 @@ impl Window {
                         window.apply_track_settings(track, settings);
                     }
                 });
+                let weak = self.downgrade();
+                header.connect_remove(move |track| {
+                    if let Some(window) = weak.upgrade() {
+                        window.remove_track(track);
+                    }
+                });
                 container.append(&header);
                 existing.push(header);
             }
@@ -184,7 +190,15 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
                 .map(|clip| LaneClip {
                     clip: *clip,
                     waveform: sources.get(&clip.source).map(|s| s.waveform.clone()),
-                    name: track.name.clone(),
+                    // The clip shows the file it plays (tracks can hold clips of
+                    // several files), falling back to the track name.
+                    name: project
+                        .source(clip.source)
+                        .and_then(|source| source.path.file_stem())
+                        .map_or_else(
+                            || track.name.clone(),
+                            |stem| stem.to_string_lossy().into_owned(),
+                        ),
                 })
                 .collect(),
         })

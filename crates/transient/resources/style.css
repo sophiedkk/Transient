@@ -8,7 +8,17 @@
   border-bottom: 1px solid alpha(currentColor, 0.08);
 }
 
-/* The output level meter: plain accent bars, red while the mix clips. */
+/* The output level meter: two thin bars (left and right) close together, so
+   they read as one stereo meter. Plain accent colour, red while the mix clips. */
+.level-meter levelbar trough,
+.level-meter levelbar block {
+  min-height: 4px;
+}
+
+.level-meter levelbar trough {
+  padding: 0;
+}
+
 .level-meter levelbar block.filled {
   background-color: var(--accent-bg-color);
 }

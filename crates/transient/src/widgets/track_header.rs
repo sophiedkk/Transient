@@ -29,6 +29,8 @@ pub(crate) struct TrackSettings {
 
 /// What a header reports when the user changes a control.
 type ChangedCallback = Box<dyn Fn(TrackId, TrackSettings)>;
+/// What a header reports when the user chooses Remove Track.
+type RemoveCallback = Box<dyn Fn(TrackId)>;
 
 mod imp {
     use std::cell::{Cell, RefCell};
@@ -37,7 +39,7 @@ mod imp {
     use gtk::glib;
     use transient_core::project::TrackId;
 
-    use super::ChangedCallback;
+    use super::{ChangedCallback, RemoveCallback};
 
     #[derive(Default, gtk::CompositeTemplate)]
     #[template(resource = "/io/github/sophiedkk/Transient/ui/track-header.ui")]
@@ -55,6 +57,7 @@ mod imp {
 
         pub(super) track: Cell<TrackId>,
         pub(super) on_changed: RefCell<Option<ChangedCallback>>,
+        pub(super) on_remove: RefCell<Option<RemoveCallback>>,
         /// True while the code sets the controls, so that does not count as a change.
         pub(super) updating: Cell<bool>,
     }
@@ -75,6 +78,14 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.bind_template();
+            // "track.remove", used by the header's menu: the action lives on the
+            // header itself, so it always means this header's track.
+            klass.install_action("track.remove", None, |header, _, _| {
+                let imp = header.imp();
+                if let Some(callback) = imp.on_remove.borrow().as_ref() {
+                    callback(imp.track.get());
+                }
+            });
         }
 
         fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
@@ -127,6 +138,11 @@ impl TrackHeader {
     /// changes a control.
     pub(crate) fn connect_changed(&self, callback: impl Fn(TrackId, TrackSettings) + 'static) {
         self.imp().on_changed.replace(Some(Box::new(callback)));
+    }
+
+    /// Calls `callback` with the track when the user chooses Remove Track.
+    pub(crate) fn connect_remove(&self, callback: impl Fn(TrackId) + 'static) {
+        self.imp().on_remove.replace(Some(Box::new(callback)));
     }
 
     /// The settings as the controls show them now.
@@ -185,9 +201,18 @@ impl TrackHeader {
     }
 
     /// Tooltips show the exact values, for example "Volume: −6.0 dB".
+    /// Brings the tooltips (and the mute icon) in line with the controls.
     fn update_tooltips(&self) {
         let imp = self.imp();
         let settings = self.settings();
+        // The icon says what you hear now; the tooltip says what a click does.
+        let (icon, mute_tooltip) = if settings.mute {
+            ("audio-volume-muted-symbolic", gettext("Unmute"))
+        } else {
+            ("audio-volume-high-symbolic", gettext("Mute"))
+        };
+        imp.mute_button.set_icon_name(icon);
+        imp.mute_button.set_tooltip_text(Some(&mute_tooltip));
         let volume = if settings.volume_db <= SILENT_DB {
             gettext("Volume: silent")
         } else {

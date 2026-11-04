@@ -35,7 +35,12 @@ pub fn ticks(view_start: f64, seconds_per_pixel: f64, width: f64, min_spacing: f
         .unwrap_or(3600.0);
 
     let view_end = view_start + width * seconds_per_pixel;
+    // The view can start a little before 0:00 (the space in front of the first
+    // clip); there are no ticks before the start. Comparing also turns -0.0 into 0.
     let mut time = (view_start / interval).ceil() * interval;
+    if time <= 0.0 {
+        time = 0.0;
+    }
     let mut ticks = Vec::new();
     while time <= view_end {
         ticks.push(Tick {
@@ -119,6 +124,14 @@ mod tests {
     fn hours_appear_after_an_hour() {
         assert_eq!(label(3725.0, 5.0), "1:02:05");
         assert_eq!(label(59.999_99, 1.0), "1:00");
+    }
+
+    #[test]
+    fn there_are_no_ticks_before_the_start() {
+        // A view starting 8 pixels before 0:00, at 0.01 s per pixel.
+        let ticks = ticks(-0.08, 0.01, 500.0, 60.0);
+        assert_eq!(ticks[0].label, "0:00");
+        assert!((ticks[0].x - 8.0).abs() < 1e-9);
     }
 
     #[test]

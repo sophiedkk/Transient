@@ -5,8 +5,10 @@
 //! - Click a clip: selects it (`clip-selected`). Drag it to move it, also to
 //!   another lane; drag its left or right edge to trim it. While dragging, the
 //!   view shows a preview; on release it emits `clip-changed` (see `interaction.rs`).
-//! - Shift+scroll (or a touchpad): moves through the timeline.
-//!   Ctrl+scroll: zooms around the pointer.
+//! - Shift+scroll (or a touchpad): moves through the timeline, gliding on after
+//!   a swipe. Ctrl+scroll: zooms around the pointer. Pinch: zooms around the
+//!   fingers (see `gestures.rs`).
+//! - Dragging near the left or right edge scrolls the view (auto-scroll).
 //! - The visible range lives in a `gtk::Adjustment` (seconds), which a
 //!   `gtk::Scrollbar` can share, giving a scrollbar for free.
 //!
@@ -14,14 +16,16 @@
 //! [`RULER_HEIGHT`] and [`LANE_HEIGHT`]. Drawing is in `draw.rs`.
 
 mod draw;
+mod gestures;
 mod imp;
 mod interaction;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::{gdk, glib};
+use gtk::glib;
 use transient_core::project::{Clip, ClipId};
 use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
+use transient_core::view::start_keeping_anchor;
 use transient_core::waveform::Waveform;
 
 /// Height of the time ruler, in pixels.
@@ -52,6 +56,10 @@ const END_SPACE_FRACTION: f64 = 0.1;
 const END_SPACE_MIN_SECONDS: f64 = 2.0;
 /// While following the playhead, keep it this far (fraction of the view) from the edge.
 const FOLLOW_MARGIN: f64 = 0.05;
+/// Empty space before 0:00, in pixels, so that the playhead and the left edge of a
+/// clip at the start are not squeezed against the track headers. It scrolls away
+/// with the rest of the timeline.
+const LEADING_SPACE: f64 = 8.0;
 
 /// A clip as the timeline draws it.
 #[derive(Debug, Clone)]
@@ -167,17 +175,29 @@ impl TimelineView {
         length + (length * END_SPACE_FRACTION).max(minimum)
     }
 
-    /// The zoom level that shows the whole timeline (and the space after it).
+    /// The zoom level that shows the whole timeline (and the space around it).
     fn fit_frames_per_pixel(&self) -> Option<f64> {
         self.rate()?;
-        let width = f64::from(self.width());
+        let width = f64::from(self.width()) - LEADING_SPACE;
         (width > 0.0).then(|| (self.scroll_length() / width).max(MIN_FRAMES_PER_PIXEL))
     }
 
-    /// The frame at the left edge (fractional when zoomed in far).
+    /// The frame at the left edge (fractional when zoomed in far). Scrolled all
+    /// the way to the start this is slightly negative: [`LEADING_SPACE`] pixels
+    /// before 0:00. Every pixel ↔ frame conversion goes through this, so the
+    /// space is the same for drawing, clicking and dragging.
     fn start_frame(&self) -> f64 {
         let rate = self.rate().unwrap_or(0.0);
         self.adjustment().map_or(0.0, |a| a.value()) * rate
+            - LEADING_SPACE * self.imp().frames_per_pixel.get()
+    }
+
+    /// Scrolls so that the left edge shows `frame` (the opposite of `start_frame`).
+    fn set_start_frame(&self, frame: f64) {
+        if let (Some(adjustment), Some(rate)) = (self.adjustment(), self.rate()) {
+            let value = frame + LEADING_SPACE * self.imp().frames_per_pixel.get();
+            adjustment.set_value(value / rate);
+        }
     }
 
     /// Brings the adjustment in line with the timeline, width and zoom level.
@@ -197,7 +217,9 @@ impl TimelineView {
             imp.fit.set(true);
         }
         let duration = self.scroll_length() / rate;
-        let page = (f64::from(self.width()) * imp.frames_per_pixel.get() / rate).min(duration);
+        // The leading space is not part of the scrollable range.
+        let visible_width = (f64::from(self.width()) - LEADING_SPACE).max(0.0);
+        let page = (visible_width * imp.frames_per_pixel.get() / rate).min(duration);
         let value = adjustment.value().clamp(0.0, (duration - page).max(0.0));
         adjustment.configure(value, 0.0, duration, page / 10.0, page * 0.9, page);
         self.queue_draw();
@@ -205,19 +227,38 @@ impl TimelineView {
 
     /// Changes the zoom by `factor`, keeping the frame under `anchor_x` in place.
     fn zoom_by(&self, factor: f64, anchor_x: f64) {
+        let old = self.imp().frames_per_pixel.get();
+        let anchor_frame = self.start_frame() + anchor_x * old;
+        self.zoom_to(old * factor, anchor_frame, anchor_x);
+    }
+
+    /// Zooms to `frames_per_pixel` (kept between the furthest zoom in and "show
+    /// everything"), with `anchor_frame` drawn at pixel column `anchor_x`.
+    fn zoom_to(&self, frames_per_pixel: f64, anchor_frame: f64, anchor_x: f64) {
         let imp = self.imp();
-        let (Some(fit), Some(rate), Some(adjustment)) =
-            (self.fit_frames_per_pixel(), self.rate(), self.adjustment())
-        else {
+        let Some(fit) = self.fit_frames_per_pixel() else {
             return;
         };
-        let old = imp.frames_per_pixel.get();
-        let new = (old * factor).clamp(MIN_FRAMES_PER_PIXEL, fit);
-        let anchor_frame = self.start_frame() + anchor_x * old;
+        let new = frames_per_pixel.clamp(MIN_FRAMES_PER_PIXEL, fit);
         imp.frames_per_pixel.set(new);
         imp.fit.set(new >= fit);
         self.update_adjustment();
-        adjustment.set_value((anchor_frame - anchor_x * new) / rate);
+        self.set_start_frame(start_keeping_anchor(anchor_frame, anchor_x, new));
+    }
+
+    /// Scrolls sideways by `pixels` (negative: towards the start). Returns false
+    /// when the view could not move because it is already at the start or end.
+    fn scroll_by_pixels(&self, pixels: f64) -> bool {
+        let (Some(adjustment), Some(rate)) = (self.adjustment(), self.rate()) else {
+            return false;
+        };
+        if pixels.abs() < f64::EPSILON {
+            return true;
+        }
+        let before = adjustment.value();
+        // The adjustment counts in seconds; `set_value` keeps it inside the timeline.
+        adjustment.set_value(before + pixels * self.imp().frames_per_pixel.get() / rate);
+        (adjustment.value() - before).abs() > f64::EPSILON
     }
 
     /// Zoom around the playhead when it is visible, otherwise around the middle.
@@ -234,14 +275,11 @@ impl TimelineView {
 
     /// Scrolls so that `frame` is visible, a little away from the edge.
     fn scroll_to_show(&self, frame: Frames) {
-        let (Some(adjustment), Some(rate)) = (self.adjustment(), self.rate()) else {
-            return;
-        };
-        let start = adjustment.value() * rate;
-        let page = adjustment.page_size() * rate;
+        let start = self.start_frame();
+        let page = f64::from(self.width()) * self.imp().frames_per_pixel.get();
         let frame = frames_to_f64(frame);
         if frame < start || frame > start + page * (1.0 - FOLLOW_MARGIN) {
-            adjustment.set_value((frame - page * FOLLOW_MARGIN) / rate);
+            self.set_start_frame(frame - page * FOLLOW_MARGIN);
         }
     }
 
@@ -315,9 +353,14 @@ impl TimelineView {
         }
     }
 
-    /// Mouse and touchpad handling. Called once, from `constructed`.
+    /// Mouse, touchpad and touchscreen handling. Called once, from `constructed`.
     fn setup_controllers(&self) {
-        self.setup_drag();
+        let drag = self.drag_gesture();
+        // The pinch is added before the drag, so that when a second finger lands
+        // the pinch can take over from a drag the first finger started.
+        self.setup_pinch(&drag);
+        self.add_controller(drag);
+        self.setup_scroll();
 
         // Remember the pointer position for Ctrl+scroll zooming.
         let motion = gtk::EventControllerMotion::new();
@@ -335,42 +378,6 @@ impl TimelineView {
             }
         });
         self.add_controller(motion);
-
-        // Horizontal scroll moves through the timeline; Ctrl+scroll zooms around the
-        // pointer. Plain vertical scrolling is left to the scrolled window around the
-        // view, which scrolls through the tracks.
-        let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
-        let weak = self.downgrade();
-        scroll.connect_scroll(move |controller, dx, dy| {
-            let Some(view) = weak.upgrade() else {
-                return glib::Propagation::Proceed;
-            };
-            let state = controller.current_event_state();
-            if state.contains(gdk::ModifierType::CONTROL_MASK) {
-                let anchor = view
-                    .imp()
-                    .pointer_x
-                    .get()
-                    .unwrap_or_else(|| f64::from(view.width()) / 2.0);
-                view.zoom_by(ZOOM_STEP.powf(dy), anchor);
-                return glib::Propagation::Stop;
-            }
-            // Shift+wheel is the usual way to scroll sideways with a mouse.
-            let sideways = if state.contains(gdk::ModifierType::SHIFT_MASK) {
-                dx + dy
-            } else {
-                dx
-            };
-            match view.adjustment() {
-                Some(adjustment) if sideways != 0.0 => {
-                    adjustment
-                        .set_value(adjustment.value() + sideways * adjustment.page_size() / 5.0);
-                    glib::Propagation::Stop
-                }
-                _ => glib::Propagation::Proceed,
-            }
-        });
-        self.add_controller(scroll);
 
         // Redraw when the accent colour or light/dark style changes.
         let style = adw::StyleManager::default();

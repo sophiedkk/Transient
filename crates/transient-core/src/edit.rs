@@ -1,10 +1,18 @@
 //! Editing operations: moving, trimming, splitting and deleting clips, snapping,
 //! and the undo history.
 //!
+//! Clips on one track are stacked like sheets of paper, as in Ardour: the order
+//! of `Track::clips` is bottom to top, and a clip that is moved goes on top
+//! ([`Project::place_clip`]). Where clips overlap you hear (and see) only the top
+//! one; nothing is cut, so moving the top clip away brings the one underneath
+//! back whole. [`visible_parts`] works out what remains of each clip. Where the
+//! top clip fades in or out, the clip underneath keeps playing and fades the
+//! other way, so the two crossfade.
+//!
 //! The clip operations are pure functions (a clip in, a changed clip out), so the
 //! timeline can use them to preview a drag before the project changes.
 
-use crate::project::{Clip, ClipId, Project, TrackId};
+use crate::project::{Clip, ClipId, Project, Track, TrackId};
 use crate::time::Frames;
 
 /// The shortest a clip can be trimmed to (about 1.3 ms at 48 kHz).
@@ -87,6 +95,65 @@ impl Clip {
         .with_fades(0, self.fade_out);
         Some((first, second))
     }
+
+    /// What remains visible of `self` (a clip underneath) with `top` over it on
+    /// the same track: the piece before `top` and the piece after it. Either can
+    /// be `None`; both are `None` when `top` covers all of `self`. If both are
+    /// left (`top` lies in the middle), the second piece gets `new_id`.
+    ///
+    /// `self` keeps playing only while `top` fades in or out, with a matching
+    /// fade of its own, so they crossfade. Where `top` plays at full volume,
+    /// nothing of `self` is left.
+    #[must_use]
+    pub fn covered_by(self, top: &Self, new_id: ClipId) -> (Option<Self>, Option<Self>) {
+        if self.end() <= top.start || self.start >= top.end() {
+            return (Some(self), None);
+        }
+        // `self` may only play where `top` is fading: up to the end of its fade-in,
+        // and again from the start of its fade-out.
+        let cut_start = top.start + top.fade_in;
+        let cut_end = top.end() - top.fade_out;
+
+        let before = (self.start < top.start).then(|| {
+            let end = self.end().min(cut_start);
+            let length = end - self.start;
+            // Fade out for as long as `top` fades in (keep a longer fade-out of
+            // its own if `self` already ended inside that fade).
+            let overlap = end - top.start;
+            let fade_out = if end < self.end() {
+                overlap
+            } else {
+                self.fade_out.max(overlap)
+            };
+            Self { length, ..self }.with_fades(self.fade_in, fade_out)
+        });
+        let after = (self.end() > top.end()).then(|| {
+            let start = self.start.max(cut_end);
+            let skipped = start - self.start;
+            let length = self.end() - start;
+            let overlap = top.end() - start;
+            let fade_in = if start > self.start {
+                overlap
+            } else {
+                self.fade_in.max(overlap)
+            };
+            // The fade-out at the far end is kept as it is (so the audio after
+            // `top` sounds exactly as before); the new fade-in gets what is left.
+            let fade_out = self.fade_out.min(length);
+            Self {
+                id: if before.is_some() { new_id } else { self.id },
+                start,
+                offset: self.offset + skipped,
+                length,
+                ..self
+            }
+            .with_fades(fade_in.min(length - fade_out), fade_out)
+        });
+        // Both pieces are at least one frame long: `before` ends after `top`
+        // starts, `after` starts before `top` ends. Short pieces are kept: they
+        // are still audio that you hear.
+        (before, after)
+    }
 }
 
 impl Project {
@@ -99,15 +166,55 @@ impl Project {
         })
     }
 
-    /// Replaces the clip with the same ID by `clip`, on `track` (moving it there if
-    /// it was on another track). Returns `false` if the clip or track does not exist.
+    /// Replaces the clip with the same ID by `clip`, on `track`. On the same
+    /// track it keeps its place in the stack (changing a clip's gain must not
+    /// change which clip you hear); moved to another track, it goes on top.
+    /// Returns `false` if the clip or track does not exist.
     pub fn update_clip(&mut self, clip: Clip, track: TrackId) -> bool {
+        if let Some(slot) = self
+            .track_mut(track)
+            .and_then(|track| track.clips.iter_mut().find(|c| c.id == clip.id))
+        {
+            *slot = clip;
+            return true;
+        }
+        self.place_clip(clip, track)
+    }
+
+    /// Puts `clip` on `track`, on top of the other clips there (where they
+    /// overlap, it is the one you hear). Used when a clip is moved. Nothing
+    /// underneath changes. Returns `false` if the clip or track does not exist.
+    pub fn place_clip(&mut self, clip: Clip, track: TrackId) -> bool {
         if self.track(track).is_none() || self.remove_clip(clip.id).is_none() {
             return false;
         }
         self.track_mut(track)
             .map(|track| track.clips.push(clip))
             .is_some()
+    }
+
+    /// Moves `clip` to `track` by dragging: it goes on top there (see
+    /// [`Project::place_clip`]). Tracks come from imported files, so a track
+    /// whose last clip was dragged to another track has no use left and is
+    /// removed too. Returns `false` if the clip or track does not exist.
+    pub fn move_clip(&mut self, clip: Clip, track: TrackId) -> bool {
+        let from = self.clip(clip.id).map(|(from, _)| from);
+        if !self.place_clip(clip, track) {
+            return false;
+        }
+        if let Some(from) = from.filter(|&from| from != track)
+            && self.track(from).is_some_and(|from| from.clips.is_empty())
+        {
+            let _removed = self.remove_track(from);
+        }
+        true
+    }
+
+    /// Removes a track and its clips, returning it. The sources stay, so undo
+    /// (a snapshot) and other clips of the same file keep working.
+    pub fn remove_track(&mut self, id: TrackId) -> Option<Track> {
+        let index = self.tracks.iter().position(|track| track.id == id)?;
+        Some(self.tracks.remove(index))
     }
 
     /// Removes a clip, returning it and the track it was on.
@@ -125,24 +232,50 @@ impl Project {
         let (first, second) = clip.split_at(at, new_id)?;
         self.next_id += 1;
         let clips = &mut self.track_mut(track)?.clips;
-        if let Some(slot) = clips.iter_mut().find(|c| c.id == id) {
+        // The second half goes right above the first, so the stack (which clip
+        // you hear where clips overlap) stays the same.
+        let index = clips.iter().position(|c| c.id == id)?;
+        if let Some(slot) = clips.get_mut(index) {
             *slot = first;
         }
-        clips.push(second);
+        clips.insert(index + 1, second);
         Some(new_id)
     }
 
     /// Every clip playing at `frame`: from its first frame up to (not including)
     /// its end, so after a split the playhead belongs to the second half.
+    /// Track by track, and within a track the topmost clip (drawn last) first.
     #[must_use]
     pub fn clips_at(&self, frame: Frames) -> Vec<ClipId> {
         self.tracks
             .iter()
-            .flat_map(|track| &track.clips)
+            .flat_map(|track| track.clips.iter().rev())
             .filter(|clip| clip.start <= frame && frame < clip.end())
             .map(|clip| clip.id)
             .collect()
     }
+}
+
+/// The parts of a track's `clips` (stored bottom to top) that are heard and
+/// drawn. Each clip is hidden where a clip above it covers it, except while the
+/// clip above fades in or out: there both play, crossfading (see
+/// [`Clip::covered_by`]). Parts keep their clip's ID, so one clip can have
+/// several parts, or none when it is covered completely. The parts are in
+/// stacking order too: later ones are on top.
+#[must_use]
+pub fn visible_parts(clips: &[Clip]) -> Vec<Clip> {
+    let mut parts: Vec<Clip> = Vec::with_capacity(clips.len());
+    for clip in clips {
+        parts = parts
+            .into_iter()
+            .flat_map(|part| {
+                let (before, after) = part.covered_by(clip, part.id);
+                before.into_iter().chain(after)
+            })
+            .collect();
+        parts.push(*clip);
+    }
+    parts
 }
 
 /// The point in `points` nearest to `frame` if it is within `tolerance`,
@@ -326,6 +459,172 @@ mod tests {
         assert!(!project.update_clip(clip, TrackId(999)), "unknown track");
     }
 
+    /// A track with a 1000-frame clip at 1000..2000 (from a 5000-frame source)
+    /// and a second clip, on its own track, to drop onto it.
+    fn two_clips() -> (Project, TrackId, Clip, Clip) {
+        let mut project = Project::default();
+        let track = project.import("under.wav".into(), 5000, "under".to_owned());
+        let under = project.track(track).unwrap().clips[0];
+        let under = Clip {
+            offset: 500,
+            ..under.moved_to(1000)
+        };
+        let under = Clip {
+            length: 1000,
+            ..under
+        };
+        assert!(project.update_clip(under, track));
+        let other = project.import("top.wav".into(), 5000, "top".to_owned());
+        let top = project.track(other).unwrap().clips[0];
+        (project, track, under, Clip { length: 400, ..top })
+    }
+
+    fn clips(project: &Project, track: TrackId) -> Vec<Clip> {
+        project.track(track).unwrap().clips.clone()
+    }
+
+    /// What is visible on `track`.
+    fn visible(project: &Project, track: TrackId) -> Vec<Clip> {
+        visible_parts(&clips(project, track))
+    }
+
+    #[test]
+    fn a_clip_on_top_hides_the_end_it_covers() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(1800), track));
+        let parts = visible(&project, track);
+        assert_eq!(parts.len(), 2);
+        assert_eq!((parts[0].start, parts[0].length), (1000, 800));
+        assert_eq!(parts[0].id, under.id);
+        assert_eq!(parts[1].id, top.id, "the moved clip is on top");
+        assert_eq!(clips(&project, track)[0], under, "nothing is cut");
+    }
+
+    #[test]
+    fn a_clip_on_top_hides_the_start_it_covers() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(800), track));
+        let rest = visible(&project, track)[0];
+        // The audio stays where it was: 200 frames later, 200 frames further in.
+        assert_eq!(
+            (rest.start, rest.offset, rest.length),
+            (1200, under.offset + 200, 800)
+        );
+    }
+
+    #[test]
+    fn a_clip_in_the_middle_leaves_two_visible_parts() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(1300), track));
+        let parts = visible(&project, track);
+        assert_eq!(parts.len(), 3);
+        assert_eq!((parts[0].start, parts[0].length), (1000, 300));
+        assert_eq!(
+            (parts[1].start, parts[1].offset),
+            (1700, under.offset + 700)
+        );
+        assert_eq!(parts[1].end(), under.end());
+        assert_eq!(parts[1].id, under.id, "both parts belong to the same clip");
+    }
+
+    #[test]
+    fn a_clip_that_is_covered_completely_is_hidden_but_kept() {
+        let (mut project, track, under, top) = two_clips();
+        let top = Clip {
+            length: 1500,
+            ..top.moved_to(900)
+        };
+        assert!(project.place_clip(top, track));
+        assert_eq!(visible(&project, track), vec![top]);
+        assert_eq!(clips(&project, track), vec![under, top]);
+    }
+
+    #[test]
+    fn a_fade_in_on_the_top_clip_makes_a_crossfade() {
+        let (mut project, track, _, top) = two_clips();
+        let top = top.moved_to(1500).with_fades(200, 0);
+        assert!(project.place_clip(top, track));
+        let rest = visible(&project, track)[0];
+        // The clip underneath plays on until the fade-in ends, fading out.
+        assert_eq!(rest.end(), 1700);
+        assert_eq!(rest.fade_out, 200);
+    }
+
+    #[test]
+    fn clips_elsewhere_are_left_alone() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(3000), track));
+        assert_eq!(visible(&project, track)[0], under);
+    }
+
+    #[test]
+    fn changing_a_clip_keeps_its_place_in_the_stack() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(1500), track));
+        // Changing the gain of the clip underneath must not bring it to the top.
+        let louder = Clip {
+            gain_db: 3.0,
+            ..under
+        };
+        assert!(project.update_clip(louder, track));
+        assert_eq!(clips(&project, track)[1].id, top.id);
+    }
+
+    #[test]
+    fn splitting_keeps_the_stack() {
+        let (mut project, track, under, top) = two_clips();
+        assert!(project.place_clip(top.moved_to(1500), track));
+        let before = visible(&project, track);
+        let second = project.split_clip(under.id, 1200).unwrap();
+        let ids: Vec<ClipId> = clips(&project, track).iter().map(|c| c.id).collect();
+        assert_eq!(ids, vec![under.id, second, top.id]);
+        // Splitting changes nothing you hear: same parts, the second half has a new ID.
+        assert_eq!(visible(&project, track).len(), before.len() + 1);
+    }
+
+    #[test]
+    fn the_topmost_clip_under_the_playhead_comes_first() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let below = project.track(track).unwrap().clips[0];
+        let above = project.add_clip(track, below.source, 0).unwrap();
+        assert_eq!(project.clips_at(10), vec![above, below.id]);
+    }
+
+    #[test]
+    fn dragging_the_last_clip_away_removes_its_track() {
+        let mut project = Project::default();
+        let first = project.import("a.wav".into(), 1000, "a".to_owned());
+        let second = project.import("b.wav".into(), 1000, "b".to_owned());
+        let clip = project.track(second).unwrap().clips[0];
+        assert!(project.move_clip(clip.moved_to(2000), first));
+        assert_eq!(project.tracks.len(), 1);
+        assert_eq!(project.track(first).unwrap().clips.len(), 2);
+    }
+
+    #[test]
+    fn moving_a_clip_on_its_own_track_keeps_the_track() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let clip = project.track(track).unwrap().clips[0];
+        assert!(project.move_clip(clip.moved_to(500), track));
+        assert_eq!(project.tracks.len(), 1);
+    }
+
+    #[test]
+    fn a_track_can_be_removed() {
+        let mut project = Project::default();
+        let first = project.import("a.wav".into(), 1000, "a".to_owned());
+        let second = project.import("b.wav".into(), 1000, "b".to_owned());
+        assert_eq!(
+            project.remove_track(first).map(|track| track.id),
+            Some(first)
+        );
+        assert_eq!(project.tracks.len(), 1);
+        assert_eq!(project.tracks[0].id, second);
+        assert!(project.remove_track(first).is_none(), "already gone");
+    }
+
     #[test]
     fn undo_and_redo_walk_through_the_history() {
         let mut history = History::default();
@@ -374,6 +673,56 @@ mod tests {
 
             project.split_clip(clip.id, at);
             prop_assert_eq!(render(&project, &pool), before);
+        }
+
+        /// A clip on top changes nothing you hear outside it, hides everything
+        /// underneath where it plays at full volume, and moving it away again
+        /// brings back exactly what was there: stacking never cuts audio.
+        #[test]
+        fn a_clip_on_top_only_hides_what_it_covers(
+            start in 0_u64..2500,
+            length in 64_u64..1500,
+            fade_in in 0_u64..600,
+            fade_out in 0_u64..600,
+        ) {
+            let ramp: Vec<f32> = (0..2000_u16).flat_map(|n| [f32::from(n), 0.0]).collect();
+            let mut project = Project::default();
+            let track = project.import("ramp.wav".into(), 2000, "r".to_owned());
+            let other = project.import("silence.wav".into(), 2000, "s".to_owned());
+            let top = project.track(other).unwrap().clips[0];
+            let pool = AudioPool::from([
+                (project.track(track).unwrap().clips[0].source,
+                 AudioBuffer::new(SampleRate::HZ_48000, ramp).unwrap()),
+                (top.source, AudioBuffer::new(SampleRate::HZ_48000, vec![0.0; 4000]).unwrap()),
+            ]);
+            // The top clip plays silence, so it only matters through what it hides.
+            let before = render(&project, &pool);
+
+            let top = Clip { length, ..top.moved_to(start) }.with_fades(fade_in, fade_out);
+            prop_assert!(project.place_clip(top, track));
+            let stacked = render(&project, &pool);
+            let covered = usize::try_from(top.start).unwrap()..usize::try_from(top.end()).unwrap();
+            for (frame, (a, b)) in before.iter().zip(&stacked).enumerate() {
+                if !covered.contains(&frame) {
+                    prop_assert!((a - b).abs() < 1e-6, "frame {} outside the top clip changed", frame);
+                }
+            }
+            let full_volume = (top.start + top.fade_in)..(top.end() - top.fade_out);
+            for part in visible_parts(&project.track(track).unwrap().clips) {
+                if part.id != top.id {
+                    prop_assert!(
+                        part.end() <= full_volume.start || part.start >= full_volume.end,
+                        "{:?} still plays under {:?}", part, top
+                    );
+                }
+            }
+
+            // Back to its own track: the ramp sounds exactly as before.
+            prop_assert!(project.place_clip(top, other));
+            let restored = render(&project, &pool);
+            for (frame, (a, b)) in before.iter().zip(&restored).enumerate() {
+                prop_assert!((a - b).abs() < 1e-6, "frame {} did not come back", frame);
+            }
         }
 
         /// Trimming the start never moves audio on the timeline: wherever the
