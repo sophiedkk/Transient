@@ -4,7 +4,12 @@ A simple multitrack audio editor for GNOME: put audio files on tracks, trim and
 arrange them, balance their volume, and export the mix. Built with Rust, GTK 4,
 Libadwaita and GStreamer.
 
-> **Status:** early development. The window exists; editing audio does not yet.
+![Transient with four tracks: a voice clip selected, a piano bed and drums with
+fades, and applause at the end](data/screenshots/main-window.png)
+
+> **Status:** early development, no release yet. You can import audio files,
+> arrange, trim and cut them on tracks, add fades, mix the tracks and export
+> the result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
 
 ## Development
 
