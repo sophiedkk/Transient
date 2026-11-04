@@ -289,10 +289,17 @@ impl LaunchOptions {
                 Err(err) => error!("could not run action {name}: {err}"),
             }
         }
+        // With --screenshot, the screenshot shows the recording in progress
+        // (taken just before it stops) instead of the result.
+        let mut screenshot_taken = false;
         if let Some(seconds) = self.record_for {
             window.use_test_input();
             window.toggle_recording();
             glib::timeout_future_seconds(seconds).await;
+            if let Some(path) = &self.screenshot {
+                save_screenshot_when_drawn(&window, path).await;
+                screenshot_taken = true;
+            }
             window.stop_recording_now().await;
         }
         if let Some(path) = &self.save_to {
@@ -306,7 +313,7 @@ impl LaunchOptions {
         if self.play {
             window.toggle_playback();
         }
-        if let Some(path) = &self.screenshot {
+        if let Some(path) = self.screenshot.as_ref().filter(|_| !screenshot_taken) {
             if let Some(seconds) = self.screenshot_delay {
                 glib::timeout_future_seconds(seconds).await;
             }

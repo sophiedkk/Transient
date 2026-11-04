@@ -102,7 +102,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Recording: the Record button (or R) records onto a new track at the
   playhead, while the other tracks play along; the level meter shows the
   input. Stop (or Space) ends the take, which is saved as FLAC inside the
-  project. The arrow next to the Record button chooses the input (the system
+  project; while recording, the take grows on the timeline. The start page has
+  a Record Audio button. The arrow next to the Record button chooses the input (the system
   default or a specific microphone); the choice is remembered.
   `transient-cli inputs` lists the inputs.
 - The timeline works from the keyboard: it gets focus when a project opens (or

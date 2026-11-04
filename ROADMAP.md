@@ -107,8 +107,8 @@ Requested 2026-11-04: recording comes before 1.0, not after.
       recorded over music.
 - [ ] **Correct for the delay** between what plays and what is recorded
       (latency), so overdubs line up exactly; measure it with a loopback test.
-- [ ] **Show the take growing** on the timeline while recording (now it
-      appears when recording stops).
+- [x] **Show the take growing** on the timeline while recording, with its
+      outline, below the last track; the start page has a Record Audio button.
 - [x] **Where takes are stored**: as FLAC in the project file, like imported
       audio (decided 2026-11-04).
 - [ ] **Permissions**: there is no portal for the microphone yet, so the

@@ -17,7 +17,8 @@ use transient_core::time::{Frames, frames_to_f64};
 use transient_core::waveform::Peak;
 
 use super::{
-    CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, LaneRange, RULER_HEIGHT, TimelineView,
+    CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, LaneRange, LiveTake, RULER_HEIGHT,
+    TimelineView,
 };
 
 /// Labelled ruler ticks are at least this far apart, in pixels.
@@ -160,6 +161,9 @@ impl TimelineView {
             self.draw_fade_handles(snapshot, &palette, &clip, lane_top, &parts);
         }
 
+        if let Some(take) = imp.live_take.borrow().as_ref() {
+            self.draw_live_take(snapshot, &view, &palette, take, lanes.len());
+        }
         if self.rate().is_some() {
             draw_playhead(snapshot, &view, &palette, imp.playhead.get(), height);
         }
@@ -187,6 +191,75 @@ impl TimelineView {
             &graphene::Rect::new(0.0, top, view.width, pixels(LANE_HEIGHT)),
         );
         self.draw_clip(snapshot, view, palette, drawn, moved, top, true);
+    }
+
+    /// A take being recorded, in `lane` (the empty one below the last track): a
+    /// clip that grows as the recording goes on, with the take's outline as its
+    /// waveform, labelled "Recording…".
+    fn draw_live_take(
+        &self,
+        snapshot: &gtk::Snapshot,
+        view: &View,
+        palette: &Palette,
+        take: &LiveTake,
+        lane: usize,
+    ) {
+        let left = view.x(frames_to_f64(take.start));
+        let right = view.x(frames_to_f64(take.start + take.frames));
+        if right < 0.0 || left > f64::from(view.width) {
+            return;
+        }
+        let top = lane_top(lane) + CLIP_INSET;
+        let height = pixels(LANE_HEIGHT) - 2.0 * CLIP_INSET;
+        let (box_left, box_right) = (
+            pixels_f64(left.max(-4.0)),
+            pixels_f64(right.min(f64::from(view.width) + 4.0)),
+        );
+        let bounds = graphene::Rect::new(box_left, top, (box_right - box_left).max(1.0), height);
+        snapshot.push_rounded_clip(&gsk::RoundedRect::from_rect(bounds, CLIP_RADIUS));
+        snapshot.append_color(&palette.accent.with_alpha(0.16), &bounds);
+        snapshot.append_color(
+            &palette.accent.with_alpha(0.28),
+            &graphene::Rect::new(box_left, top, bounds.width(), CLIP_LABEL_HEIGHT),
+        );
+
+        // The outline: per pixel column, the loudest block it covers.
+        let wave_middle = top + CLIP_LABEL_HEIGHT + (height - CLIP_LABEL_HEIGHT) / 2.0;
+        let half = (height - CLIP_LABEL_HEIGHT) / 2.0;
+        let block =
+            f64::from(u32::try_from(transient_engine::recorder::PEAK_BLOCK).unwrap_or(1024));
+        let first_column = left.max(0.0).floor();
+        let last_column = right.min(f64::from(view.width)).ceil();
+        let mut column = first_column;
+        while column < last_column {
+            let from =
+                (view.start + column * view.frames_per_pixel - frames_to_f64(take.start)) / block;
+            let to = from + view.frames_per_pixel / block;
+            let peak = take
+                .peaks
+                .get(
+                    block_index(from)
+                        ..block_index(to)
+                            .max(block_index(from) + 1)
+                            .min(take.peaks.len()),
+                )
+                .unwrap_or_default()
+                .iter()
+                .fold(0.0_f32, |peak, value| peak.max(*value));
+            let bar = (peak.min(1.0) * half).max(0.5);
+            snapshot.append_color(
+                &palette.accent,
+                &graphene::Rect::new(pixels_f64(column), wave_middle - bar, 1.0, 2.0 * bar),
+            );
+            column += 1.0;
+        }
+
+        let layout = self.small_text(&gettext("Recording…"));
+        snapshot.save();
+        snapshot.translate(&graphene::Point::new(box_left.max(0.0) + 6.0, top + 1.0));
+        snapshot.append_layout(&layout, &palette.foreground);
+        snapshot.restore();
+        snapshot.pop();
     }
 
     /// With keyboard focus: a faint band on the current track (the one Up/Down
@@ -592,4 +665,11 @@ fn pango_units(pixels: f32) -> i32 {
     )]
     let units = (pixels.max(0.0) * 1024.0) as i32;
     units
+}
+
+/// A block number from a fractional one (rounded down; negative counts as 0).
+fn block_index(value: f64) -> usize {
+    transient_core::time::frames_from_f64(value.max(0.0).floor())
+        .and_then(|index| usize::try_from(index).ok())
+        .unwrap_or(0)
 }

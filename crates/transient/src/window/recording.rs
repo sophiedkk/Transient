@@ -33,6 +33,8 @@ pub(super) struct Recording {
     start: Frames,
     /// The input's last measured level, for the level meter.
     levels: std::cell::Cell<Option<[f64; 2]>>,
+    /// How many outline values the timeline has been given so far.
+    peaks_shown: std::cell::Cell<usize>,
 }
 
 impl Window {
@@ -72,7 +74,14 @@ impl Window {
             recorder,
             start,
             levels: std::cell::Cell::new(None),
+            peaks_shown: std::cell::Cell::new(0),
         }));
+        // The take is drawn while it grows; in an empty project, show the
+        // timeline (instead of the start page) to see it.
+        imp.timeline.start_live_take(start, rate);
+        imp.stack.set_visible_child_name("project");
+        // The Stop button and the meter are in the bottom bar.
+        imp.toolbar_view.set_reveal_bottom_bars(true);
         // The other tracks play along (overdubbing).
         self.set_playing(true);
         self.update_record_button();
@@ -87,11 +96,13 @@ impl Window {
         else {
             return;
         };
+        imp.timeline.end_live_take();
         self.update_record_button();
         self.set_playing(false);
 
         let Some(folder) = self.audio_folder() else {
             self.show_toast(&gettext("Could not save the recording"));
+            self.project_changed();
             return;
         };
         let number = self.next_recording_number();
@@ -109,16 +120,19 @@ impl Window {
             Ok(Ok(audio)) if audio.frames() > 0 => audio,
             Ok(Ok(_)) => {
                 self.show_toast(&gettext("Nothing was recorded"));
+                self.project_changed();
                 return;
             }
             Ok(Err(error)) => {
                 warn!("could not save the recording: {error}");
                 self.show_toast(&gettext("Could not save the recording"));
+                self.project_changed();
                 return;
             }
             Err(_panic) => {
                 warn!("saving the recording stopped unexpectedly");
                 self.show_toast(&gettext("Could not save the recording"));
+                self.project_changed();
                 return;
             }
         };
@@ -161,6 +175,14 @@ impl Window {
         let polled = {
             let recording = self.imp().recording.borrow();
             let recording = recording.as_ref()?;
+            // The take so far, for the timeline: only the new outline values.
+            let new_peaks = recording.recorder.peaks_from(recording.peaks_shown.get());
+            recording
+                .peaks_shown
+                .set(recording.peaks_shown.get() + new_peaks.len());
+            self.imp()
+                .timeline
+                .extend_live_take(&new_peaks, recording.recorder.recorded_frames());
             recording.recorder.poll_levels().map(|levels| {
                 // Keep the last measurement: the meter updates more often than
                 // the input is measured.

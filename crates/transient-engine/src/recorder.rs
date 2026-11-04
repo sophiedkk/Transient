@@ -28,6 +28,9 @@ use crate::export::{ExportError, ExportFormat, export};
 use crate::player::read_levels;
 use crate::{EngineError, make_element};
 
+/// How many frames each value of [`Recorder::peaks_from`] covers (about 21 ms).
+pub const PEAK_BLOCK: usize = 1024;
+
 /// How often the input level is measured.
 const LEVEL_INTERVAL: Duration = Duration::from_millis(50);
 /// How long [`Recorder::stop`] waits for the last audio to arrive.
@@ -182,6 +185,26 @@ impl Recorder {
         Frames::try_from(samples / CHANNELS).unwrap_or(0)
     }
 
+    /// A rough outline of what was recorded, to draw while recording: the
+    /// loudest sample (of either channel) in each block of [`PEAK_BLOCK`]
+    /// frames, starting at block `first`. Only complete blocks; ask again from
+    /// where the last answer ended to get just the new ones.
+    #[must_use]
+    pub fn peaks_from(&self, first: usize) -> Vec<f32> {
+        let Ok(samples) = self.samples.lock() else {
+            return Vec::new();
+        };
+        samples
+            .chunks_exact(PEAK_BLOCK * CHANNELS)
+            .skip(first)
+            .map(|block| {
+                block
+                    .iter()
+                    .fold(0.0_f32, |peak, sample| peak.max(sample.abs()))
+            })
+            .collect()
+    }
+
     /// The input's latest level per channel, in dBFS (for the level meter), or
     /// `None` if nothing new was measured. Call this regularly.
     ///
@@ -277,6 +300,14 @@ mod tests {
         let recorder = Recorder::start(&Input::TestTone, SampleRate::HZ_48000).unwrap();
         std::thread::sleep(Duration::from_millis(500));
         let levels = recorder.poll_levels().unwrap();
+        // The outline for drawing: one peak per block, about half (the tone's volume).
+        let peaks = recorder.peaks_from(0);
+        assert!(!peaks.is_empty());
+        assert!(
+            peaks.iter().all(|peak| (0.4..0.6).contains(peak)),
+            "peaks {peaks:?}"
+        );
+        assert_eq!(recorder.peaks_from(peaks.len() + 1000), Vec::<f32>::new());
         let audio = recorder.stop().unwrap();
 
         // About half a second (a live source starts with a little delay).

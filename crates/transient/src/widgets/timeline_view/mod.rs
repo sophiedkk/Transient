@@ -87,6 +87,19 @@ pub(crate) struct LaneRange {
     pub(crate) last_lane: usize,
 }
 
+/// A take being recorded, drawn growing in the empty lane below the last track
+/// (see `draw_live_take`).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct LiveTake {
+    /// Where the take starts on the timeline.
+    pub(crate) start: Frames,
+    /// How long it is so far.
+    pub(crate) frames: Frames,
+    /// Its outline: the loudest sample in each block of
+    /// `transient_engine::recorder::PEAK_BLOCK` frames.
+    pub(crate) peaks: Vec<f32>,
+}
+
 /// One track's row in the timeline.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Lane {
@@ -150,6 +163,47 @@ impl TimelineView {
                 }
             ),
         );
+    }
+
+    /// Starts drawing a take being recorded from `start` (empty at first).
+    pub(crate) fn start_live_take(&self, start: Frames, sample_rate: SampleRate) {
+        let imp = self.imp();
+        if imp.sample_rate.get().is_none() {
+            imp.sample_rate.set(Some(sample_rate));
+        }
+        imp.live_take.replace(Some(LiveTake {
+            start,
+            ..LiveTake::default()
+        }));
+        self.queue_resize();
+    }
+
+    /// The take being recorded grew to `frames`, with these new outline values.
+    pub(crate) fn extend_live_take(&self, peaks: &[f32], frames: Frames) {
+        let imp = self.imp();
+        let end = {
+            let mut take = imp.live_take.borrow_mut();
+            let Some(take) = take.as_mut() else {
+                return;
+            };
+            take.peaks.extend_from_slice(peaks);
+            take.frames = frames;
+            take.start + frames
+        };
+        // The timeline grows with the take (recording past the end).
+        if end > imp.length.get() {
+            imp.length.set(end);
+            self.update_adjustment();
+        }
+        self.queue_draw();
+    }
+
+    /// Stops drawing the take (recording stopped; it becomes a clip).
+    pub(crate) fn end_live_take(&self) {
+        if self.imp().live_take.take().is_some() {
+            self.queue_resize();
+            self.queue_draw();
+        }
     }
 
     /// Highlights the selected clips: `primary` (the last one clicked, which

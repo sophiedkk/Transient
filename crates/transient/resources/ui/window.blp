@@ -241,7 +241,7 @@ template $TransientWindow: Adw.ApplicationWindow {
             // which differs for development builds.
             child: Adw.StatusPage start_page {
               title: _("Start a New Project");
-              description: _("Import audio files to start mixing");
+              description: _("Import or record audio to start");
 
               child: Box {
                 orientation: vertical;
@@ -256,6 +256,16 @@ template $TransientWindow: Adw.ApplicationWindow {
                   styles [
                     "pill",
                     "suggested-action",
+                  ]
+                }
+
+                Button {
+                  label: _("_Record Audio");
+                  use-underline: true;
+                  action-name: "win.record";
+
+                  styles [
+                    "pill",
                   ]
                 }
 
