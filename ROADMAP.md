@@ -166,10 +166,11 @@ written with an AI agent):
 - [ ] **Runtime**: the latest GNOME runtime at the time of submitting.
 - [x] **`RELEASING.md`** and a release workflow: a version tag builds a
       Flatpak bundle and an AppImage into a draft GitHub release.
-- [ ] **First test run of the release workflow** (`gh workflow run
-      release.yml`): the AppImage build has not run yet (it downloads and runs
-      linuxdeploy, which was not allowed locally). Then try the AppImage on a
-      desktop: icons, dark mode, Wayland, playback, recording.
+- [x] **First test run of the release workflow**: both files build (run
+      41901052553, 2026-11-04; the AppImage is about 120 MB).
+- [ ] **Try the AppImage on a desktop** (by hand): icons, dark mode following
+      the system, native Wayland, playback, recording, opening a project.
+      Download it with `gh run download <run id> -n appimage`.
 - [ ] **AppImage translations**: Transient looks for translations in an
       absolute folder (`/usr/share/locale`), which an AppImage cannot provide;
       once there are translations, look them up relative to the program.
