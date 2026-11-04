@@ -49,6 +49,7 @@
                         "target",
                         "_build",
                         "_flatpak",
+                        "_appimage",
                         ".flatpak-builder",
                         ".git",
                         ".idea"

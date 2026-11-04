@@ -164,8 +164,15 @@ written with an AI agent):
 - [ ] **Translations** only from people: Flathub refuses machine-generated
       translations.
 - [ ] **Runtime**: the latest GNOME runtime at the time of submitting.
-- [ ] **`RELEASING.md`**: a checklist for tagging a release and updating
-      `CHANGELOG.md` and the MetaInfo releases.
+- [x] **`RELEASING.md`** and a release workflow: a version tag builds a
+      Flatpak bundle and an AppImage into a draft GitHub release.
+- [ ] **First test run of the release workflow** (`gh workflow run
+      release.yml`): the AppImage build has not run yet (it downloads and runs
+      linuxdeploy, which was not allowed locally). Then try the AppImage on a
+      desktop: icons, dark mode, Wayland, playback, recording.
+- [ ] **AppImage translations**: Transient looks for translations in an
+      absolute folder (`/usr/share/locale`), which an AppImage cannot provide;
+      once there are translations, look them up relative to the program.
 - [ ] **Draft the AI disclosure** (a statement about the project; not part of
       the manifest or the pull request text).
 

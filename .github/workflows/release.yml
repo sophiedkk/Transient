@@ -1,0 +1,108 @@
+name: Release
+
+# Pushing a version tag (v0.1.0) builds the Flatpak and the AppImage and creates
+# a *draft* GitHub release with both attached and the notes from CHANGELOG.md.
+# Look it over on GitHub and press Publish. See RELEASING.md.
+#
+# Started by hand (`gh workflow run release.yml`), it only builds both files and
+# keeps them as downloadable artifacts: a test run, no release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Actions are pinned to a full commit hash (with the version as a comment), as in
+# ci.yml.
+
+jobs:
+  # The Flatpak with the normal app ID (build-aux/io.github.sophiedkk.Transient.json).
+  # The bundle installs the GNOME runtime from Flathub by itself.
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          bundle: transient.flatpak
+          manifest-path: build-aux/io.github.sophiedkk.Transient.json
+          cache-key: flatpak-builder-release-${{ github.sha }}
+
+  # The AppImage, built on Fedora 43 (the oldest system with GTK 4.20 and
+  # Libadwaita 1.8) by dev/build-appimage.sh.
+  appimage:
+    name: AppImage
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:43
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Fedora packages
+        run: dnf -y install rustup patchelf file curl $(grep -v -e '^#' -e '^$' dev/packages.txt)
+
+      - name: Install Rust
+        run: |
+          rustup-init -y --default-toolchain none --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" toolchain install
+
+      - name: Build the AppImage
+        env:
+          # A tag (v0.1.0) gives the version; a test run is called "test".
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'vtest' }}
+        run: dev/build-appimage.sh "${VERSION#v}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: appimage
+          path: _appimage/*.AppImage
+          if-no-files-found: error
+
+  # A draft release with both files and the CHANGELOG.md notes for this version.
+  release:
+    name: Draft release
+    needs: [flatpak, appimage]
+    # Only for a version tag, not for a test run.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          dev/release-notes.sh "$version" > notes.md
+          flatpak_file="$(find dist -name '*.flatpak' | head -n1)"
+          appimage_file="$(find dist -name '*.AppImage' | head -n1)"
+          cp "$flatpak_file" "Transient-$version.flatpak"
+          cp "$appimage_file" "Transient-$version-x86_64.AppImage"
+          gh release create "$TAG" --draft --verify-tag \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Transient $version" \
+            --notes-file notes.md \
+            "Transient-$version.flatpak" \
+            "Transient-$version-x86_64.AppImage"

@@ -151,6 +151,13 @@ just test-audio                                 # decode the whole test collecti
   (Wikimedia Commons, checksummed, licences in `test-audio/CREDITS.md`). It is not
   committed. Add files by adding a manifest row with its SHA-256.
 
+## Releases
+
+`RELEASING.md` is the checklist. A `v*` tag runs `.github/workflows/release.yml`:
+Flatpak bundle (`build-aux/io.github.sophiedkk.Transient.json`, not for Flathub)
+and AppImage (`dev/build-appimage.sh`, Fedora 43, pinned linuxdeploy) into a draft
+release with notes from `dev/release-notes.sh`.
+
 ## Roadmap and way of working
 
 - `ROADMAP.md` holds the milestones, open tasks and known gaps; it is the source of
