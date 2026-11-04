@@ -40,6 +40,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Tracks: rename one by double-clicking its name, with Rename… in its menu or
   F2; move it with Move Up / Move Down in its menu or Alt+Up / Alt+Down.
   Imported files start at the playhead.
+- Several clips at once: Ctrl+click or Shift+click adds a clip to the
+  selection (or removes it). Dragging one of them by its name strip moves them
+  all, also across tracks; Ctrl+Left/Right, Delete and S act on all of them.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

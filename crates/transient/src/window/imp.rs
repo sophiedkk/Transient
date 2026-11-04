@@ -88,8 +88,12 @@ pub(crate) struct Window {
     pub(super) sources: RefCell<LoadedSources>,
     /// The undo/redo history.
     pub(super) history: RefCell<History>,
-    /// The selected clip, if any.
+    /// The primary selected clip, if any: the last one clicked. The clip pane,
+    /// fades and the track commands act on it.
     pub(super) selected: Cell<Option<ClipId>>,
+    /// Every selected clip, including the primary one. Moving, nudging, deleting
+    /// and splitting act on all of them.
+    pub(super) selection: RefCell<Vec<ClipId>>,
     /// The last mixer slider change and when, to coalesce a drag into one undo step.
     pub(super) last_mixer_change: RefCell<Option<(MixerControl, std::time::Instant)>>,
     /// True while the code sets mixer controls, so that is not taken as a change.

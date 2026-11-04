@@ -83,7 +83,7 @@ when needed instead of being managed by hand.
 
 ## 12 · Clipboard and multiple selection
 
-- [ ] **Multiple selection**: Shift+click selects several clips; move, nudge and
+- [x] **Multiple selection**: Ctrl+click or Shift+click selects several clips; move, nudge and
       delete act on all of them.
 - [ ] **Cut, Copy, Paste** (Ctrl+X/C/V) for clips and time ranges, plus "Insert
       and Keep Tracks in Sync" (Shift+Ctrl+V).

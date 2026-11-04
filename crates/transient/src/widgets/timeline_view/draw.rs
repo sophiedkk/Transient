@@ -11,7 +11,7 @@ use gettextrs::gettext;
 use gtk::{gdk, graphene, gsk, pango};
 use transient_core::edit::visible_parts;
 use transient_core::mix::{db_to_gain, fade_shape};
-use transient_core::project::Clip;
+use transient_core::project::{Clip, ClipId};
 use transient_core::ruler;
 use transient_core::time::{Frames, frames_to_f64};
 use transient_core::waveform::Peak;
@@ -71,20 +71,31 @@ impl TimelineView {
 
         self.draw_ruler(snapshot, &view, &palette);
 
-        // A clip being dragged is drawn at its preview position, on top of the
-        // clips in the lane it is over. Only the visible parts of clips are drawn
-        // (where clips overlap you see, and hear, the top one), worked out again
-        // with the preview so the clip underneath reappears while dragging.
+        // Clips being dragged (one, or a selected group) are drawn at their preview
+        // positions, on top of the clips in the lanes they are over. Only the
+        // visible parts of clips are drawn (where clips overlap you see, and hear,
+        // the top one), worked out again with the preview so clips underneath
+        // reappear while dragging.
         let drag = imp.drag.borrow();
         let preview = drag.as_ref().and_then(|drag| drag.preview);
-        let selected = imp.selected.get();
+        let moved: Vec<(usize, Clip)> = drag.as_ref().map_or_else(Vec::new, |drag| {
+            drag.preview
+                .into_iter()
+                .chain(drag.group_preview.iter().copied())
+                .collect()
+        });
+        let is_moved = |id: ClipId| moved.iter().any(|(_, clip)| clip.id == id);
+        let selection = imp.selection.borrow();
+        // Fade handles belong to a single selected clip; with several, there are none.
+        let handles_for = imp.selected.get().filter(|_| selection.len() <= 1);
         let lanes = imp.lanes.borrow();
-        let dragged = preview.and_then(|(_, moved)| {
+        // A clip's waveform and name, wherever it is (also while dragged elsewhere).
+        let drawn_clip = |id: ClipId| {
             lanes
                 .iter()
                 .flat_map(|lane| &lane.clips)
-                .find(|clip| clip.clip.id == moved.id)
-        });
+                .find(|clip| clip.clip.id == id)
+        };
         // The selected clip (as a whole) and its lane's top, for its fade handles.
         let mut selected_clip = None;
         for (index, lane) in lanes.iter().enumerate() {
@@ -96,29 +107,27 @@ impl TimelineView {
             if !lane.audible {
                 snapshot.push_opacity(SILENT_LANE_OPACITY);
             }
-            // This lane's clips as they would be if the drag ended now.
+            // This lane's clips as they would be if the drag ended now: moved clips
+            // go on top, like on release.
             let mut stack: Vec<Clip> = lane
                 .clips
                 .iter()
                 .map(|clip| clip.clip)
-                .filter(|clip| preview.is_none_or(|(_, moved)| moved.id != clip.id))
+                .filter(|clip| !is_moved(clip.id))
                 .collect();
-            if let Some((_, moved)) = preview.filter(|(lane, _)| *lane == index) {
-                stack.push(moved);
-            }
+            stack.extend(
+                moved
+                    .iter()
+                    .filter(|(lane, _)| *lane == index)
+                    .map(|(_, clip)| *clip),
+            );
             let parts = visible_parts(&stack);
             for &part in &parts {
-                // The waveform and name come from the lane's clip (or the dragged one).
-                let Some(drawn) = lane
-                    .clips
-                    .iter()
-                    .chain(dragged)
-                    .find(|clip| clip.clip.id == part.id)
-                else {
+                let Some(drawn) = drawn_clip(part.id) else {
                     continue;
                 };
-                let is_selected = selected == Some(part.id);
-                if is_selected {
+                let is_selected = selection.contains(&part.id) || is_moved(part.id);
+                if handles_for == Some(part.id) {
                     selected_clip = stack
                         .iter()
                         .find(|clip| clip.id == part.id)
@@ -141,8 +150,9 @@ impl TimelineView {
 
         // Dragged below the last lane: the clip is drawn where its new track will be,
         // over a faint band that shows the track to come.
-        if let (Some(drawn), Some((lane, moved))) = (dragged, preview)
+        if let Some((lane, moved)) = preview
             && lane == lanes.len()
+            && let Some(drawn) = drawn_clip(moved.id)
         {
             let top = lane_top(lane);
             snapshot.append_color(
@@ -152,21 +162,32 @@ impl TimelineView {
             self.draw_clip(snapshot, &view, &palette, drawn, &moved, top, true);
         }
 
-        // Fade handles, dragged to change the fades (see interaction.rs). They
-        // belong to the whole clip, so they are drawn once, even when other clips
-        // hide parts of it.
         if let Some((clip, lane_top, parts)) = selected_clip {
-            let (fade_in_x, fade_out_x) = self.fade_handle_positions(&clip);
-            let y = lane_top + CLIP_INSET + CLIP_LABEL_HEIGHT / 2.0;
-            for x in [fade_in_x, fade_out_x] {
-                if self.is_visible_at(&parts, clip.id, x) {
-                    draw_handle(snapshot, &palette, pixels_f64(x), y);
-                }
-            }
+            self.draw_fade_handles(snapshot, &palette, &clip, lane_top, &parts);
         }
 
         if self.rate().is_some() {
             draw_playhead(snapshot, &view, &palette, imp.playhead.get(), height);
+        }
+    }
+
+    /// Fade handles of the selected clip, dragged to change the fades (see
+    /// interaction.rs). They belong to the whole clip, so they are drawn once, even
+    /// when other clips hide parts of it, and only where the clip is visible.
+    fn draw_fade_handles(
+        &self,
+        snapshot: &gtk::Snapshot,
+        palette: &Palette,
+        clip: &Clip,
+        lane_top: f32,
+        parts: &[Clip],
+    ) {
+        let (fade_in_x, fade_out_x) = self.fade_handle_positions(clip);
+        let y = lane_top + CLIP_INSET + CLIP_LABEL_HEIGHT / 2.0;
+        for x in [fade_in_x, fade_out_x] {
+            if self.is_visible_at(parts, clip.id, x) {
+                draw_handle(snapshot, palette, pixels_f64(x), y);
+            }
         }
     }
 

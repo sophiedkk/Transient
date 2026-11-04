@@ -12,7 +12,9 @@
 //! | a fade handle (selected clip, top corners) | changes the fade |
 //!
 //! A click (no drag) selects the clip under the pointer (or nothing) and moves
-//! the playhead there.
+//! the playhead there. Ctrl+click or Shift+click adds a clip to the selection
+//! (or removes it); dragging one of several selected clips by its name strip
+//! moves them all (`clips-moved`, one undo step).
 //!
 //! While dragging, only a *preview* changes (drawn by `draw.rs`). The project
 //! changes once, on release, through the `clip-changed` signal, so one drag is
@@ -92,6 +94,9 @@ enum Hit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DragKind {
     Seek,
+    /// Ctrl/Shift+click: the clip was added to (or removed from) the selection;
+    /// the press does nothing else.
+    Nothing,
     Select,
     Move,
     TrimStart,
@@ -122,6 +127,13 @@ pub(crate) struct Drag {
     start_lane: usize,
     select_from: Frames,
     pub(super) range_preview: Option<LaneRange>,
+    /// When dragging one of several selected clips: the others, with their lanes,
+    /// as they were, and where they would end up if released now.
+    group: Vec<(usize, Clip)>,
+    pub(super) group_preview: Vec<(usize, Clip)>,
+    /// A plain press on one of several selected clips keeps the group (to drag
+    /// it); if it turns out to be a click, only this clip stays selected.
+    collapse_to: Option<ClipId>,
     /// The other clips' edges, the playhead and the start.
     snap_points: Vec<Frames>,
     /// Whether the pointer moved far enough to count as a drag.
@@ -141,7 +153,10 @@ impl TimelineView {
             let touch = gesture
                 .current_event_device()
                 .is_some_and(|device| device.source() == gdk::InputSource::Touchscreen);
-            if view.drag_begin(x, y, touch) {
+            let extend = gesture
+                .current_event_state()
+                .intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::SHIFT_MASK);
+            if view.drag_begin(x, y, touch, extend) {
                 // A clip or a selection is being dragged: claim the touch, so the
                 // scrolled window around the view does not scroll the tracks instead.
                 gesture.set_state(gtk::EventSequenceState::Claimed);
@@ -244,7 +259,12 @@ impl TimelineView {
         let strip_bottom = strip_top + f64::from(super::CLIP_LABEL_HEIGHT);
         let stack: Vec<Clip> = clips.iter().map(|clip| clip.clip).collect();
         let parts = visible_parts(&stack);
-        let selected = self.imp().selected.get();
+        // Fade handles belong to a single selected clip; with several, there are none.
+        let selected = self
+            .imp()
+            .selected
+            .get()
+            .filter(|_| self.imp().selection.borrow().len() <= 1);
         if (strip_top..=strip_bottom).contains(&y)
             && let Some(clip) = clips.iter().find(|clip| Some(clip.clip.id) == selected)
         {
@@ -284,28 +304,44 @@ impl TimelineView {
         Hit::Empty(lane)
     }
 
-    /// Starts a drag at (`x`, `y`). Returns true when it grabbed a clip.
-    fn drag_begin(&self, x: f64, y: f64, touch: bool) -> bool {
+    /// Starts a drag at (`x`, `y`). With `extend` (Ctrl or Shift held), a press
+    /// on a clip only adds it to the selection or removes it. Returns true when
+    /// it grabbed a clip or started a selection.
+    fn drag_begin(&self, x: f64, y: f64, touch: bool, extend: bool) -> bool {
         self.stop_glide();
         let grab = if touch { TOUCH_GRAB } else { POINTER_GRAB };
         let hit = self.hit(x, y, grab);
         let mut start_lane = 0;
+        let mut group = Vec::new();
+        let mut collapse_to = None;
         let (kind, original) = match hit {
+            Hit::Clip(_, clip, _) if extend => {
+                self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0, &true]);
+                (DragKind::Nothing, None)
+            }
             Hit::Ruler => (DragKind::Seek, None),
             Hit::Empty(lane) => {
                 // Clicking empty space selects nothing; dragging selects time.
-                self.emit_by_name::<()>("clip-selected", &[&0_u64]);
+                self.emit_by_name::<()>("clip-selected", &[&0_u64, &false]);
                 start_lane = lane;
                 (DragKind::Select, None)
             }
             Hit::Clip(lane, clip, Zone::Waveform) => {
                 // A click selects the clip; a drag turns into a time selection.
-                self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0]);
+                self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0, &false]);
                 start_lane = lane;
                 (DragKind::Select, None)
             }
             Hit::Clip(lane, clip, zone) => {
-                self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0]);
+                let id = clip.clip.id;
+                group = self.other_selected_clips(id);
+                if zone == Zone::Strip && !group.is_empty() {
+                    // One of several selected clips: keep them all, to drag together.
+                    collapse_to = Some(id);
+                } else {
+                    group.clear();
+                    self.emit_by_name::<()>("clip-selected", &[&id.0, &false]);
+                }
                 let kind = match zone {
                     Zone::LeftEdge => DragKind::TrimStart,
                     Zone::RightEdge => DragKind::TrimEnd,
@@ -320,7 +356,7 @@ impl TimelineView {
             self.seek_to_x(x);
         }
         let except = original.as_ref().map(|(_, clip)| clip.clip.id);
-        let claims = kind != DragKind::Seek;
+        let claims = !matches!(kind, DragKind::Seek | DragKind::Nothing);
         let snap_points = self.snap_points(except);
         let frames_per_pixel = self.imp().frames_per_pixel.get();
         let tolerance = frames_from_f64(SNAP_DISTANCE * frames_per_pixel).unwrap_or(0);
@@ -339,6 +375,9 @@ impl TimelineView {
             start_lane,
             select_from,
             range_preview: None,
+            group,
+            group_preview: Vec::new(),
+            collapse_to,
             moved: false,
         };
         self.imp().drag.replace(Some(drag));
@@ -450,8 +489,18 @@ impl TimelineView {
                     clip.with_fades(clip.fade_in, clip.end().saturating_sub(start)),
                 )
             }
-            DragKind::Seek | DragKind::Select => return,
+            DragKind::Seek | DragKind::Select | DragKind::Nothing => return,
         });
+        // Several selected clips move by the same amount as the grabbed one.
+        if drag.kind == DragKind::Move
+            && !drag.group.is_empty()
+            && let Some(preview) = drag.preview
+        {
+            let lanes = self.imp().lanes.borrow().len();
+            let (grabbed, others) = move_group((*lane, clip), preview, &drag.group, lanes);
+            drag.preview = Some(grabbed);
+            drag.group_preview = others;
+        }
         drop(drag_slot);
         self.queue_draw();
     }
@@ -465,7 +514,10 @@ impl TimelineView {
         if !drag.moved {
             // A click: the clip (or nothing) was selected in drag_begin; move the
             // playhead here too. (On the ruler it already moved on press.)
-            if drag.kind != DragKind::Seek {
+            if let Some(id) = drag.collapse_to {
+                self.emit_by_name::<()>("clip-selected", &[&id.0, &false]);
+            }
+            if !matches!(drag.kind, DragKind::Seek | DragKind::Nothing) {
                 self.seek_to_x(drag.start_x);
             }
             return;
@@ -488,6 +540,13 @@ impl TimelineView {
             return;
         };
         if lane == old_lane && clip == original.clip {
+            return;
+        }
+        if !drag.group.is_empty() {
+            // The whole group moved: one change, reported as the distance.
+            let frames = signed(clip.start) - signed(original.clip.start);
+            let lanes = i32::try_from(signed_lane(lane) - signed_lane(old_lane)).unwrap_or(0);
+            self.emit_by_name::<()>("clips-moved", &[&frames, &lanes]);
             return;
         }
         let lane = u32::try_from(lane).unwrap_or(0);
@@ -574,6 +633,23 @@ impl TimelineView {
             .any(|part| (to_x(part.start)..=to_x(part.end())).contains(&x))
     }
 
+    /// The selected clips other than `id`, with their lanes (empty unless `id` is
+    /// one of several selected clips).
+    fn other_selected_clips(&self, id: ClipId) -> Vec<(usize, Clip)> {
+        if !self.is_selected(id) {
+            return Vec::new();
+        }
+        let selection = self.imp().selection.borrow();
+        self.imp()
+            .lanes
+            .borrow()
+            .iter()
+            .enumerate()
+            .flat_map(|(lane, clips)| clips.clips.iter().map(move |clip| (lane, clip.clip)))
+            .filter(|(_, clip)| clip.id != id && selection.contains(&clip.id))
+            .collect()
+    }
+
     /// Where a clip's fade-in and fade-out handles are drawn, in pixels: at the end
     /// of the fade-in and the start of the fade-out, kept just inside the clip.
     pub(super) fn fade_handle_positions(&self, clip: &Clip) -> (f64, f64) {
@@ -603,4 +679,42 @@ impl TimelineView {
         points.push(self.imp().playhead.get());
         points
     }
+}
+
+/// Moves a group of clips together: the grabbed clip went from `original` to
+/// `preview`; every clip in `group` moves by the same frames and lanes. The
+/// distance is limited so that no clip starts before 0:00 and every clip stays
+/// on one of the `lanes` (a group cannot be dropped onto a new track). Returns
+/// the grabbed clip's and the group's new places.
+fn move_group(
+    original: (usize, Clip),
+    preview: (usize, Clip),
+    group: &[(usize, Clip)],
+    lanes: usize,
+) -> ((usize, Clip), Vec<(usize, Clip)>) {
+    let all = || group.iter().chain(std::iter::once(&original));
+    let earliest = all().map(|(_, clip)| signed(clip.start)).min().unwrap_or(0);
+    let frames = (signed(preview.1.start) - signed(original.1.start)).max(-earliest);
+    let top = all().map(|(lane, _)| signed_lane(*lane)).min().unwrap_or(0);
+    let bottom = all().map(|(lane, _)| signed_lane(*lane)).max().unwrap_or(0);
+    let last = signed_lane(lanes.saturating_sub(1));
+    let lane_delta = (signed_lane(preview.0) - signed_lane(original.0)).clamp(-top, last - bottom);
+    let shift = |(lane, clip): (usize, Clip)| {
+        let lane = usize::try_from(signed_lane(lane) + lane_delta).unwrap_or(0);
+        (
+            lane,
+            clip.moved_to(clip.start.saturating_add_signed(frames)),
+        )
+    };
+    (shift(original), group.iter().copied().map(shift).collect())
+}
+
+/// A frame position as a signed number, for distances that can be negative.
+fn signed(frame: Frames) -> i64 {
+    i64::try_from(frame).unwrap_or(i64::MAX)
+}
+
+/// A lane index as a signed number, for distances that can be negative.
+fn signed_lane(lane: usize) -> i64 {
+    i64::try_from(lane).unwrap_or(i64::MAX)
 }

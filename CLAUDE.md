@@ -110,7 +110,9 @@ just test-audio                                 # decode the whole test collecti
 - App options (`transient --help`): `FILE…` opens files, `--play`, `--silent`
   (no sound output, still real time), `--screenshot=FILE`, `--quit-after=SECONDS`,
   `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead),
-  `--select=START..END` (seconds, every track; runs before the actions), and
+  `--select=START..END` (seconds, every track; runs before the actions),
+  `--select-clips-at=SECONDS` (repeatable; adds every clip playing there to the
+  selection, like Ctrl+click), and
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
   `select-clip-at-playhead`, `select-all`, `context-menu` (opens it; popovers are
   not in screenshots, check the debug log), `nudge-right`, `delete-clip`

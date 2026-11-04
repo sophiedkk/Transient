@@ -7,14 +7,14 @@
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, ngettext};
 use transient_core::project::{Clip, ClipId, Project, TrackId};
 use transient_core::time::Frames;
 
 use super::Window;
 use crate::widgets::track_header::TrackHeader;
 
-/// Ctrl+Left/Right moves the selected clip by this many pixels at the current zoom.
+/// Ctrl+Left/Right moves the selected clips by this many pixels at the current zoom.
 const NUDGE_PIXELS: f64 = 10.0;
 
 impl Window {
@@ -22,11 +22,20 @@ impl Window {
     pub(super) fn setup_editing(&self) {
         let timeline = &self.imp().timeline;
         let weak = self.downgrade();
-        timeline.connect_clip_selected(move |_, clip| {
+        timeline.connect_clip_selected(move |_, clip, extend| {
             if let Some(window) = weak.upgrade() {
                 // A click selects a clip or nothing; either way, not a stretch of time.
                 window.set_time_selection(None);
-                window.select(clip);
+                match clip {
+                    Some(clip) if extend => window.toggle_in_selection(clip),
+                    _ => window.select(clip),
+                }
+            }
+        });
+        let weak = self.downgrade();
+        timeline.connect_clips_moved(move |_, frames, lanes| {
+            if let Some(window) = weak.upgrade() {
+                window.move_selected_clips(frames, lanes);
             }
         });
         let weak = self.downgrade();
@@ -61,16 +70,85 @@ impl Window {
         changed
     }
 
-    /// Selects a clip (or nothing).
+    /// Selects one clip (or nothing).
     pub(crate) fn select(&self, clip: Option<ClipId>) {
         // A clip selection and a time selection never exist at the same time.
         if clip.is_some() && self.imp().time_selection.take().is_some() {
             self.show_time_selection();
         }
+        self.imp().selection.replace(clip.into_iter().collect());
         self.imp().selected.set(clip);
-        self.imp().timeline.set_selection(clip);
+        self.selection_changed();
+    }
+
+    /// Ctrl+click or Shift+click: adds `clip` to the selection, or removes it if
+    /// it is selected already. An added clip becomes the primary one.
+    fn toggle_in_selection(&self, clip: ClipId) {
+        let imp = self.imp();
+        {
+            let mut selection = imp.selection.borrow_mut();
+            if let Some(index) = selection.iter().position(|id| *id == clip) {
+                selection.remove(index);
+                imp.selected.set(selection.last().copied());
+            } else {
+                selection.push(clip);
+                imp.selected.set(Some(clip));
+            }
+        }
+        self.selection_changed();
+    }
+
+    /// Adds every clip playing at `seconds` to the selection (for `--select-clips-at`).
+    pub(crate) fn add_clips_at_seconds(&self, seconds: f64) {
+        let clips = {
+            let project = self.imp().project.borrow();
+            project
+                .sample_rate
+                .seconds_to_frames(seconds.max(0.0))
+                .map(|frame| project.clips_at(frame))
+                .unwrap_or_default()
+        };
+        for clip in clips {
+            if !self.imp().selection.borrow().contains(&clip) {
+                self.toggle_in_selection(clip);
+            }
+        }
+    }
+
+    /// Shows the clip selection in the timeline and updates what depends on it.
+    fn selection_changed(&self) {
+        let imp = self.imp();
+        imp.timeline
+            .set_selection(imp.selected.get(), &imp.selection.borrow());
         self.update_edit_actions();
         self.update_clip_pane();
+    }
+
+    /// The selected clips (all of them).
+    pub(super) fn selected_clips(&self) -> Vec<ClipId> {
+        self.imp().selection.borrow().clone()
+    }
+
+    /// Moves every selected clip by `frames` and `lanes` (a group drag), as one
+    /// undo step. The timeline already kept the group inside the timeline.
+    fn move_selected_clips(&self, frames: i64, lanes: i32) {
+        let ids = self.selected_clips();
+        self.apply_edit(|project| {
+            let moves: Vec<(Clip, TrackId)> = ids
+                .iter()
+                .filter_map(|id| {
+                    let (track, clip) = project.clip(*id)?;
+                    let index = project.tracks.iter().position(|t| t.id == track)?;
+                    let target = index.checked_add_signed(isize::try_from(lanes).ok()?)?;
+                    let target = project.tracks.get(target)?.id;
+                    Some((
+                        clip.moved_to(clip.start.saturating_add_signed(frames)),
+                        target,
+                    ))
+                })
+                .collect();
+            project.move_clips(&moves)
+        });
     }
 
     /// Steps back in the history (`win.undo`, Ctrl+Z).
@@ -105,12 +183,23 @@ impl Window {
         if self.delete_time_selection() {
             return;
         }
-        let Some(clip) = self.imp().selected.get() else {
+        let clips = self.selected_clips();
+        if clips.is_empty() {
             return;
-        };
-        self.apply_edit(|project| project.remove_clip(clip).is_some());
+        }
+        self.apply_edit(|project| {
+            let mut changed = false;
+            for clip in &clips {
+                changed |= project.remove_clip(*clip).is_some();
+            }
+            changed
+        });
         self.select(None);
-        self.show_undo_toast(&gettext("Clip deleted"));
+        let count = u32::try_from(clips.len()).unwrap_or(u32::MAX);
+        self.show_undo_toast(
+            &ngettext("Clip deleted", "{} clips deleted", count)
+                .replace("{}", &clips.len().to_string()),
+        );
     }
 
     /// Clears the clip and the time selection (`win.deselect`, Escape).
@@ -203,12 +292,19 @@ impl Window {
         let Some(at) = self.playhead_position() else {
             return;
         };
-        let selected = self.imp().selected.get();
+        let selected = self.selected_clips();
         self.apply_edit(|project| {
             let under_playhead = project.clips_at(at);
-            let targets = match selected {
-                Some(clip) if under_playhead.contains(&clip) => vec![clip],
-                _ => under_playhead,
+            // The selected clips under the playhead; if none, every clip there.
+            let chosen: Vec<ClipId> = under_playhead
+                .iter()
+                .copied()
+                .filter(|clip| selected.contains(clip))
+                .collect();
+            let targets = if chosen.is_empty() {
+                under_playhead
+            } else {
+                chosen
             };
             let mut changed = false;
             for clip in targets {
@@ -227,23 +323,38 @@ impl Window {
         self.select(clip);
     }
 
-    /// Moves the selected clip a little left or right (Ctrl+Left/Right).
+    /// Moves the selected clips a little left or right (Ctrl+Left/Right).
     pub(super) fn nudge_selected_clip(&self, direction: i8) {
-        let Some(id) = self.imp().selected.get() else {
-            return;
-        };
+        let ids = self.selected_clips();
         let step = NUDGE_PIXELS * self.imp().timeline.frames_per_pixel();
         let step = transient_core::time::frames_from_f64(step.max(1.0)).unwrap_or(1);
         self.apply_edit(|project| {
-            let Some((track, clip)) = project.clip(id).map(|(track, clip)| (track, *clip)) else {
-                return false;
-            };
-            let start = if direction < 0 {
-                clip.start.saturating_sub(step)
+            let clips: Vec<(TrackId, Clip)> = ids
+                .iter()
+                .filter_map(|id| project.clip(*id).map(|(track, clip)| (track, *clip)))
+                .collect();
+            // To the left, the group stops when its first clip reaches 0:00.
+            let earliest = clips.iter().map(|(_, clip)| clip.start).min().unwrap_or(0);
+            let step = if direction < 0 {
+                step.min(earliest)
             } else {
-                clip.start.saturating_add(step)
+                step
             };
-            start != clip.start && project.place_clip(Clip::moved_to(clip, start), track)
+            if step == 0 {
+                return false;
+            }
+            let moves: Vec<(Clip, TrackId)> = clips
+                .iter()
+                .map(|&(track, clip)| {
+                    let start = if direction < 0 {
+                        clip.start - step
+                    } else {
+                        clip.start.saturating_add(step)
+                    };
+                    (clip.moved_to(start), track)
+                })
+                .collect();
+            project.move_clips(&moves)
         });
     }
 
@@ -273,12 +384,24 @@ impl Window {
     /// change, selection and undo/redo.
     pub(super) fn update_edit_actions(&self) {
         let imp = self.imp();
-        // A selected clip can disappear through undo; drop such a selection.
-        if let Some(clip) = imp.selected.get()
-            && imp.project.borrow().clip(clip).is_none()
-        {
-            imp.selected.set(None);
-            imp.timeline.set_selection(None);
+        // Selected clips can disappear through undo; drop them from the selection.
+        let gone = {
+            let project = imp.project.borrow();
+            let mut selection = imp.selection.borrow_mut();
+            let before = selection.len();
+            selection.retain(|clip| project.clip(*clip).is_some());
+            if imp
+                .selected
+                .get()
+                .is_some_and(|clip| !selection.contains(&clip))
+            {
+                imp.selected.set(selection.last().copied());
+            }
+            selection.len() != before
+        };
+        if gone {
+            imp.timeline
+                .set_selection(imp.selected.get(), &imp.selection.borrow());
         }
         let has_clip = imp.selected.get().is_some();
         let has_time = imp.time_selection.borrow().is_some();
@@ -326,8 +449,11 @@ impl Window {
             gettext("Import audio to split it")
         };
         imp.split_button.set_tooltip_text(Some(&split));
+        let clips = imp.selection.borrow().len();
         let delete = if has_time {
             gettext("Delete Selection")
+        } else if clips > 1 {
+            gettext("Delete Selected Clips")
         } else if has_clip {
             gettext("Delete Clip")
         } else {

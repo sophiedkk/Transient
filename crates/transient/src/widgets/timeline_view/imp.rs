@@ -46,8 +46,10 @@ pub(crate) struct TimelineView {
     pub(super) playhead: Cell<Frames>,
     /// Where the pointer is, so Ctrl+scroll zooms around it.
     pub(super) pointer_x: Cell<Option<f64>>,
-    /// The selected clip, drawn highlighted.
+    /// The primary selected clip (the last one clicked): it gets the fade handles.
     pub(super) selected: Cell<Option<ClipId>>,
+    /// Every selected clip (including the primary one), drawn highlighted.
+    pub(super) selection: RefCell<Vec<ClipId>>,
     /// The time selection, drawn as a highlighted stretch over its lanes.
     pub(super) time_selection: Cell<Option<LaneRange>>,
     /// The drag in progress, if any.
@@ -79,7 +81,10 @@ impl ObjectSubclass for TimelineView {
 impl ObjectImpl for TimelineView {
     /// The signals the view emits:
     /// - `seek(frame)`: the user clicked or dragged to a position.
-    /// - `clip-selected(clip id)`: a clip was clicked; 0 means "nothing".
+    /// - `clip-selected(clip id, extend)`: a clip was clicked; 0 means "nothing".
+    ///   `extend` (Ctrl or Shift held) adds it to the selection or removes it.
+    /// - `clips-moved(frames, lanes)`: the selected clips were dragged together,
+    ///   this many frames to the right and lanes down (negative: left or up).
     /// - `clip-changed(clip id, start, offset, length, fade in, fade out, lane)`: a
     ///   clip was moved, trimmed or had its fades changed by dragging.
     /// - `range-selected(start, end, first lane, last lane)`: time was selected.
@@ -90,7 +95,10 @@ impl ObjectImpl for TimelineView {
             vec![
                 Signal::builder("seek").param_types([u64_type]).build(),
                 Signal::builder("clip-selected")
-                    .param_types([u64_type])
+                    .param_types([u64_type, bool::static_type()])
+                    .build(),
+                Signal::builder("clips-moved")
+                    .param_types([i64::static_type(), i32::static_type()])
                     .build(),
                 Signal::builder("range-selected")
                     .param_types([u64_type, u64_type, u32::static_type(), u32::static_type()])

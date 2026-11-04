@@ -147,11 +147,33 @@ impl TimelineView {
         );
     }
 
-    /// Highlights the selected clip (or none).
-    pub(crate) fn set_selection(&self, clip: Option<ClipId>) {
-        if self.imp().selected.replace(clip) != clip {
+    /// Highlights the selected clips: `primary` (the last one clicked, which
+    /// gets the fade handles) and `all` (including the primary one).
+    pub(crate) fn set_selection(&self, primary: Option<ClipId>, all: &[ClipId]) {
+        let imp = self.imp();
+        let changed =
+            imp.selected.replace(primary) != primary || imp.selection.borrow().as_slice() != all;
+        if changed {
+            imp.selection.replace(all.to_vec());
             self.queue_draw();
         }
+    }
+
+    /// Whether `id` is one of the selected clips.
+    fn is_selected(&self, id: ClipId) -> bool {
+        self.imp().selection.borrow().contains(&id)
+    }
+
+    /// Calls `callback` with how far the selected clips were dragged together:
+    /// frames to the right and lanes down (negative: left or up).
+    pub(crate) fn connect_clips_moved<F: Fn(&Self, i64, i32) + 'static>(&self, callback: F) {
+        self.connect_closure(
+            "clips-moved",
+            false,
+            glib::closure_local!(move |view: Self, frames: i64, lanes: i32| {
+                callback(&view, frames, lanes);
+            }),
+        );
     }
 
     /// The zoom level, as frames per pixel (used for nudging by a few pixels).
@@ -332,16 +354,17 @@ impl TimelineView {
             .min(self.imp().length.get())
     }
 
-    /// Calls `callback` with the clip the user clicked (or `None` for empty space).
-    pub(crate) fn connect_clip_selected<F: Fn(&Self, Option<ClipId>) + 'static>(
+    /// Calls `callback` with the clip the user clicked (or `None` for empty space)
+    /// and whether Ctrl or Shift was held (add it to the selection, or remove it).
+    pub(crate) fn connect_clip_selected<F: Fn(&Self, Option<ClipId>, bool) + 'static>(
         &self,
         callback: F,
     ) {
         self.connect_closure(
             "clip-selected",
             false,
-            glib::closure_local!(move |view: Self, id: u64| {
-                callback(&view, (id != 0).then_some(ClipId(id)));
+            glib::closure_local!(move |view: Self, id: u64, extend: bool| {
+                callback(&view, (id != 0).then_some(ClipId(id)), extend);
             }),
         );
     }

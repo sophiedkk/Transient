@@ -48,6 +48,9 @@ pub(crate) struct LaunchOptions {
     pub(crate) zoom: Option<u32>,
     /// Select this stretch of time (seconds, on every track) before the actions.
     pub(crate) select: Option<(f64, f64)>,
+    /// Add every clip playing at these positions (seconds) to the selection, as
+    /// Ctrl+click would, before the actions.
+    pub(crate) select_clips_at: Vec<f64>,
     /// Window actions to run after opening, in order (for example "split").
     pub(crate) actions: Vec<String>,
     /// Save the project to this file after the actions.
@@ -109,6 +112,14 @@ impl LaunchOptions {
             Some("START..END"),
         );
         app.add_main_option(
+            "select-clips-at",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::StringArray,
+            "Add every clip playing at SECONDS to the selection (repeatable)",
+            Some("SECONDS"),
+        );
+        app.add_main_option(
             "action",
             glib::Char::from(0),
             none,
@@ -164,6 +175,14 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .and_then(|text| parse_range(&text)),
+            select_clips_at: dict
+                .lookup::<Vec<String>>("select-clips-at")
+                .ok()
+                .flatten()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|text| text.trim().parse().ok())
+                .collect(),
             actions: dict
                 .lookup::<Vec<String>>("action")
                 .ok()
@@ -184,6 +203,7 @@ impl LaunchOptions {
             || self.seek.is_some()
             || self.zoom.is_some()
             || self.select.is_some()
+            || !self.select_clips_at.is_empty()
             || !self.actions.is_empty()
             || self.save_to.is_some()
             || self.export_to.is_some()
@@ -211,6 +231,9 @@ impl LaunchOptions {
         }
         if let Some((start, end)) = self.select {
             window.select_seconds(start, end);
+        }
+        for seconds in &self.select_clips_at {
+            window.add_clips_at_seconds(*seconds);
         }
         for action in &self.actions {
             let name = if action.contains('.') {

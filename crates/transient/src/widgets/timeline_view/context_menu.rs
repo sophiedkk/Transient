@@ -59,7 +59,7 @@ impl TimelineView {
     fn open_context_menu_at(&self, x: f64, y: f64) {
         if !self.is_in_time_selection(x, y) {
             let clip = self.clip_at(x, y).map_or(0, |id| id.0);
-            self.emit_by_name::<()>("clip-selected", &[&clip]);
+            self.emit_by_name::<()>("clip-selected", &[&clip, &false]);
         }
         self.popup_context_menu(x, y);
     }

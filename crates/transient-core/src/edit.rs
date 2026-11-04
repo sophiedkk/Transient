@@ -210,6 +210,28 @@ impl Project {
         true
     }
 
+    /// Moves several clips at once (a group drag or nudge): each goes onto its
+    /// track, on top. Tracks left empty by the move are removed afterwards, once
+    /// every clip has landed (so a clip can still move onto a track another clip
+    /// leaves). Returns whether anything changed.
+    pub fn move_clips(&mut self, moves: &[(Clip, TrackId)]) -> bool {
+        let sources: Vec<TrackId> = moves
+            .iter()
+            .filter_map(|(clip, _)| self.clip(clip.id).map(|(track, _)| track))
+            .collect();
+        let mut changed = false;
+        for &(clip, track) in moves {
+            changed |= self.place_clip(clip, track);
+        }
+        for source in sources {
+            let emptied = self.track(source).is_some_and(|t| t.clips.is_empty());
+            if emptied && moves.iter().all(|(_, target)| *target != source) {
+                let _removed = self.remove_track(source);
+            }
+        }
+        changed
+    }
+
     /// Moves `clip` to a new track at the bottom, called `name` (the other way
     /// round from dragging a clip onto another track). Like [`Project::move_clip`],
     /// the track it leaves is removed if it is left empty. Returns the new track,
@@ -714,6 +736,26 @@ mod tests {
         let track = project.import_at("a.wav".into(), 1000, "a".to_owned(), 4800);
         assert_eq!(project.track(track).unwrap().clips[0].start, 4800);
         assert_eq!(project.length(), 5800);
+    }
+
+    #[test]
+    fn a_group_moves_together_and_leaves_no_empty_track() {
+        let mut project = Project::default();
+        let a = project.import("a.wav".into(), 1000, "a".to_owned());
+        let b = project.import("b.wav".into(), 1000, "b".to_owned());
+        let c = project.import("c.wav".into(), 1000, "c".to_owned());
+        let clip_b = project.track(b).unwrap().clips[0];
+        let clip_c = project.track(c).unwrap().clips[0];
+        // Both clips move up one track: b's onto a, c's onto b. Track b is both
+        // left and arrived at, so only track c ends up empty.
+        assert!(project.move_clips(&[(clip_b.moved_to(100), a), (clip_c.moved_to(100), b)]));
+        assert_eq!(
+            project.track_ids(),
+            vec![a, b],
+            "only the emptied track c goes"
+        );
+        assert_eq!(project.track(a).unwrap().clips.len(), 2);
+        assert_eq!(project.track(b).unwrap().clips, vec![clip_c.moved_to(100)]);
     }
 
     #[test]
