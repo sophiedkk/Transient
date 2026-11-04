@@ -4,6 +4,10 @@
 //! (use headphones, or the speakers end up in the take). Pressing Record again,
 //! or Space, stops it. While recording, the level meter shows the input.
 //!
+//! The arrow on the Record button chooses the input (`win.record-input`): the
+//! system default, or one of the inputs GStreamer sees when the menu opens.
+//! The choice is remembered (the `record-input` setting).
+//!
 //! A take is saved as FLAC into the project's folder for unpacked audio (see
 //! `file.rs`), then added as a new track, like an imported file: when the
 //! project is saved, the take goes into the project file.
@@ -16,7 +20,7 @@ use tracing::{info, warn};
 use transient_core::time::Frames;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::SourceFormat;
-use transient_engine::recorder::{Input, Recorder, save_flac};
+use transient_engine::recorder::{Input, Recorder, inputs, save_flac};
 
 use super::Window;
 use super::project::LoadedSource;
@@ -53,7 +57,7 @@ impl Window {
     fn start_recording(&self) {
         let imp = self.imp();
         let rate = imp.project.borrow().sample_rate;
-        let input = imp.record_input.borrow().clone();
+        let input = self.chosen_input();
         let recorder = match Recorder::start(&input, rate) {
             Ok(recorder) => recorder,
             Err(error) => {
@@ -215,6 +219,85 @@ impl Window {
 
     /// Uses a test tone instead of a microphone (for `--record-for` tests).
     pub(crate) fn use_test_input(&self) {
-        self.imp().record_input.replace(Input::TestTone);
+        self.imp().test_input.set(true);
     }
+
+    /// Sets up the input menu on the Record button. Called once.
+    pub(super) fn setup_record_input(&self) {
+        let saved = self
+            .imp()
+            .settings
+            .get()
+            .map(|settings| settings.string("record-input").to_string())
+            .unwrap_or_default();
+        // A stateful action: its state is the chosen input's ID ("" = default),
+        // and the menu shows it as radio items.
+        let action = gio::SimpleAction::new_stateful(
+            "record-input",
+            Some(glib::VariantTy::STRING),
+            &saved.to_variant(),
+        );
+        let weak = self.downgrade();
+        action.connect_activate(move |action, value| {
+            let Some(id) = value.and_then(glib::Variant::get::<String>) else {
+                return;
+            };
+            action.set_state(&id.to_variant());
+            if let Some(window) = weak.upgrade()
+                && let Some(settings) = window.imp().settings.get()
+                && let Err(error) = settings.set_string("record-input", &id)
+            {
+                warn!("could not remember the input: {error}");
+            }
+        });
+        self.add_action(&action);
+
+        // The menu is filled in each time it opens, so a microphone plugged in
+        // meanwhile shows up.
+        let menu = gio::Menu::new();
+        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        popover.connect_show(move |_| fill_input_menu(&menu));
+        self.imp().record_button.set_popover(Some(&popover));
+    }
+
+    /// The input to record from: the test tone in tests, else the chosen input,
+    /// else (or if it is gone) the system default.
+    fn chosen_input(&self) -> Input {
+        if self.imp().test_input.get() {
+            return Input::TestTone;
+        }
+        let chosen = self
+            .lookup_action("record-input")
+            .and_then(|action| action.state())
+            .and_then(|state| state.get::<String>())
+            .unwrap_or_default();
+        if chosen.is_empty() {
+            return Input::Default;
+        }
+        if let Some(device) = inputs().into_iter().find(|device| device.id() == chosen) {
+            return Input::Device(device);
+        }
+        self.show_toast(&gettext(
+            "The chosen input is not connected; recording from the default input",
+        ));
+        Input::Default
+    }
+}
+
+/// Lists the inputs in the Record button's menu: the system default first.
+fn fill_input_menu(menu: &gio::Menu) {
+    menu.remove_all();
+    let item = |label: &str, id: &str| {
+        let item = gio::MenuItem::new(Some(label), None);
+        item.set_action_and_target_value(Some("win.record-input"), Some(&id.to_variant()));
+        item
+    };
+    let default = gio::Menu::new();
+    default.append_item(&item(&gettext("System Default"), ""));
+    menu.append_section(None, &default);
+    let devices = gio::Menu::new();
+    for device in inputs() {
+        devices.append_item(&item(&device.name, &device.id()));
+    }
+    menu.append_section(None, &devices);
 }

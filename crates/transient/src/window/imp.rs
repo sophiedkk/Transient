@@ -33,7 +33,7 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) start_page: TemplateChild<adw::StatusPage>,
     #[template_child]
-    pub(super) record_button: TemplateChild<gtk::Button>,
+    pub(super) record_button: TemplateChild<adw::SplitButton>,
     #[template_child]
     pub(super) split_button: TemplateChild<gtk::Button>,
     #[template_child]
@@ -110,7 +110,8 @@ pub(crate) struct Window {
     /// The recording in progress, if any, and where to record from (see
     /// `recording.rs`).
     pub(super) recording: RefCell<Option<super::recording::Recording>>,
-    pub(super) record_input: RefCell<transient_engine::recorder::Input>,
+    /// Record a test tone instead of an input (`--record-for`).
+    pub(super) test_input: Cell<bool>,
     /// What Cut or Copy took (see `clipboard.rs`).
     pub(super) clipboard: RefCell<Option<transient_core::clipboard::Clipboard>>,
     /// The time selection (see `selection.rs`).
@@ -261,6 +262,7 @@ impl ObjectImpl for Window {
         window.setup_editing();
         window.setup_time_selection();
         window.setup_shortcuts();
+        window.setup_record_input();
         window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();

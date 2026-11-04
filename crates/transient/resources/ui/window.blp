@@ -411,10 +411,12 @@ template $TransientWindow: Adw.ApplicationWindow {
           }
         }
 
-        // Turns into a red Stop button while recording (see recording.rs).
-        Button record_button {
+        // Turns into a red Stop button while recording; its arrow chooses the
+        // input (see recording.rs).
+        Adw.SplitButton record_button {
           icon-name: "media-record-symbolic";
           tooltip-text: _("Record");
+          dropdown-tooltip: _("Choose Input");
           action-name: "win.record";
 
           styles [

@@ -14,5 +14,10 @@
       <default>false</default>
       <summary>Window maximized</summary>
     </key>
+    <key name="record-input" type="s">
+      <default>''</default>
+      <summary>Recording input</summary>
+      <description>The input to record from; empty means the system default.</description>
+    </key>
   </schema>
 </schemalist>

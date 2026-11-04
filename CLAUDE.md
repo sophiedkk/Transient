@@ -17,8 +17,11 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   buffers (48 kHz stereo), play the mix through `appsrc`, export through encoders.
   Our own mixer, not GStreamer Editing Services.
 - `crates/transient-cli`: `probe FILE…` (decode), `mix FILE…` (one track per
-  file, render the mix) and `export PROJECT|FILES --output OUT.ext` — the engine
-  without a window, JSON output.
+  file, render the mix), `export PROJECT|FILES --output OUT.ext` and `inputs`
+  (recording inputs) — the engine without a window, JSON output.
+- Recording: `transient-engine::recorder` (input → f32 in memory, level meter,
+  `save_flac`); `window/recording.rs` (Record button/R, input menu, takes as new
+  tracks).
 - Export: `transient-engine::export` (appsrc → encoder → filesink, blocking
   push, progress + cancel, removes unfinished files; round-trip tested for every
   format). `ExportDialog` runs it on a background thread with an async-channel.

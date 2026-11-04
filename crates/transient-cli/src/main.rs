@@ -58,6 +58,16 @@ enum Command {
         #[arg(short, long)]
         output: PathBuf,
     },
+    /// List the sound inputs (microphones, line inputs) the app can record
+    /// from, one JSON line each, with the ID the app remembers them by.
+    Inputs,
+}
+
+/// One line of `inputs`.
+#[derive(Debug, Serialize)]
+struct InputReport {
+    name: String,
+    id: String,
 }
 
 /// The output of `export`.
@@ -139,6 +149,18 @@ fn run(cli: Cli) -> anyhow::Result<bool> {
             let mut stdout = std::io::stdout().lock();
             serde_json::to_writer(&mut stdout, &report)?;
             writeln!(stdout)?;
+            Ok(true)
+        }
+        Command::Inputs => {
+            let mut stdout = std::io::stdout().lock();
+            for device in transient_engine::recorder::inputs() {
+                let report = InputReport {
+                    id: device.id(),
+                    name: device.name,
+                };
+                serde_json::to_writer(&mut stdout, &report)?;
+                writeln!(stdout)?;
+            }
             Ok(true)
         }
         Command::Mix { files } => {

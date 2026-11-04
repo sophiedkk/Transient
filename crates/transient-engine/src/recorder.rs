@@ -69,7 +69,9 @@ impl InputDevice {
     }
 }
 
-/// The sound inputs (microphones, line inputs) GStreamer can see now.
+/// The sound inputs (microphones, line inputs) GStreamer can see now. "Monitor"
+/// inputs, which only capture what is playing, are left out, and each input is
+/// listed once (PipeWire and PulseAudio can both report the same one).
 #[must_use]
 pub fn inputs() -> Vec<InputDevice> {
     let monitor = gstreamer::DeviceMonitor::new();
@@ -77,14 +79,16 @@ pub fn inputs() -> Vec<InputDevice> {
     if monitor.start().is_err() {
         return Vec::new();
     }
-    let devices = monitor
-        .devices()
-        .into_iter()
-        .map(|device| InputDevice {
-            name: device.display_name().to_string(),
-            device,
-        })
-        .collect();
+    let mut devices: Vec<InputDevice> = Vec::new();
+    for device in monitor.devices() {
+        let is_monitor = device.properties().is_some_and(|properties| {
+            properties.get::<String>("device.class").ok().as_deref() == Some("monitor")
+        });
+        let name = device.display_name().to_string();
+        if !is_monitor && devices.iter().all(|known| known.name != name) {
+            devices.push(InputDevice { name, device });
+        }
+    }
     monitor.stop();
     devices
 }

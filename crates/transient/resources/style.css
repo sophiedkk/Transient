@@ -27,8 +27,9 @@
   background-color: var(--destructive-bg-color);
 }
 
-/* The Record button: a red record icon (red is the convention for recording).
-   While recording it becomes a red "destructive-action" Stop button. */
-.record-button:not(.destructive-action) {
+/* The Record button: a red record icon (red is the convention for recording),
+   not the input menu's arrow next to it. While recording it becomes a red
+   "destructive-action" Stop button. */
+splitbutton.record-button:not(.destructive-action) > button:first-child {
   color: var(--destructive-color);
 }

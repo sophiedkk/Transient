@@ -10,6 +10,6 @@ allow-indexing-slicing-in-tests = true
 
 # Words that clippy::doc_markdown should not ask to put in `backticks`.
 doc-valid-idents = [
-    "..", "GStreamer", "GNOME", "Libadwaita", "PipeWire", "Flatpak", "Toolbx",
+    "..", "GStreamer", "GNOME", "Libadwaita", "PipeWire", "PulseAudio", "Flatpak", "Toolbx",
     "GObject", "GResource", "GSettings", "GtkBuilder", "GApplication", "GApplication",
 ]

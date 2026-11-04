@@ -99,8 +99,10 @@ Requested 2026-11-04: recording comes before 1.0, not after.
 - [x] **Record onto a new track** at the playhead (a Record button in the
       transport bar and R), with the level meter showing the input while
       recording. Stop (or Space) ends the take; it becomes an ordinary clip.
-- [ ] **Choose the input** (microphone, line in) and see its level before
-      recording.
+- [x] **Choose the input** (microphone, line in) from the arrow on the Record
+      button; remembered in the settings. `transient-cli inputs` lists them.
+- [ ] **See the input's level before recording** (to set the microphone's
+      volume), for example while the input menu is open.
 - [x] **Play the other tracks while recording** (overdubbing), so a voice can be
       recorded over music.
 - [ ] **Correct for the delay** between what plays and what is recorded
