@@ -39,14 +39,22 @@
   </supports>
 
   <branding>
-    <color type="primary" scheme_preference="light">#f6d32d</color>
+    <color type="primary" scheme_preference="light">#f5a9b8</color>
     <color type="primary" scheme_preference="dark">#241f31</color>
   </branding>
 
   <releases>
-    <release version="0.1.0" date="2026-11-03" type="development">
+    <release version="0.1.0" date="2026-11-04">
       <description>
-        <p>Project setup: an empty window, ready for the first features.</p>
+        <p>The first release of Transient: a simple multitrack audio editor.</p>
+        <ul>
+          <li>Import, arrange, trim, split and cut audio on tracks, with undo</li>
+          <li>Time selections, ripple delete, cut, copy and paste</li>
+          <li>Fades, clip gain, normalizing, and a mixer with volume, pan, mute and solo</li>
+          <li>Record from a microphone while the other tracks play</li>
+          <li>Project files that hold their audio, and export to WAV, FLAC, MP3, Opus and Ogg Vorbis</li>
+          <li>Works with the keyboard, touchpad gestures and screen readers</li>
+        </ul>
       </description>
     </release>
   </releases>

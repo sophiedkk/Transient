@@ -6,6 +6,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
+The first release.
+
 ### Added
 
 - Project setup: Cargo workspace (`transient-core`, `transient-engine`, `transient`),
