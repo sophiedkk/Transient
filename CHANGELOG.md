@@ -26,7 +26,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clip fades in or out, the clip underneath fades the other way, so they
   crossfade. Clips are labelled with the file they play. A track whose last
   clip is dragged to another track is removed; Remove Track in a track's menu
-  removes one yourself (with an Undo toast).
+  removes one yourself (with an Undo toast). Dragging a clip below the last
+  track, or Move to New Track in the clip pane, gives it a track of its own.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

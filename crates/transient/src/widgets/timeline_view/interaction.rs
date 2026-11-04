@@ -187,6 +187,17 @@ impl TimelineView {
         usize::try_from(index).ok().filter(|&index| index < lanes)
     }
 
+    /// The lane a clip dragged to height `y` lands in. Below the last lane, that
+    /// is one past it: a new track (see `clip-changed`). Above the lanes (on the
+    /// ruler), `None`.
+    fn drop_lane(&self, y: f64) -> Option<usize> {
+        let lanes = self.imp().lanes.borrow().len();
+        if y < f64::from(RULER_HEIGHT) {
+            return None;
+        }
+        Some(self.lane_at(y).unwrap_or(lanes))
+    }
+
     /// What is at (`x`, `y`): what you see there. Only the visible parts of clips
     /// count (see `visible_parts`), and later parts are drawn on top, so they win.
     fn hit(&self, x: f64, y: f64, grab: Grab) -> Hit {
@@ -344,7 +355,7 @@ impl TimelineView {
                 } else {
                     snapped_start
                 };
-                let new_lane = self.lane_at(drag.start_y + dy).unwrap_or(*lane);
+                let new_lane = self.drop_lane(drag.start_y + dy).unwrap_or(*lane);
                 (new_lane, clip.moved_to(new_start))
             }
             DragKind::TrimStart => {

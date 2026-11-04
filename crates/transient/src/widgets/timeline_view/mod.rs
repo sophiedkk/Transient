@@ -3,7 +3,8 @@
 //!
 //! - Click on the ruler or an empty lane: emits `seek` with the frame there.
 //! - Click a clip: selects it (`clip-selected`). Drag it to move it, also to
-//!   another lane; drag its left or right edge to trim it. While dragging, the
+//!   another lane or below the last one (a new track); drag its left or right
+//!   edge to trim it. While dragging, the
 //!   view shows a preview; on release it emits `clip-changed` (see `interaction.rs`).
 //! - Shift+scroll (or a touchpad): moves through the timeline, gliding on after
 //!   a swipe. Ctrl+scroll: zooms around the pointer. Pinch: zooms around the
@@ -306,7 +307,7 @@ impl TimelineView {
     }
 
     /// Calls `callback` with the changed clip and its (possibly new) lane, after
-    /// the user moved or trimmed it.
+    /// the user moved or trimmed it. A lane one past the last means "a new track".
     pub(crate) fn connect_clip_changed<F: Fn(&Self, Clip, usize) + 'static>(&self, callback: F) {
         self.connect_closure(
             "clip-changed",

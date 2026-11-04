@@ -30,8 +30,10 @@ impl Window {
         timeline.connect_clip_changed(move |_, clip, lane| {
             if let Some(window) = weak.upgrade() {
                 window.apply_edit(|project| {
+                    // Dropped below the last track: the clip gets a new track.
                     let Some(track) = project.tracks.get(lane).map(|track| track.id) else {
-                        return false;
+                        let name = new_track_name(project, &clip);
+                        return project.move_clip_to_new_track(clip, name).is_some();
                     };
                     // The moved clip goes on top of the clips it overlaps; a track
                     // left empty goes away (in the same undo step).
@@ -104,6 +106,21 @@ impl Window {
             .build();
         self.imp().toast_overlay.add_toast(toast.clone());
         self.imp().undo_toast.replace(Some(toast));
+    }
+
+    /// Moves the selected clip to a new track of its own (`win.move-to-new-track`,
+    /// also in the clip pane): the keyboard way of dragging it below the last track.
+    pub(super) fn move_selected_clip_to_new_track(&self) {
+        let Some(id) = self.imp().selected.get() else {
+            return;
+        };
+        self.apply_edit(|project| {
+            let Some(clip) = project.clip(id).map(|(_, clip)| *clip) else {
+                return false;
+            };
+            let name = new_track_name(project, &clip);
+            project.move_clip_to_new_track(clip, name).is_some()
+        });
     }
 
     /// Removes a track (the header's Remove Track), with an Undo toast.
@@ -232,6 +249,7 @@ impl Window {
         self.action_set_enabled("win.toggle-mute", has_selection);
         self.action_set_enabled("win.toggle-solo", has_selection);
         for action in [
+            "win.move-to-new-track",
             "win.normalize-peak",
             "win.normalize-loudness",
             "win.fade-in-to-playhead",
@@ -251,4 +269,9 @@ impl Window {
             .as_ref()
             .map(transient_engine::player::Player::position)
     }
+}
+
+/// The name for a new track holding `clip`: the clip's file name, as on import.
+fn new_track_name(project: &Project, clip: &Clip) -> String {
+    super::project::clip_file_name(project, clip).unwrap_or_else(|| gettext("Track"))
 }

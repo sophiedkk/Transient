@@ -169,6 +169,13 @@ template $TransientWindow: Adw.ApplicationWindow {
                 }
 
                 Adw.PreferencesGroup {
+                  Adw.ButtonRow {
+                    title: _("Move to New Track");
+                    action-name: "win.move-to-new-track";
+                  }
+                }
+
+                Adw.PreferencesGroup {
                   title: _("Fades");
 
                   Adw.ButtonRow {

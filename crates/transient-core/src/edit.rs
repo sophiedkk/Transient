@@ -210,6 +210,16 @@ impl Project {
         true
     }
 
+    /// Moves `clip` to a new track at the bottom, called `name` (the other way
+    /// round from dragging a clip onto another track). Like [`Project::move_clip`],
+    /// the track it leaves is removed if it is left empty. Returns the new track,
+    /// or `None` if the clip does not exist.
+    pub fn move_clip_to_new_track(&mut self, clip: Clip, name: String) -> Option<TrackId> {
+        self.clip(clip.id)?;
+        let track = self.add_track(name);
+        self.move_clip(clip, track).then_some(track)
+    }
+
     /// Removes a track and its clips, returning it. The sources stay, so undo
     /// (a snapshot) and other clips of the same file keep working.
     pub fn remove_track(&mut self, id: TrackId) -> Option<Track> {
@@ -609,6 +619,38 @@ mod tests {
         let clip = project.track(track).unwrap().clips[0];
         assert!(project.move_clip(clip.moved_to(500), track));
         assert_eq!(project.tracks.len(), 1);
+    }
+
+    #[test]
+    fn a_clip_can_get_a_track_of_its_own_again() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let source = project.track(track).unwrap().clips[0].source;
+        let second = project.add_clip(track, source, 2000).unwrap();
+        let clip = *project.clip(second).unwrap().1;
+
+        let new = project
+            .move_clip_to_new_track(clip, "b".to_owned())
+            .unwrap();
+        assert_eq!(project.tracks.len(), 2);
+        assert_eq!(project.tracks[1].id, new, "the new track is at the bottom");
+        assert_eq!(project.track(new).unwrap().clips, vec![clip]);
+        assert_eq!(project.track(track).unwrap().clips.len(), 1);
+
+        // Moving a track's only clip to a new track leaves no empty track behind.
+        assert!(
+            project
+                .move_clip_to_new_track(clip, "c".to_owned())
+                .is_some()
+        );
+        assert_eq!(project.tracks.len(), 2);
+        assert!(
+            project
+                .move_clip_to_new_track(Clip::default(), "x".to_owned())
+                .is_none(),
+            "unknown clip"
+        );
+        assert_eq!(project.tracks.len(), 2, "no track for an unknown clip");
     }
 
     #[test]

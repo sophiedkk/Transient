@@ -67,8 +67,8 @@ Inspired by Audacity 4's clip editing, kept GNOME-simple (no tool modes).
 Tracks stay (the mixer and ripple delete need them), but they should appear
 when needed instead of being managed by hand.
 
-- [ ] **New track by dropping** a clip below the last track (drag maths in
-      `transient-core::edit`, unit-tested).
+- [x] **New track by dropping** a clip below the last track, or with Move to
+      New Track in the clip pane (`Project::move_clip_to_new_track`, unit-tested).
 - [ ] **Import onto the selected track** at the playhead, or onto a new track as now.
 - [ ] **Rename** (double-click the name) and **reorder** (drag the header, plus
       a keyboard shortcut), in the track menu next to Remove Track.

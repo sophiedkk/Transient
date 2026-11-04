@@ -12,7 +12,7 @@ use adw::subclass::prelude::*;
 use gettextrs::{gettext, ngettext};
 use tracing::warn;
 use transient_core::mix::{AudioPool, Mix};
-use transient_core::project::{Project, SourceId};
+use transient_core::project::{Clip, Project, SourceId};
 use transient_core::time::format_position;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::SourceFormat;
@@ -176,6 +176,13 @@ impl Window {
     }
 }
 
+/// The name of the file a clip plays, without its extension (for example
+/// "piano"), if its source is known.
+pub(super) fn clip_file_name(project: &Project, clip: &Clip) -> Option<String> {
+    let path = &project.source(clip.source)?.path;
+    Some(path.file_stem()?.to_string_lossy().into_owned())
+}
+
 /// The timeline's view of the project: one lane per track.
 fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
     let any_solo = project.tracks.iter().any(|track| track.solo);
@@ -192,13 +199,7 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
                     waveform: sources.get(&clip.source).map(|s| s.waveform.clone()),
                     // The clip shows the file it plays (tracks can hold clips of
                     // several files), falling back to the track name.
-                    name: project
-                        .source(clip.source)
-                        .and_then(|source| source.path.file_stem())
-                        .map_or_else(
-                            || track.name.clone(),
-                            |stem| stem.to_string_lossy().into_owned(),
-                        ),
+                    name: clip_file_name(project, clip).unwrap_or_else(|| track.name.clone()),
                 })
                 .collect(),
         })

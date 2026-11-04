@@ -128,6 +128,19 @@ impl TimelineView {
                 snapshot.pop();
             }
         }
+        // Dragged below the last lane: the clip is drawn where its new track will be,
+        // over a faint band that shows the track to come.
+        if let (Some(drawn), Some((lane, moved))) = (dragged, preview)
+            && lane == lanes.len()
+        {
+            let top = lane_top(lane);
+            snapshot.append_color(
+                &palette.foreground.with_alpha(0.04),
+                &graphene::Rect::new(0.0, top, width, pixels(LANE_HEIGHT)),
+            );
+            self.draw_clip(snapshot, &view, &palette, drawn, &moved, top, true);
+        }
+
         // Fade handles, dragged to change the fades (see interaction.rs). They
         // belong to the whole clip, so they are drawn once, even when other clips
         // hide parts of it.

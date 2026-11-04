@@ -113,13 +113,14 @@ impl ObjectImpl for TimelineView {
 
 impl WidgetImpl for TimelineView {
     /// Minimum and natural size: (minimum, natural, baselines). The height is
-    /// exactly the ruler plus all lanes, so a scrolled window can scroll it.
+    /// the ruler plus all lanes plus one empty lane, so a scrolled window can
+    /// scroll it and there is always room to drop a clip onto a new track.
     fn measure(&self, orientation: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
         if orientation == gtk::Orientation::Horizontal {
             return (100, 600, -1, -1);
         }
         let lanes = i32::try_from(self.lanes.borrow().len()).unwrap_or(0);
-        let height = RULER_HEIGHT + lanes * LANE_HEIGHT;
+        let height = RULER_HEIGHT + (lanes + 1) * LANE_HEIGHT;
         (height, height, -1, -1)
     }
 

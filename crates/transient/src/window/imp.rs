@@ -141,6 +141,9 @@ impl ObjectSubclass for Window {
             window.delete_selected_clip();
         });
         klass.install_action("win.deselect", None, |window, _, _| window.select(None));
+        klass.install_action("win.move-to-new-track", None, |window, _, _| {
+            window.move_selected_clip_to_new_track();
+        });
         klass.install_action("win.remove-track", None, |window, _, _| {
             window.remove_selected_track();
         });
