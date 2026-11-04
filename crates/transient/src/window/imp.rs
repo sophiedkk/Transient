@@ -161,6 +161,15 @@ impl ObjectSubclass for Window {
         klass.install_action("win.move-to-new-track", None, |window, _, _| {
             window.move_selected_clip_to_new_track();
         });
+        klass.install_action("win.rename-track", None, |window, _, _| {
+            window.rename_selected_track();
+        });
+        klass.install_action("win.move-track-up", None, |window, _, _| {
+            window.move_selected_track(true);
+        });
+        klass.install_action("win.move-track-down", None, |window, _, _| {
+            window.move_selected_track(false);
+        });
         klass.install_action("win.remove-track", None, |window, _, _| {
             window.remove_selected_track();
         });

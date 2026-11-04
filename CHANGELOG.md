@@ -37,6 +37,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   press, or the Menu key / Shift+F10) with Split, Delete, Delete and Close Gap,
   Move to New Track and Select All, showing their shortcuts; Split and Delete
   buttons in the bottom bar, whose tooltips explain how to select.
+- Tracks: rename one by double-clicking its name, with Rename… in its menu or
+  F2; move it with Move Up / Move Down in its menu or Alt+Up / Alt+Down.
+  Imported files start at the playhead.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

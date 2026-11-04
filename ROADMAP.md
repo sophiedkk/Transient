@@ -72,9 +72,11 @@ when needed instead of being managed by hand.
 
 - [x] **New track by dropping** a clip below the last track, or with Move to
       New Track in the clip pane (`Project::move_clip_to_new_track`, unit-tested).
-- [ ] **Import onto the selected track** at the playhead, or onto a new track as now.
-- [ ] **Rename** (double-click the name) and **reorder** (drag the header, plus
-      a keyboard shortcut), in the track menu next to Remove Track.
+- [x] **Import at the playhead** (decided 2026-11-04): every imported file
+      still gets a new track, starting at the playhead instead of 0:00.
+- [x] **Rename** (double-click the name, Rename… in the track menu, or F2) and
+      **Move Up / Move Down** in the track menu (Alt+Up / Alt+Down).
+- [ ] **Reorder by dragging** a track header (later; the menu covers it for now).
 - [x] **Remove Track** in the track menu (Undo toast, no confirmation). A track
       whose last clip is dragged to another track is removed automatically
       (decided 2026-11-04: tracks come from imported files).

@@ -220,6 +220,37 @@ impl Project {
         self.move_clip(clip, track).then_some(track)
     }
 
+    /// Renames a track. Leading and trailing spaces are dropped; an empty name is
+    /// refused. Returns whether the name changed.
+    pub fn rename_track(&mut self, id: TrackId, name: &str) -> bool {
+        let name = name.trim();
+        match self.track_mut(id) {
+            Some(track) if !name.is_empty() && track.name != name => {
+                name.clone_into(&mut track.name);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Moves a track one place up (towards the top, `up`) or down. Returns
+    /// whether it moved (not past the first or last place).
+    pub fn move_track(&mut self, id: TrackId, up: bool) -> bool {
+        let Some(index) = self.tracks.iter().position(|track| track.id == id) else {
+            return false;
+        };
+        let other = if up {
+            index.checked_sub(1)
+        } else {
+            Some(index + 1).filter(|&other| other < self.tracks.len())
+        };
+        let Some(other) = other else {
+            return false;
+        };
+        self.tracks.swap(index, other);
+        true
+    }
+
     /// Removes a track and its clips, returning it. The sources stay, so undo
     /// (a snapshot) and other clips of the same file keep working.
     pub fn remove_track(&mut self, id: TrackId) -> Option<Track> {
@@ -651,6 +682,38 @@ mod tests {
             "unknown clip"
         );
         assert_eq!(project.tracks.len(), 2, "no track for an unknown clip");
+    }
+
+    #[test]
+    fn a_track_can_be_renamed_but_not_to_nothing() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        assert!(project.rename_track(track, "  Voice  "));
+        assert_eq!(project.track(track).unwrap().name, "Voice");
+        assert!(!project.rename_track(track, "Voice"), "same name");
+        assert!(!project.rename_track(track, "   "), "empty name");
+        assert!(!project.rename_track(TrackId(999), "x"), "unknown track");
+    }
+
+    #[test]
+    fn tracks_move_up_and_down_but_not_past_the_ends() {
+        let mut project = Project::default();
+        let a = project.import("a.wav".into(), 1000, "a".to_owned());
+        let b = project.import("b.wav".into(), 1000, "b".to_owned());
+        assert!(!project.move_track(a, true), "already at the top");
+        assert!(!project.move_track(b, false), "already at the bottom");
+        assert!(project.move_track(b, true));
+        assert_eq!(project.track_ids(), vec![b, a]);
+        assert!(project.move_track(b, false));
+        assert_eq!(project.track_ids(), vec![a, b]);
+    }
+
+    #[test]
+    fn a_file_can_be_imported_at_the_playhead() {
+        let mut project = Project::default();
+        let track = project.import_at("a.wav".into(), 1000, "a".to_owned(), 4800);
+        assert_eq!(project.track(track).unwrap().clips[0].start, 4800);
+        assert_eq!(project.length(), 5800);
     }
 
     #[test]

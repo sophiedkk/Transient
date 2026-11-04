@@ -31,6 +31,10 @@ pub(crate) struct TrackSettings {
 type ChangedCallback = Box<dyn Fn(TrackId, TrackSettings)>;
 /// What a header reports when the user chooses Remove Track.
 type RemoveCallback = Box<dyn Fn(TrackId)>;
+/// What a header reports when the user renames the track.
+type RenameCallback = Box<dyn Fn(TrackId, String)>;
+/// What a header reports for Move Up (`true`) or Move Down (`false`).
+type MoveCallback = Box<dyn Fn(TrackId, bool)>;
 
 mod imp {
     use std::cell::{Cell, RefCell};
@@ -39,13 +43,19 @@ mod imp {
     use gtk::glib;
     use transient_core::project::TrackId;
 
-    use super::{ChangedCallback, RemoveCallback};
+    use super::{ChangedCallback, MoveCallback, RemoveCallback, RenameCallback};
 
     #[derive(Default, gtk::CompositeTemplate)]
     #[template(resource = "/io/github/sophiedkk/Transient/ui/track-header.ui")]
     pub(crate) struct TrackHeader {
         #[template_child]
         pub(super) name_label: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub(super) name_stack: TemplateChild<gtk::Stack>,
+        #[template_child]
+        pub(super) name_entry: TemplateChild<gtk::Entry>,
+        #[template_child]
+        pub(super) menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
         pub(super) mute_button: TemplateChild<gtk::ToggleButton>,
         #[template_child]
@@ -58,6 +68,8 @@ mod imp {
         pub(super) track: Cell<TrackId>,
         pub(super) on_changed: RefCell<Option<ChangedCallback>>,
         pub(super) on_remove: RefCell<Option<RemoveCallback>>,
+        pub(super) on_rename: RefCell<Option<RenameCallback>>,
+        pub(super) on_move: RefCell<Option<MoveCallback>>,
         /// True while the code sets the controls, so that does not count as a change.
         pub(super) updating: Cell<bool>,
     }
@@ -80,6 +92,15 @@ mod imp {
             klass.bind_template();
             // "track.remove", used by the header's menu: the action lives on the
             // header itself, so it always means this header's track.
+            klass.install_action("track.rename", None, |header, _, _| {
+                header.start_rename();
+            });
+            klass.install_action("track.move-up", None, |header, _, _| {
+                header.report_move(true);
+            });
+            klass.install_action("track.move-down", None, |header, _, _| {
+                header.report_move(false);
+            });
             klass.install_action("track.remove", None, |header, _, _| {
                 let imp = header.imp();
                 if let Some(callback) = imp.on_remove.borrow().as_ref() {
@@ -145,6 +166,114 @@ impl TrackHeader {
         self.imp().on_remove.replace(Some(Box::new(callback)));
     }
 
+    /// Calls `callback` with the track and its new name after the user renamed it.
+    pub(crate) fn connect_rename(&self, callback: impl Fn(TrackId, String) + 'static) {
+        self.imp().on_rename.replace(Some(Box::new(callback)));
+    }
+
+    /// Calls `callback` with the track and `true` (up) or `false` (down) for
+    /// Move Up and Move Down.
+    pub(crate) fn connect_move(&self, callback: impl Fn(TrackId, bool) + 'static) {
+        self.imp().on_move.replace(Some(Box::new(callback)));
+    }
+
+    /// The track this header shows.
+    pub(crate) fn track_id(&self) -> TrackId {
+        self.imp().track.get()
+    }
+
+    /// Greys out Move Up for the first track and Move Down for the last.
+    pub(crate) fn set_position(&self, first: bool, last: bool) {
+        self.action_set_enabled("track.move-up", !first);
+        self.action_set_enabled("track.move-down", !last);
+    }
+
+    /// Swaps the name for a text field holding it, all selected, ready to type.
+    pub(crate) fn start_rename(&self) {
+        let imp = self.imp();
+        imp.name_entry.set_text(&imp.name_label.label());
+        // The buttons make room, so the whole header width is there for typing.
+        self.set_buttons_visible(false);
+        imp.name_stack.set_visible_child_name("entry");
+        imp.name_entry.grab_focus();
+        imp.name_entry.select_region(0, -1);
+    }
+
+    /// Ends renaming: shows the name again and, with `save`, reports the new one.
+    fn finish_rename(&self, save: bool) {
+        let imp = self.imp();
+        // Called again when the field loses focus after Enter or Escape: once is enough.
+        if imp.name_stack.visible_child_name().as_deref() != Some("entry") {
+            return;
+        }
+        imp.name_stack.set_visible_child_name("label");
+        self.set_buttons_visible(true);
+        let name = imp.name_entry.text().to_string();
+        if save
+            && name.trim() != imp.name_label.label().as_str()
+            && let Some(callback) = imp.on_rename.borrow().as_ref()
+        {
+            callback(imp.track.get(), name);
+        }
+    }
+
+    fn set_buttons_visible(&self, visible: bool) {
+        let imp = self.imp();
+        imp.mute_button.set_visible(visible);
+        imp.solo_button.set_visible(visible);
+        imp.menu_button.set_visible(visible);
+    }
+
+    fn report_move(&self, up: bool) {
+        let imp = self.imp();
+        if let Some(callback) = imp.on_move.borrow().as_ref() {
+            callback(imp.track.get(), up);
+        }
+    }
+
+    /// Double-click to rename; in the text field, Enter (or clicking elsewhere)
+    /// saves and Escape cancels. Called once, from `setup_controls`.
+    fn setup_rename(&self) {
+        let imp = self.imp();
+        let double_click = gtk::GestureClick::new();
+        let weak = self.downgrade();
+        double_click.connect_pressed(move |_, presses, _, _| {
+            if presses == 2
+                && let Some(header) = weak.upgrade()
+            {
+                header.start_rename();
+            }
+        });
+        imp.name_label.add_controller(double_click);
+
+        let weak = self.downgrade();
+        imp.name_entry.connect_activate(move |_| {
+            if let Some(header) = weak.upgrade() {
+                header.finish_rename(true);
+            }
+        });
+        let escape = gtk::EventControllerKey::new();
+        let weak = self.downgrade();
+        escape.connect_key_pressed(move |_, key, _, _| {
+            if key != gtk::gdk::Key::Escape {
+                return glib::Propagation::Proceed;
+            }
+            if let Some(header) = weak.upgrade() {
+                header.finish_rename(false);
+            }
+            glib::Propagation::Stop
+        });
+        imp.name_entry.add_controller(escape);
+        let focus = gtk::EventControllerFocus::new();
+        let weak = self.downgrade();
+        focus.connect_leave(move |_| {
+            if let Some(header) = weak.upgrade() {
+                header.finish_rename(true);
+            }
+        });
+        imp.name_entry.add_controller(focus);
+    }
+
     /// The settings as the controls show them now.
     fn settings(&self) -> TrackSettings {
         let imp = self.imp();
@@ -157,6 +286,7 @@ impl TrackHeader {
     }
 
     fn setup_controls(&self) {
+        self.setup_rename();
         let imp = self.imp();
         let weak = self.downgrade();
         let changed = move || {

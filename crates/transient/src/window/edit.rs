@@ -12,6 +12,7 @@ use transient_core::project::{Clip, ClipId, Project, TrackId};
 use transient_core::time::Frames;
 
 use super::Window;
+use crate::widgets::track_header::TrackHeader;
 
 /// Ctrl+Left/Right moves the selected clip by this many pixels at the current zoom.
 const NUDGE_PIXELS: f64 = 10.0;
@@ -140,6 +141,42 @@ impl Window {
         }
     }
 
+    /// The track of the selected clip, or else the first track of the time selection.
+    fn selected_track(&self) -> Option<TrackId> {
+        let imp = self.imp();
+        if let Some(clip) = imp.selected.get() {
+            return imp.project.borrow().clip(clip).map(|(track, _)| track);
+        }
+        imp.time_selection
+            .borrow()
+            .as_ref()
+            .and_then(|selection| selection.tracks.first().copied())
+    }
+
+    /// Starts renaming the selected track in its header (`win.rename-track`, F2).
+    pub(super) fn rename_selected_track(&self) {
+        let Some(track) = self.selected_track() else {
+            return;
+        };
+        let mut child = self.imp().track_headers.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if let Ok(header) = widget.downcast::<TrackHeader>()
+                && header.track_id() == track
+            {
+                header.start_rename();
+            }
+        }
+    }
+
+    /// Moves the selected track up or down (`win.move-track-up` / `-down`,
+    /// Alt+Up / Alt+Down).
+    pub(super) fn move_selected_track(&self, up: bool) {
+        if let Some(track) = self.selected_track() {
+            self.apply_edit(|project| project.move_track(track, up));
+        }
+    }
+
     /// Removes the selected clip's track (`win.remove-track`).
     pub(super) fn remove_selected_track(&self) {
         let Some(clip) = self.imp().selected.get() else {
@@ -254,6 +291,9 @@ impl Window {
         self.action_set_enabled("win.ripple-delete", has_selection);
         self.action_set_enabled("win.deselect", has_selection);
         self.action_set_enabled("win.select-all", has_clips);
+        self.action_set_enabled("win.rename-track", has_selection);
+        self.action_set_enabled("win.move-track-up", has_selection);
+        self.action_set_enabled("win.move-track-down", has_selection);
         // These act on the selected clip only.
         self.action_set_enabled("win.remove-track", has_clip);
         self.action_set_enabled("win.nudge-left", has_clip);

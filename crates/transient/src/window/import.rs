@@ -8,6 +8,7 @@ use adw::subclass::prelude::*;
 use gettextrs::{gettext, ngettext};
 use gtk::gio;
 use tracing::{info, warn};
+use transient_core::time::Frames;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::{DecodedAudio, SourceFormat, decode_file};
 
@@ -90,10 +91,12 @@ impl Window {
 
         // Importing is undoable like any other change.
         let before = imp.project.borrow().clone();
+        // Each file gets a new track, starting at the playhead (0:00 in a new project).
+        let start = self.playhead_position().unwrap_or(0);
         let mut failed = Vec::new();
         for (path, decoded) in results {
             match decoded {
-                Ok((decoded, waveform)) => self.add_to_project(path, &decoded, waveform),
+                Ok((decoded, waveform)) => self.add_to_project(path, &decoded, waveform, start),
                 Err(error) => {
                     warn!("could not open {}: {error}", path.display());
                     failed.push(display_name(&path));
@@ -124,15 +127,24 @@ impl Window {
         }
     }
 
-    /// Adds a decoded file to the project as a new track.
-    fn add_to_project(&self, path: PathBuf, decoded: &DecodedAudio, waveform: Waveform) {
+    /// Adds a decoded file to the project as a new track, starting at `start`.
+    fn add_to_project(
+        &self,
+        path: PathBuf,
+        decoded: &DecodedAudio,
+        waveform: Waveform,
+        start: Frames,
+    ) {
         let imp = self.imp();
         let name = path.file_stem().map_or_else(
             || display_name(&path),
             |stem| stem.to_string_lossy().into_owned(),
         );
         let frames = decoded.buffer.frames();
-        let track = imp.project.borrow_mut().import(path, frames, name);
+        let track = imp
+            .project
+            .borrow_mut()
+            .import_at(path, frames, name, start);
         let Some(source) = imp
             .project
             .borrow()

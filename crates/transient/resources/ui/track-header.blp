@@ -17,14 +17,35 @@ template $TransientTrackHeader: Box {
   Box {
     spacing: 2;
 
-    Label name_label {
+    // The name, or a text field while renaming (double-click the name, Rename
+    // in the menu, or F2).
+    Stack name_stack {
       hexpand: true;
-      xalign: 0;
-      ellipsize: end;
 
-      styles [
-        "heading",
-      ]
+      StackPage {
+        name: "label";
+
+        child: Label name_label {
+          xalign: 0;
+          ellipsize: end;
+
+          styles [
+            "heading",
+          ]
+        };
+      }
+
+      StackPage {
+        name: "entry";
+
+        child: Entry name_entry {
+          width-chars: 6;
+
+          accessibility {
+            label: _("Track Name");
+          }
+        };
+      }
     }
 
     // The icon shows the track's state (speaker, or crossed-out speaker when
@@ -53,7 +74,7 @@ template $TransientTrackHeader: Box {
 
     // More track commands (for now Remove Track). The menu's actions are the
     // header's own ("track.…", see track_header.rs).
-    MenuButton {
+    MenuButton menu_button {
       icon-name: "view-more-symbolic";
       tooltip-text: _("Track Menu");
       menu-model: track_menu;
@@ -105,6 +126,23 @@ template $TransientTrackHeader: Box {
 }
 
 menu track_menu {
+  section {
+    item {
+      label: _("Re_name…");
+      action: "track.rename";
+    }
+
+    item {
+      label: _("Move _Up");
+      action: "track.move-up";
+    }
+
+    item {
+      label: _("Move _Down");
+      action: "track.move-down";
+    }
+  }
+
   section {
     item {
       label: _("_Remove Track");

@@ -273,10 +273,22 @@ impl Project {
     /// Imports a file the usual way: a new track named `name`, with the whole
     /// file as one clip at the start of the timeline.
     pub fn import(&mut self, path: PathBuf, frames: Frames, name: String) -> TrackId {
+        self.import_at(path, frames, name, 0)
+    }
+
+    /// Like [`Project::import`], with the clip starting at `start` (the app
+    /// imports at the playhead).
+    pub fn import_at(
+        &mut self,
+        path: PathBuf,
+        frames: Frames,
+        name: String,
+        start: Frames,
+    ) -> TrackId {
         let source = self.add_source(path, frames);
         let track = self.add_track(name);
         // Both were just created, so this cannot fail.
-        let _clip = self.add_clip(track, source, 0);
+        let _clip = self.add_clip(track, source, start);
         track
     }
 

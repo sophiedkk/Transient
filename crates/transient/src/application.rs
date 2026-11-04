@@ -102,6 +102,9 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.ripple-delete", &["<Control>Delete"]);
     app.set_accels_for_action("win.select-all", &["<Control>a"]);
     app.set_accels_for_action("win.context-menu", &["Menu", "<Shift>F10"]);
+    app.set_accels_for_action("win.rename-track", &["F2"]);
+    app.set_accels_for_action("win.move-track-up", &["<Alt>Up"]);
+    app.set_accels_for_action("win.move-track-down", &["<Alt>Down"]);
     app.set_accels_for_action("win.deselect", &["Escape"]);
     app.set_accels_for_action("win.toggle-mute", &["m"]);
     app.set_accels_for_action("win.toggle-solo", &["<Shift>m"]);

@@ -76,6 +76,25 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("Tracks");
+
+    Adw.ShortcutsItem {
+      title: _("Rename Track");
+      action-name: "win.rename-track";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Move Track Up");
+      action-name: "win.move-track-up";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Move Track Down");
+      action-name: "win.move-track-down";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("Mixing");
 
     Adw.ShortcutsItem {

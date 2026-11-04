@@ -160,11 +160,25 @@ impl Window {
                         window.remove_track(track);
                     }
                 });
+                let weak = self.downgrade();
+                header.connect_rename(move |track, name| {
+                    if let Some(window) = weak.upgrade() {
+                        window.apply_edit(|project| project.rename_track(track, &name));
+                    }
+                });
+                let weak = self.downgrade();
+                header.connect_move(move |track, up| {
+                    if let Some(window) = weak.upgrade() {
+                        window.apply_edit(|project| project.move_track(track, up));
+                    }
+                });
                 container.append(&header);
                 existing.push(header);
             }
         }
-        for (header, track) in existing.iter().zip(&project.tracks) {
+        let last = project.tracks.len().saturating_sub(1);
+        for (index, (header, track)) in existing.iter().zip(&project.tracks).enumerate() {
+            header.set_position(index == 0, index == last);
             // The format of the track's first clip, for example "44.1 kHz · Stereo".
             let format = track
                 .clips
