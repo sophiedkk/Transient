@@ -33,6 +33,14 @@ Download a file from the [latest release](https://github.com/sophiedkk/Transient
 - **AppImage** (Fedora 43+, Ubuntu 26.04+, Arch, openSUSE Tumbleweed): make it
   executable (`chmod +x Transient-0.1.0-x86_64.AppImage`) and start it.
 
+## The name
+
+In audio, a *transient* is the short, sharp burst at the start of a sound: the
+crack of a snare drum, the "t" in "test", the moment a string is plucked. They
+are what you look for when you cut audio, and the tall white bar in the middle
+of the icon is one. The icon's light blue, pink and white come from the
+transgender pride flag, which the name nods to as well.
+
 ## Development
 
 Development happens inside a [Toolbx](https://containertoolbx.org/) container, so
