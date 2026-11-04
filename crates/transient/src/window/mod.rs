@@ -47,6 +47,9 @@ glib::wrapper! {
 
 pub(crate) use file::{is_project_file, remove_unused_project_caches};
 
+/// The corner radius of screenshots, in pixels: Libadwaita's `--window-radius`.
+const SCREENSHOT_CORNER_RADIUS: f32 = 15.0;
+
 impl Window {
     /// Creates a new main window for `app`.
     pub(crate) fn new(app: &adw::Application) -> Self {
@@ -81,7 +84,22 @@ impl Window {
     pub(crate) fn save_screenshot(&self, path: &Path) -> Result<(), glib::BoolError> {
         let paintable = gtk::WidgetPaintable::new(Some(self));
         let snapshot = gtk::Snapshot::new();
-        paintable.snapshot(&snapshot, f64::from(self.width()), f64::from(self.height()));
+        let (width, height) = (self.width(), self.height());
+        // Rounded corners like a GNOME window on the desktop (Libadwaita's
+        // --window-radius and its faint inner outline): the headless window
+        // fills the screen, so GTK draws it square, as if maximized.
+        // Window sizes fit in an i16, which converts to f32 exactly.
+        let pixels = |size: i32| f32::from(i16::try_from(size).unwrap_or(i16::MAX));
+        let bounds = gtk::graphene::Rect::new(0.0, 0.0, pixels(width), pixels(height));
+        let corners = gtk::gsk::RoundedRect::from_rect(bounds, SCREENSHOT_CORNER_RADIUS);
+        snapshot.push_rounded_clip(&corners);
+        paintable.snapshot(&snapshot, f64::from(width), f64::from(height));
+        snapshot.append_border(
+            &corners,
+            &[1.0; 4],
+            &[gtk::gdk::RGBA::new(1.0, 1.0, 1.0, 0.07); 4],
+        );
+        snapshot.pop();
         let node = snapshot
             .to_node()
             .ok_or_else(|| glib::bool_error!("the window has nothing to draw yet"))?;
