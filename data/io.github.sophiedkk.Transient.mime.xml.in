@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers the project file type, so file managers recognise .transient files,
+     show them with Transient's icon and offer to open them with Transient.
+     @APP_ID@ is filled in by Meson (data/meson.build). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-transient-project">
+    <comment>Transient project</comment>
+    <!-- A project file is a ZIP archive holding the project and its audio
+         (crates/transient-core/src/archive.rs). -->
+    <sub-class-of type="application/zip"/>
+    <!-- The app icon (its name is the app ID), or a plain audio icon without it. -->
+    <icon name="@APP_ID@"/>
+    <generic-icon name="audio-x-generic"/>
+    <glob pattern="*.transient"/>
+  </mime-type>
+</mime-info>

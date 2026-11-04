@@ -28,12 +28,14 @@ metainfo_file = i18n.merge_file(
   install_dir: datadir / 'metainfo',
 )
 
-# The project file type (.transient). Flatpak only exports MIME definitions
-# named after the app ID, hence the rename.
-install_data(
-  base_id + '.mime.xml',
+# The project file type (.transient), with the app ID filled in as its icon.
+# Flatpak only exports MIME definitions named after the app ID.
+configure_file(
+  input: base_id + '.mime.xml.in',
+  output: application_id + '.xml',
+  configuration: conf,
+  install: true,
   install_dir: datadir / 'mime' / 'packages',
-  rename: application_id + '.xml',
 )
 
 install_data(

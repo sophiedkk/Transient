@@ -29,7 +29,7 @@ use super::project::{LoadedSource, LoadedSources};
 
 /// The project file extension.
 pub(crate) const PROJECT_EXTENSION: &str = "transient";
-/// The project file MIME type (see data/io.github.sophiedkk.Transient.mime.xml).
+/// The project file MIME type (see data/io.github.sophiedkk.Transient.mime.xml.in).
 const PROJECT_MIME_TYPE: &str = "application/x-transient-project";
 
 /// Whether `file` is a Transient project (judged by its extension).
