@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time setup on the HOST (not inside the toolbox). Needs no sudo.
 #
-#   dev/setup.sh            create the transient-dev toolbox and the RustRover launcher
+#   dev/setup.sh            create the transient-dev toolbox
 #   dev/setup.sh --rebuild  rebuild the image and recreate the toolbox
 #                           (after changing dev/Containerfile or dev/packages.txt)
 set -euo pipefail
@@ -32,21 +32,14 @@ echo "==> Installing the Rust toolchain from rust-toolchain.toml"
 echo "==> Enabling the git hooks in .githooks/"
 git -C "$repo" config core.hooksPath .githooks
 
-echo "==> Adding the 'RustRover (Transient)' launcher"
-launcher="$HOME/.local/share/applications/transient-rustrover.desktop"
-mkdir -p "$(dirname "$launcher")"
-cat > "$launcher" <<EOF
-[Desktop Entry]
-Type=Application
-Name=RustRover (Transient)
-Comment=RustRover running inside the transient-dev toolbox
-Exec=toolbox run -c $container $repo/dev/rustrover.sh $repo
-Icon=rustrover
-Terminal=false
-Categories=Development;IDE;
-EOF
+# Earlier versions added a launcher that ran RustRover inside the toolbox; RustRover
+# now runs on the desktop with dev/toolbox-bin as its toolchain (see README.md).
+rm -f "$HOME/.local/share/applications/transient-rustrover.desktop"
 
 echo
 echo "Done. Next steps:"
 echo "  toolbox enter $container"
 echo "  cd $repo && just run"
+echo
+echo "RustRover: open the project normally, then Settings → Rust → Toolchain location:"
+echo "  $repo/dev/toolbox-bin"

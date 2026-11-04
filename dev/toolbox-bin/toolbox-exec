@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Runs a Rust tool (cargo, rustc, …) inside the transient-dev toolbox, where GTK,
+# GStreamer and Blueprint are installed. The tool is named after this script's
+# link name: dev/toolbox-bin/cargo runs ~/.cargo/bin/cargo in the toolbox.
+#
+# RustRover runs on the desktop and uses this folder as its Rust toolchain
+# (Settings → Rust → Toolchain location), so builds happen in the toolbox.
+# The home folder is the same inside and outside, so paths work both ways.
+set -euo pipefail
+
+tool="$(basename "$0")"
+container="transient-dev"
+
+# Already inside a toolbox: run the tool directly.
+if [ -f /run/.toolboxenv ]; then
+    exec "$HOME/.cargo/bin/$tool" "$@"
+fi
+
+# toolbox run does not pass on environment variables; RustRover sets some for
+# Cargo (RUSTC_BOOTSTRAP, CARGO_TERM_COLOR, …), so forward Cargo's and Rust's.
+forwarded=()
+while IFS='=' read -r name _; do
+    case "$name" in
+        CARGO* | RUST* | TERM | GSETTINGS_SCHEMA_DIR) forwarded+=("$name=${!name}") ;;
+    esac
+done < <(env)
+
+exec toolbox run --container "$container" \
+    env "${forwarded[@]}" "$HOME/.cargo/bin/$tool" "$@"

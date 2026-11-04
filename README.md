@@ -76,9 +76,25 @@ dev/setup.sh
 
 This builds the `transient-dev` image from [`dev/Containerfile`](dev/Containerfile),
 creates the toolbox, installs the Rust version from `rust-toolchain.toml`, enables the
-git hooks and adds a **RustRover (Transient)** launcher that runs RustRover inside the
-toolbox. After changing `dev/Containerfile` or `dev/packages.txt`, run
+git hooks. After changing `dev/Containerfile` or `dev/packages.txt`, run
 `dev/setup.sh --rebuild`.
+
+### RustRover
+
+RustRover runs normally on the desktop; only the Rust tools run in the toolbox,
+where GTK, GStreamer and Blueprint are installed. `dev/toolbox-bin/` holds small
+wrappers (`cargo`, `rustc`, `rustup`, `rustfmt`, …) that do that.
+
+1. Open `~/Projects/Transient` in RustRover.
+2. *Settings → Rust → Toolchain location*: the `dev/toolbox-bin` folder of this
+   repository. Leave *Standard library* on automatic. Decline offers to
+   download a toolchain.
+3. *Settings → Rust → External Linters*: **Clippy**, run on the fly.
+   *Settings → Rust → Rustfmt*: use rustfmt, run on save.
+4. Run the app with a Cargo configuration: command `run -p transient`,
+   environment `GSETTINGS_SCHEMA_DIR=target/gschemas` (after one `just run`, so
+   the schema is compiled). It runs in the toolbox, like `just run`.
+5. In RustRover's terminal, `toolbox enter transient-dev` first, then `just …`.
 
 ### Everyday work (inside the toolbox)
 
@@ -119,7 +135,7 @@ the command-line options.
 | `data/` | Desktop file, AppStream metainfo, icons and the GSettings schema. |
 | `po/` | Translations. |
 | `build-aux/` | Flatpak manifest and Meson helper script. |
-| `dev/` | Toolbx image, setup script and RustRover launcher. |
+| `dev/` | Toolbx image, setup and test scripts, release scripts, and the `toolbox-bin` wrappers for RustRover. |
 
 Dependencies point one way: `transient` and `transient-cli` → `transient-engine` →
 `transient-core`.

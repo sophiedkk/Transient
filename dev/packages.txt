@@ -33,8 +33,3 @@ appstream
 mutter
 dbus-daemon
 
-# Libraries RustRover (a Java app) needs when it runs inside the toolbox
-fontconfig
-libXtst
-libXi
-libXrender
