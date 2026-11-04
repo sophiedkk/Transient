@@ -40,6 +40,9 @@ pub(crate) struct LaunchOptions {
     pub(crate) silent: bool,
     /// Save a PNG of the window to this path, then quit.
     pub(crate) screenshot: Option<PathBuf>,
+    /// Wait this many seconds before the screenshot (for example until keys
+    /// typed with `HEADLESS_KEYS` have arrived).
+    pub(crate) screenshot_delay: Option<u32>,
     /// Quit after this many seconds.
     pub(crate) quit_after: Option<u32>,
     /// Move the playhead to this position (in seconds) after opening.
@@ -144,6 +147,14 @@ impl LaunchOptions {
             Some("FILE"),
         );
         app.add_main_option(
+            "screenshot-delay",
+            glib::Char::from(0),
+            none,
+            glib::OptionArg::Int,
+            "Wait SECONDS before taking the screenshot",
+            Some("SECONDS"),
+        );
+        app.add_main_option(
             "quit-after",
             glib::Char::from(0),
             none,
@@ -159,6 +170,11 @@ impl LaunchOptions {
             play: dict.contains("play"),
             silent: dict.contains("silent"),
             screenshot: dict.lookup::<PathBuf>("screenshot").ok().flatten(),
+            screenshot_delay: dict
+                .lookup::<i32>("screenshot-delay")
+                .ok()
+                .flatten()
+                .and_then(|seconds| u32::try_from(seconds).ok()),
             quit_after: dict
                 .lookup::<i32>("quit-after")
                 .ok()
@@ -258,6 +274,9 @@ impl LaunchOptions {
             window.toggle_playback();
         }
         if let Some(path) = &self.screenshot {
+            if let Some(seconds) = self.screenshot_delay {
+                glib::timeout_future_seconds(seconds).await;
+            }
             save_screenshot_when_drawn(&window, path).await;
         }
         if let Some(seconds) = self.quit_after {

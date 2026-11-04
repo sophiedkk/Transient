@@ -473,7 +473,7 @@ impl Window {
         } else {
             gettext("Import audio to split it")
         };
-        imp.split_button.set_tooltip_text(Some(&split));
+        crate::widgets::set_button_text(&*imp.split_button, &split);
         let clips = imp.selection.borrow().len();
         let delete = if has_time {
             gettext("Delete Selection")
@@ -484,7 +484,7 @@ impl Window {
         } else {
             gettext("Select a clip, or drag over a waveform to select time")
         };
-        imp.delete_button.set_tooltip_text(Some(&delete));
+        crate::widgets::set_button_text(&*imp.delete_button, &delete);
     }
 
     /// The playhead position, if something is loaded.

@@ -47,7 +47,10 @@ impl Window {
                         tracks,
                     }));
                     // Playback starts at the selection, as in other audio editors.
-                    window.seek_to_frame(selection.range.start);
+                    // (An empty range only clears the selection.)
+                    if !selection.range.is_empty() {
+                        window.seek_to_frame(selection.range.start);
+                    }
                 }
             });
     }

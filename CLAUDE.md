@@ -125,7 +125,10 @@ just test-audio                                 # decode the whole test collecti
   `cut`, `copy`, `paste`, `paste-insert` (paste at the playhead),
   `toggle-clip-pane`, `new-project`, `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
   `.transient` file opens it — together they test a full save/open round trip.
-  `--export-to=FILE.ext` exports through the app's export path. With `--play`, the level meter (red = clipping)
+  `--export-to=FILE.ext` exports through the app's export path.
+  `--screenshot-delay=SECONDS` waits before the screenshot (e.g. for keys typed
+  with `HEADLESS_KEYS`; the headless window is never "active", so GTK's focus
+  outline does not show there). With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
 - Typing and real key presses: `HEADLESS_KEYS="t e s t Return Control_L+s"
   just headless …` types GDK key names into the app ~4 s after it starts

@@ -52,6 +52,11 @@ pub(crate) struct TimelineView {
     pub(super) selection: RefCell<Vec<ClipId>>,
     /// The time selection, drawn as a highlighted stretch over its lanes.
     pub(super) time_selection: Cell<Option<LaneRange>>,
+    /// The track the keyboard works on (Up/Down change it; a click sets it).
+    pub(super) current_lane: Cell<usize>,
+    /// A time selection being made with Shift+Left/Right: the end that stays
+    /// put and the end that moves (see keyboard.rs).
+    pub(super) keyboard_selection: Cell<Option<(Frames, Frames)>>,
     /// The drag in progress, if any.
     pub(super) drag: RefCell<Option<Drag>>,
     /// The context menu (see `context_menu.rs`). The view is its parent, so the
@@ -73,7 +78,9 @@ impl ObjectSubclass for TimelineView {
 
     fn class_init(klass: &mut Self::Class) {
         klass.set_css_name("timeline");
-        klass.set_accessible_role(gtk::AccessibleRole::Img);
+        // "Application": a widget with its own keyboard handling, so screen
+        // readers pass the arrow keys through to it.
+        klass.set_accessible_role(gtk::AccessibleRole::Application);
     }
 }
 

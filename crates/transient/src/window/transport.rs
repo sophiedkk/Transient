@@ -124,7 +124,7 @@ impl Window {
             ("media-playback-start-symbolic", gettext("Play"))
         };
         imp.play_button.set_icon_name(icon);
-        imp.play_button.set_tooltip_text(Some(&tooltip));
+        crate::widgets::set_button_text(&*imp.play_button, &tooltip);
     }
 
     pub(super) fn set_playback_enabled(&self, enabled: bool) {

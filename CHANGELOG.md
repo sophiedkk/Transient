@@ -97,6 +97,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--quit-after`, `--seek`, `--zoom`, `--action`, `--save-to`, `--export-to`; `transient-cli probe` decodes files and
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
+- The timeline works from the keyboard: it gets focus when a project opens (or
+  with Tab or a click); Left/Right move the playhead, Shift+Left/Right select
+  time, Up/Down go to the track above or below and select the clip there, End
+  goes to the end. A band shows the current track. Screen readers get names
+  for every icon button and a description of the timeline (track, playhead,
+  selection), and hear track and selection changes.
 - App icon: five waveform bars in the colours of the trans flag, the tall white
   one in the middle being the "transient"; a matching symbolic icon, and a
   striped variant for development builds. The start screen shows the app icon.

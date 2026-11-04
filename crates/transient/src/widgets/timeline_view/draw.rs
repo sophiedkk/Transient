@@ -148,18 +148,12 @@ impl TimelineView {
             draw_time_selection(snapshot, &view, &palette, selection);
         }
 
-        // Dragged below the last lane: the clip is drawn where its new track will be,
-        // over a faint band that shows the track to come.
+        // Dragged below the last lane: the clip is drawn where its new track will be.
         if let Some((lane, moved)) = preview
             && lane == lanes.len()
             && let Some(drawn) = drawn_clip(moved.id)
         {
-            let top = lane_top(lane);
-            snapshot.append_color(
-                &palette.foreground.with_alpha(0.04),
-                &graphene::Rect::new(0.0, top, width, pixels(LANE_HEIGHT)),
-            );
-            self.draw_clip(snapshot, &view, &palette, drawn, &moved, top, true);
+            self.draw_new_track_preview(snapshot, &view, &palette, drawn, &moved, lane);
         }
 
         if let Some((clip, lane_top, parts)) = selected_clip {
@@ -168,6 +162,52 @@ impl TimelineView {
 
         if self.rate().is_some() {
             draw_playhead(snapshot, &view, &palette, imp.playhead.get(), height);
+        }
+        // `is_focus`: the timeline is the window's focus widget, even while the
+        // window itself is not active (then GTK's `has_focus` is false).
+        if self.is_focus() {
+            self.draw_focus(snapshot, &palette, width, height);
+        }
+    }
+
+    /// A clip dragged below the last lane, over a faint band that shows the track
+    /// it will get.
+    fn draw_new_track_preview(
+        &self,
+        snapshot: &gtk::Snapshot,
+        view: &View,
+        palette: &Palette,
+        drawn: &LaneClip,
+        moved: &Clip,
+        lane: usize,
+    ) {
+        let top = lane_top(lane);
+        snapshot.append_color(
+            &palette.foreground.with_alpha(0.04),
+            &graphene::Rect::new(0.0, top, view.width, pixels(LANE_HEIGHT)),
+        );
+        self.draw_clip(snapshot, view, palette, drawn, moved, top, true);
+    }
+
+    /// With keyboard focus: a faint band on the current track (the one Up/Down
+    /// and Shift+Left/Right work on) and, as GTK draws focus (only when the
+    /// keyboard is in use, in the active window), an outline around the timeline.
+    fn draw_focus(&self, snapshot: &gtk::Snapshot, palette: &Palette, width: f32, height: f32) {
+        let lanes = self.imp().lanes.borrow().len();
+        if lanes > 0 {
+            let lane = self.imp().current_lane.get().min(lanes - 1);
+            snapshot.append_color(
+                &palette.accent.with_alpha(0.08),
+                &graphene::Rect::new(0.0, lane_top(lane), width, pixels(LANE_HEIGHT)),
+            );
+        }
+        if self.has_visible_focus() {
+            let bounds = graphene::Rect::new(1.0, 1.0, width - 2.0, height - 2.0);
+            snapshot.append_border(
+                &gsk::RoundedRect::from_rect(bounds, 0.0),
+                &[2.0; 4],
+                &[palette.accent.with_alpha(0.5); 4],
+            );
         }
     }
 

@@ -342,7 +342,7 @@ impl TrackHeader {
             ("audio-volume-high-symbolic", gettext("Mute"))
         };
         imp.mute_button.set_icon_name(icon);
-        imp.mute_button.set_tooltip_text(Some(&mute_tooltip));
+        super::set_button_text(&*imp.mute_button, &mute_tooltip);
         let volume = if settings.volume_db <= SILENT_DB {
             gettext("Volume: silent")
         } else {

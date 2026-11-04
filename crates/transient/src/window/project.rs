@@ -76,8 +76,14 @@ impl Window {
         };
         imp.header_title.set_subtitle(&subtitle);
         imp.duration_label.set_label(&format!("/ {length}"));
-        imp.stack
-            .set_visible_child_name(if tracks == 0 { "empty" } else { "project" });
+        let page = if tracks == 0 { "empty" } else { "project" };
+        let opening = imp.stack.visible_child_name().as_deref() != Some(page);
+        imp.stack.set_visible_child_name(page);
+        // When a project appears, the keyboard goes to the timeline, so the
+        // arrow keys work right away.
+        if opening && tracks > 0 {
+            imp.timeline.grab_focus();
+        }
         if tracks == 0 {
             self.update_recent_projects();
         }
@@ -206,6 +212,7 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
         .iter()
         .map(|track| Lane {
             audible: !track.mute && (track.solo || !any_solo),
+            name: track.name.clone(),
             clips: track
                 .clips
                 .iter()

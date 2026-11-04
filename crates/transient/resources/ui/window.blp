@@ -38,6 +38,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "list-add-symbolic";
           tooltip-text: _("Import Audio");
           action-name: "win.import-audio";
+
+          accessibility {
+            label: _("Import Audio");
+          }
         }
 
         [start]
@@ -52,6 +56,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "edit-undo-symbolic";
           tooltip-text: _("Undo");
           action-name: "win.undo";
+
+          accessibility {
+            label: _("Undo");
+          }
         }
 
         [start]
@@ -59,6 +67,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "edit-redo-symbolic";
           tooltip-text: _("Redo");
           action-name: "win.redo";
+
+          accessibility {
+            label: _("Redo");
+          }
         }
 
         [end]
@@ -67,6 +79,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "open-menu-symbolic";
           tooltip-text: _("Main Menu");
           menu-model: primary_menu;
+
+          accessibility {
+            label: _("Main Menu");
+          }
         }
 
         [end]
@@ -74,6 +90,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "document-send-symbolic";
           tooltip-text: _("Export");
           action-name: "win.export";
+
+          accessibility {
+            label: _("Export");
+          }
         }
 
         [end]
@@ -81,6 +101,10 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "sidebar-show-right-symbolic";
           tooltip-text: _("Clip Properties");
           active: bind split_view.show-sidebar bidirectional;
+
+          accessibility {
+            label: _("Clip Properties");
+          }
         }
       }
 
@@ -371,12 +395,20 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "media-skip-backward-symbolic";
           tooltip-text: _("Go to Start");
           action-name: "win.go-to-start";
+
+          accessibility {
+            label: _("Go to Start");
+          }
         }
 
         Button play_button {
           icon-name: "media-playback-start-symbolic";
           tooltip-text: _("Play");
           action-name: "win.play-pause";
+
+          accessibility {
+            label: _("Play");
+          }
         }
 
         Label position_label {
@@ -408,12 +440,20 @@ template $TransientWindow: Adw.ApplicationWindow {
             icon-name: "transient-split-symbolic";
             tooltip-text: _("Split at Playhead");
             action-name: "win.split";
+
+            accessibility {
+              label: _("Split at Playhead");
+            }
           }
 
           Button delete_button {
             icon-name: "user-trash-symbolic";
             tooltip-text: _("Delete");
             action-name: "win.delete-clip";
+
+            accessibility {
+              label: _("Delete");
+            }
           }
 
           // The time selection's start, end and length (see selection.rs).
@@ -461,7 +501,6 @@ template $TransientWindow: Adw.ApplicationWindow {
           margin-start: 12;
         }
 
-
         Scale master_scale {
           width-request: 120;
           draw-value: false;
@@ -489,18 +528,30 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "zoom-out-symbolic";
           tooltip-text: _("Zoom Out");
           action-name: "win.zoom-out";
+
+          accessibility {
+            label: _("Zoom Out");
+          }
         }
 
         Button {
           icon-name: "zoom-fit-best-symbolic";
           tooltip-text: _("Zoom to Fit");
           action-name: "win.zoom-fit";
+
+          accessibility {
+            label: _("Zoom to Fit");
+          }
         }
 
         Button {
           icon-name: "zoom-in-symbolic";
           tooltip-text: _("Zoom In");
           action-name: "win.zoom-in";
+
+          accessibility {
+            label: _("Zoom In");
+          }
         }
       }
     };

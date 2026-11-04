@@ -309,6 +309,12 @@ impl TimelineView {
     /// it grabbed a clip or started a selection.
     fn drag_begin(&self, x: f64, y: f64, touch: bool, extend: bool) -> bool {
         self.stop_glide();
+        // A click gives the keyboard to the timeline, on the clicked track.
+        self.grab_focus();
+        if let Some(lane) = self.lane_at(y) {
+            self.imp().current_lane.set(lane);
+        }
+        self.imp().keyboard_selection.set(None);
         let grab = if touch { TOUCH_GRAB } else { POINTER_GRAB };
         let hit = self.hit(x, y, grab);
         let mut start_lane = 0;

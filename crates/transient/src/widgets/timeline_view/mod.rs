@@ -22,6 +22,7 @@ mod draw;
 mod gestures;
 mod imp;
 mod interaction;
+mod keyboard;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -94,6 +95,8 @@ pub(crate) struct Lane {
     /// False when the track is muted or silenced by another track's solo;
     /// its clips are then drawn faded.
     pub(crate) audible: bool,
+    /// The track's name, for screen readers.
+    pub(crate) name: String,
 }
 
 glib::wrapper! {
@@ -117,12 +120,14 @@ impl TimelineView {
             self.queue_resize();
         }
         self.update_adjustment();
+        self.update_description();
     }
 
     /// Shows the time selection (or none).
     pub(crate) fn set_time_selection(&self, selection: Option<LaneRange>) {
         if self.imp().time_selection.replace(selection) != selection {
             self.queue_draw();
+            self.update_description();
         }
     }
 
@@ -190,6 +195,10 @@ impl TimelineView {
             self.scroll_to_show(frame);
         }
         self.queue_draw();
+        // Only while focused: during playback this runs every frame.
+        if self.has_focus() {
+            self.update_description();
+        }
     }
 
     /// Whether the view has a size yet (it has none until it is first shown).
@@ -426,6 +435,7 @@ impl TimelineView {
         self.add_controller(drag);
         self.setup_scroll();
         self.setup_context_menu();
+        self.setup_keyboard();
 
         // Remember the pointer position for Ctrl+scroll zooming.
         let motion = gtk::EventControllerMotion::new();

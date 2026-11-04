@@ -96,6 +96,30 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("Timeline");
+
+    Adw.ShortcutsItem {
+      title: _("Move Playhead");
+      accelerator: "Left Right";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Select Time");
+      accelerator: "<Shift>Left <Shift>Right";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Previous or Next Track");
+      accelerator: "Up Down";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Go to End");
+      accelerator: "End";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("Tracks");
 
     Adw.ShortcutsItem {

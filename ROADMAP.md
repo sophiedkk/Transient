@@ -42,7 +42,10 @@ dialog, dark mode (Libadwaita), error toasts.
 - [x] **Export a selection**: the export dialog offers Whole Project or
       Selection (the selected stretch on the selected tracks).
 - [ ] **"Locate…" for missing audio files** in the missing-files banner.
-- [ ] **Keyboard focus and accessibility pass.**
+- [x] **Keyboard focus and accessibility pass**: the timeline is usable from
+      the keyboard (arrows like a text cursor, Up/Down for tracks), every icon
+      button has an accessible name, and the timeline describes and announces
+      its state. Not yet checked with a real screen reader (Orca).
 - [ ] **Release-ready MetaInfo**: screenshots, a releases list and a content
       rating (see "Publishing" below).
 - [ ] **CI**: check for flaky jobs.
