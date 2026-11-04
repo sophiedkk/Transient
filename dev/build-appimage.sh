@@ -61,9 +61,19 @@ mkdir -p "$appdir/usr/share/icons"
 cp -r /usr/share/icons/Adwaita "$appdir/usr/share/icons/"
 
 # 2. Copy in the libraries, GTK's and GStreamer's files.
-# linuxdeploy's own strip is too old for Fedora's libraries (it fails on their
-# .relr.dyn sections); they are stripped already, so skip it.
+# linuxdeploy's own strip and patchelf are too old for Fedora's libraries: they
+# do not understand their .relr.dyn sections. strip fails (and the libraries
+# are stripped already, so skip it); patchelf silently damages every library it
+# changes, and the AppImage crashes at start. Use the system's patchelf (0.18
+# and later handle .relr.dyn).
 export NO_STRIP=1
+PATCHELF="$(command -v patchelf)"
+export PATCHELF
+patchelf_version="$("$PATCHELF" --version | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+if [ "$(printf '%s\n' 0.18 "$patchelf_version" | sort -V | head -n1)" != "0.18" ]; then
+    echo "error: patchelf $patchelf_version is too old; 0.18 or later is needed" >&2
+    exit 1
+fi
 export DEPLOY_GTK_VERSION=4
 export GSTREAMER_PLUGINS_DIR=/usr/lib64/gstreamer-1.0
 export GSTREAMER_HELPERS_DIR=/usr/libexec/gstreamer-1.0
@@ -85,4 +95,11 @@ fi
 # 3. Pack the AppDir into one file.
 export OUTPUT="$work/Transient-$version-x86_64.AppImage"
 linuxdeploy-x86_64.AppImage --appdir "$appdir" --output appimage
+
+# 4. A quick check that it starts at all (--help needs no display): a damaged
+# library makes it crash here instead of on someone's desktop.
+if ! "$OUTPUT" --help >/dev/null; then
+    echo "error: the AppImage does not start (transient --help failed)" >&2
+    exit 1
+fi
 echo "built $OUTPUT"
