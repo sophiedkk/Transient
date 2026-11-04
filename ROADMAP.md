@@ -87,6 +87,23 @@ when needed instead of being managed by hand.
 - [x] **Cut, Copy, Paste** (Ctrl+X/C/V) for clips and time ranges, plus "Paste
       and Make Room" (Shift+Ctrl+V), which keeps tracks in sync.
 
+## 13 · Recording (before 1.0)
+
+Requested 2026-11-04: recording comes before 1.0, not after.
+
+- [ ] **Record onto a new track** at the playhead (a Record button in the
+      transport bar and a shortcut), with the level meter showing the input
+      while recording. Stop ends the take; it becomes an ordinary clip.
+- [ ] **Choose the input** (microphone, line in) and see its level before
+      recording.
+- [ ] **Play the other tracks while recording** (overdubbing), so a voice can be
+      recorded over music; later, correct for the delay between them.
+- [ ] **Where takes are stored**: decide together with the project file question
+      under "Publishing" (a project folder would hold its recordings).
+- [ ] **Permissions**: there is no portal for the microphone yet, so the
+      Flatpak needs PulseAudio/PipeWire access (`--socket=pulseaudio`), which
+      Flathub accepts for audio apps; note it in the submission.
+
 ## Publishing (1.0 and Flathub)
 
 Checked against [Flathub's requirements](https://docs.flathub.org/docs/for-app-authors/requirements)
@@ -148,7 +165,6 @@ account), the MIT licence, the SVG icon and the desktop file.
 
 ## Later (after the MVP)
 
-- Recording
 - Effects (the model leaves room for per-track effects)
 - Volume automation
 - Level meters per track, in the track headers (the master meter is under the
