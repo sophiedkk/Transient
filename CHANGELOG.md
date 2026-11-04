@@ -74,4 +74,6 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--quit-after`, `--seek`, `--zoom`, `--action`, `--save-to`, `--export-to`; `transient-cli probe` decodes files and
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
+- App icon: five waveform bars in the colours of the trans flag, the tall white
+  one in the middle being the "transient"; a matching symbolic icon.
 - The window remembers its size.

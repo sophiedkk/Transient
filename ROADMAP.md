@@ -29,7 +29,7 @@ dialog, dark mode (Libadwaita), error toasts.
       scrolling, dragging on a touchscreen. Two-finger sideways scroll and
       Ctrl+scroll zoom already work.
 - [x] **Auto-scroll** while dragging a clip or clip edge near the edge of the view.
-- [ ] **Application icon.** Replace the placeholder
+- [x] **Application icon.** Replace the placeholder
       (`data/icons/hicolor/scalable/apps/`) with an icon that follows the
       [GNOME HIG app icon guidelines](https://developer.gnome.org/hig/guidelines/app-icons.html):
       128×128 grid, simple shapes, the GNOME palette, a slight bottom edge for
