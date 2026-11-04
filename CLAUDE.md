@@ -126,6 +126,18 @@ just test-audio                                 # decode the whole test collecti
   (Wikimedia Commons, checksummed, licences in `test-audio/CREDITS.md`). It is not
   committed. Add files by adding a manifest row with its SHA-256.
 
+## Roadmap and way of working
+
+- `ROADMAP.md` holds the milestones, open tasks and known gaps; it is the source of
+  truth for what comes next. Update it when a milestone is finished or plans change.
+- Plan together first: ask questions (with a recommended option) before big decisions.
+- Work milestone by milestone. After each one: `just check`, verify with screenshots
+  and headless runs, update the installed Flatpak (the flatpak-builder command from
+  `just flatpak`, without running the app), then commit and push to `main` when the
+  owner asks. Report what was and was not verified.
+- The owner tests by hand in the installed Flatpak and reports UX problems: fix those first.
+- No GitHub issues yet; keep plans in `ROADMAP.md`.
+
 ## Git
 
 - Branches: `feat/…`, `fix/…`, `chore/…`, `docs/…`; Conventional Commit messages.
