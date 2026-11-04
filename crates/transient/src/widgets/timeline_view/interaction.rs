@@ -195,7 +195,7 @@ impl TimelineView {
     }
 
     /// The lane at height `y`, if it is inside a lane.
-    fn lane_at(&self, y: f64) -> Option<usize> {
+    pub(super) fn lane_at(&self, y: f64) -> Option<usize> {
         let lanes = self.imp().lanes.borrow().len();
         let offset = y - f64::from(RULER_HEIGHT);
         if offset < 0.0 {
@@ -214,6 +214,14 @@ impl TimelineView {
             return None;
         }
         Some(self.lane_at(y).unwrap_or(lanes))
+    }
+
+    /// The clip you see at (`x`, `y`), if any.
+    pub(super) fn clip_at(&self, x: f64, y: f64) -> Option<ClipId> {
+        match self.hit(x, y, POINTER_GRAB) {
+            Hit::Clip(_, clip, _) => Some(clip.clip.id),
+            Hit::Ruler | Hit::Empty(_) => None,
+        }
     }
 
     /// What is at (`x`, `y`): what you see there. Only the visible parts of clips

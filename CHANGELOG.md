@@ -33,6 +33,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to move it. Delete cuts the selection, Ctrl+Delete ("Delete and Close Gap")
   cuts it and moves everything after it to the left on all tracks, S splits at
   both of its ends, Ctrl+A selects everything and Escape clears it.
+- Without shortcuts: a context menu on clips and selections (right-click, long
+  press, or the Menu key / Shift+F10) with Split, Delete, Delete and Close Gap,
+  Move to New Track and Select All, showing their shortcuts; Split and Delete
+  buttons in the bottom bar, whose tooltips explain how to select.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

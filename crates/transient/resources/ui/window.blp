@@ -389,13 +389,32 @@ template $TransientWindow: Adw.ApplicationWindow {
 
         Label duration_label {
           label: "/ 0:00.000";
-          hexpand: true;
           xalign: 0;
 
           styles [
             "numeric",
             "dimmed",
           ]
+        }
+
+        // Editing buttons, for people who do not know the shortcuts. Their
+        // tooltips change with the selection (see `update_edit_actions`).
+        Box {
+          spacing: 6;
+          margin-start: 12;
+          hexpand: true;
+
+          Button split_button {
+            icon-name: "transient-split-symbolic";
+            tooltip-text: _("Split at Playhead");
+            action-name: "win.split";
+          }
+
+          Button delete_button {
+            icon-name: "user-trash-symbolic";
+            tooltip-text: _("Delete");
+            action-name: "win.delete-clip";
+          }
         }
 
         // The output level: two thin bars (left and right) read as one meter.
@@ -429,6 +448,7 @@ template $TransientWindow: Adw.ApplicationWindow {
           icon-name: "audio-volume-high-symbolic";
           margin-start: 12;
         }
+
 
         Scale master_scale {
           width-request: 120;
@@ -525,4 +545,39 @@ SizeGroup {
     headers_column,
     scrollbar_spacer,
   ]
+}
+
+// The timeline's context menu (right-click, long press, Menu key). GTK shows
+// each item's keyboard shortcut next to it.
+menu timeline_menu {
+  section {
+    item {
+      label: _("_Split");
+      action: "win.split";
+    }
+
+    item {
+      label: _("_Delete");
+      action: "win.delete-clip";
+    }
+
+    item {
+      label: _("Delete and _Close Gap");
+      action: "win.ripple-delete";
+    }
+  }
+
+  section {
+    item {
+      label: _("Move to _New Track");
+      action: "win.move-to-new-track";
+    }
+  }
+
+  section {
+    item {
+      label: _("Select _All");
+      action: "win.select-all";
+    }
+  }
 }

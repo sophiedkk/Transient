@@ -270,7 +270,30 @@ impl Window {
             self.action_set_enabled(action, has_clip);
         }
         self.action_set_enabled("win.split", has_clips);
+        self.update_edit_tooltips(has_clip, has_time, has_clips);
         self.action_set_enabled("win.select-clip-at-playhead", has_clips);
+    }
+
+    /// Tooltips for the Split and Delete buttons in the bottom bar: they say what
+    /// a click does now, and when it can do nothing, how to select something.
+    fn update_edit_tooltips(&self, has_clip: bool, has_time: bool, has_clips: bool) {
+        let imp = self.imp();
+        let split = if has_time {
+            gettext("Split at Selection Edges")
+        } else if has_clips {
+            gettext("Split at Playhead")
+        } else {
+            gettext("Import audio to split it")
+        };
+        imp.split_button.set_tooltip_text(Some(&split));
+        let delete = if has_time {
+            gettext("Delete Selection")
+        } else if has_clip {
+            gettext("Delete Clip")
+        } else {
+            gettext("Select a clip, or drag over a waveform to select time")
+        };
+        imp.delete_button.set_tooltip_text(Some(&delete));
     }
 
     /// The playhead position, if something is loaded.

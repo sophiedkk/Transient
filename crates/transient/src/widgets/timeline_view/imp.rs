@@ -52,6 +52,9 @@ pub(crate) struct TimelineView {
     pub(super) time_selection: Cell<Option<LaneRange>>,
     /// The drag in progress, if any.
     pub(super) drag: RefCell<Option<Drag>>,
+    /// The context menu (see `context_menu.rs`). The view is its parent, so the
+    /// view positions it (`size_allocate`) and removes it (`dispose`).
+    pub(super) context_menu: RefCell<Option<gtk::PopoverMenu>>,
     /// The pinch in progress, if any.
     pub(super) pinch: Cell<Option<Pinch>>,
     /// The per-frame callback that glides on after a swipe, while it runs.
@@ -115,6 +118,12 @@ impl ObjectImpl for TimelineView {
         self.fit.set(true);
         self.obj().setup_controllers();
     }
+
+    fn dispose(&self) {
+        if let Some(menu) = self.context_menu.take() {
+            menu.unparent();
+        }
+    }
 }
 
 impl WidgetImpl for TimelineView {
@@ -134,6 +143,10 @@ impl WidgetImpl for TimelineView {
     fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
         self.parent_size_allocate(width, height, baseline);
         self.obj().update_adjustment();
+        // A popover attached to a custom widget is placed by that widget.
+        if let Some(menu) = self.context_menu.borrow().as_ref() {
+            menu.present();
+        }
     }
 
     fn snapshot(&self, snapshot: &gtk::Snapshot) {

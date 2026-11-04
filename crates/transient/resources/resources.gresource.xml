@@ -15,5 +15,7 @@
          base path's icons/ folder, so these work without installing Transient. -->
     <file alias="icons/scalable/apps/io.github.sophiedkk.Transient.svg">io.github.sophiedkk.Transient.svg</file>
     <file alias="icons/scalable/apps/io.github.sophiedkk.Transient.Devel.svg">io.github.sophiedkk.Transient.Devel.svg</file>
+    <!-- Our own symbolic icons, for commands Adwaita has no icon for. -->
+    <file alias="icons/scalable/actions/transient-split-symbolic.svg">icons/transient-split-symbolic.svg</file>
   </gresource>
 </gresources>

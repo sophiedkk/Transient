@@ -112,7 +112,8 @@ just test-audio                                 # decode the whole test collecti
   `--seek=SECONDS`, `--zoom=STEPS` (zoom in around the playhead),
   `--select=START..END` (seconds, every track; runs before the actions), and
   `--action=NAME` (repeatable; runs `win.NAME`, e.g. `split`, `undo`,
-  `select-clip-at-playhead`, `select-all`, `nudge-right`, `delete-clip`
+  `select-clip-at-playhead`, `select-all`, `context-menu` (opens it; popovers are
+  not in screenshots, check the debug log), `nudge-right`, `delete-clip`
   (deletes the time selection if there is one), `ripple-delete`, `toggle-mute`,
   `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
   `normalize-peak`, `normalize-loudness`, `move-to-new-track`, `remove-track`,

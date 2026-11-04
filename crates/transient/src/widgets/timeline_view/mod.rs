@@ -17,6 +17,7 @@
 //! The lanes line up with the track headers next to the view because both use
 //! [`RULER_HEIGHT`] and [`LANE_HEIGHT`]. Drawing is in `draw.rs`.
 
+mod context_menu;
 mod draw;
 mod gestures;
 mod imp;
@@ -401,6 +402,7 @@ impl TimelineView {
         self.setup_pinch(&drag);
         self.add_controller(drag);
         self.setup_scroll();
+        self.setup_context_menu();
 
         // Remember the pointer position for Ctrl+scroll zooming.
         let motion = gtk::EventControllerMotion::new();

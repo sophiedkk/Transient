@@ -33,6 +33,12 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) start_page: TemplateChild<adw::StatusPage>,
     #[template_child]
+    pub(super) split_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub(super) delete_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub(super) timeline_menu: TemplateChild<gio::MenuModel>,
+    #[template_child]
     pub(super) track_headers: TemplateChild<gtk::Box>,
     #[template_child]
     pub(super) timeline: TemplateChild<TimelineView>,
@@ -90,7 +96,7 @@ pub(crate) struct Window {
     pub(super) updating_controls: Cell<bool>,
     /// The "Clip deleted" toast, closed when the deletion is undone.
     pub(super) undo_toast: RefCell<Option<adw::Toast>>,
-    /// The time selection (see selection.rs).
+    /// The time selection (see `selection.rs`).
     pub(super) time_selection: RefCell<Option<super::selection::TimeSelection>>,
     /// Plays the project's mix; `None` until something is imported.
     pub(super) player: RefCell<Option<Player>>,
@@ -146,6 +152,9 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.deselect", None, |window, _, _| window.deselect_all());
         klass.install_action("win.select-all", None, |window, _, _| window.select_all());
+        klass.install_action("win.context-menu", None, |window, _, _| {
+            window.imp().timeline.show_context_menu();
+        });
         klass.install_action("win.ripple-delete", None, |window, _, _| {
             window.ripple_delete();
         });
@@ -218,6 +227,7 @@ impl ObjectImpl for Window {
         window.setup_transport();
         window.setup_editing();
         window.setup_time_selection();
+        window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();
         window.update_recent_projects();
