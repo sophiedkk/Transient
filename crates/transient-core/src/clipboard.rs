@@ -10,6 +10,9 @@ use crate::project::{Clip, ClipId, Project, TrackId};
 use crate::range::TimeRange;
 use crate::time::Frames;
 
+/// Where a copy's clips go on one track: (start, end), counted from the copy's start.
+type Places = Vec<(Frames, Frames)>;
+
 /// One copied clip.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CopiedClip {
@@ -160,6 +163,60 @@ impl Project {
         pasted
     }
 
+    /// Where Paste puts `clipboard` (starting on `first_track`) so that it covers
+    /// no audio: at `at` if the copy fits there, otherwise at the first place
+    /// after it where it does, which is always right after some clip. Only the
+    /// copy's clips count, not the silence in a copied time range.
+    #[must_use]
+    pub fn free_spot(&self, clipboard: &Clipboard, first_track: TrackId, at: Frames) -> Frames {
+        let base = self
+            .tracks
+            .iter()
+            .position(|track| track.id == first_track)
+            .unwrap_or(0);
+        // The tracks the copy lands on, with its clips' places on each.
+        let targets: Vec<(&[Clip], Places)> = self
+            .tracks
+            .iter()
+            .enumerate()
+            .skip(base)
+            .map(|(index, track)| {
+                let places = clipboard
+                    .clips
+                    .iter()
+                    .filter(|copied| base + copied.track_offset == index)
+                    .map(|copied| (copied.clip.start, copied.clip.end()))
+                    .collect();
+                (track.clips.as_slice(), places)
+            })
+            .collect();
+        let fits = |spot: Frames| {
+            targets.iter().all(|(clips, places)| {
+                places.iter().all(|&(start, end)| {
+                    let (start, end) = (spot + start, spot + end);
+                    clips
+                        .iter()
+                        .all(|clip| clip.end() <= start || clip.start >= end)
+                })
+            })
+        };
+        // A free place begins at `at` or right where some clip ends; the end of
+        // the last clip always fits.
+        let mut candidates: Vec<Frames> = std::iter::once(at)
+            .chain(
+                targets
+                    .iter()
+                    .flat_map(|(clips, _)| clips.iter().map(Clip::end))
+                    .filter(|&end| end > at),
+            )
+            .collect();
+        candidates.sort_unstable();
+        candidates
+            .into_iter()
+            .find(|&spot| fits(spot))
+            .unwrap_or(at)
+    }
+
     /// Insert ("Paste and Make Room"): moves everything from `at` onwards to
     /// the right by the clipboard's length on every track (splitting clips that
     /// cross `at`), so tracks stay in sync, then pastes into the gap. The mirror
@@ -261,6 +318,48 @@ mod tests {
     }
 
     #[test]
+    fn paste_goes_after_the_clip_under_the_playhead() {
+        let (mut project, a, _) = two_tracks();
+        let copy = project.copy_clips(&[clips(&project, a)[0].id]).unwrap();
+        // The playhead inside the copied clip (as after clicking it): the copy
+        // goes right after it, and a second copy right after that.
+        let first = project.free_spot(&copy, a, 300);
+        assert_eq!(first, 1000);
+        project.paste(&copy, a, first, "New");
+        assert_eq!(project.free_spot(&copy, a, first + copy.length), 2000);
+    }
+
+    #[test]
+    fn paste_uses_a_gap_that_is_big_enough() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let source = clips(&project, track)[0].source;
+        project.add_clip(track, source, 2500).unwrap();
+        let short = Clipboard {
+            clips: vec![CopiedClip {
+                track_offset: 0,
+                clip: Clip {
+                    source,
+                    length: 500,
+                    ..Clip::default()
+                },
+            }],
+            length: 500,
+            first_track: track,
+        };
+        assert_eq!(
+            project.free_spot(&short, track, 1200),
+            1200,
+            "fits in the gap"
+        );
+        assert_eq!(
+            project.free_spot(&short, track, 2200),
+            3500,
+            "too close to the next clip"
+        );
+    }
+
+    #[test]
     fn insert_makes_room_on_every_track() {
         let (mut project, a, b) = two_tracks();
         let copy = project.copy_range(&[a], range(0, 100)).unwrap();
@@ -308,6 +407,49 @@ mod tests {
     }
 
     proptest! {
+        /// Wherever the clips and the playhead are, the free spot is at or after
+        /// the playhead, the pasted copy covers no clip, and no earlier place
+        /// (the playhead or a clip end) would have fitted.
+        #[test]
+        fn the_free_spot_covers_nothing_and_is_the_first(
+            starts in prop::collection::vec(0_u64..5000, 0..6),
+            lengths in prop::collection::vec(1_u64..800, 6),
+            copy_length in 1_u64..800,
+            at in 0_u64..5000,
+        ) {
+            let mut project = Project::default();
+            let track = project.import("a.wav".into(), 10_000, "a".to_owned());
+            let source = clips(&project, track)[0].source;
+            project.remove_clip(clips(&project, track)[0].id);
+            for (start, length) in starts.iter().zip(&lengths) {
+                let id = project.add_clip(track, source, *start).unwrap();
+                let (_, clip) = project.clip(id).unwrap();
+                let clip = Clip { length: *length, ..*clip };
+                project.update_clip(clip, track);
+            }
+            let copy = Clipboard {
+                clips: vec![CopiedClip {
+                    track_offset: 0,
+                    clip: Clip { source, length: copy_length, ..Clip::default() },
+                }],
+                length: copy_length,
+                first_track: track,
+            };
+            let existing = clips(&project, track);
+            let covers = |spot: Frames| {
+                existing.iter().any(|clip| clip.start < spot + copy_length && spot < clip.end())
+            };
+            let spot = project.free_spot(&copy, track, at);
+            prop_assert!(spot >= at);
+            prop_assert!(!covers(spot), "the copy at {} covers a clip", spot);
+            let earlier = std::iter::once(at)
+                .chain(existing.iter().map(Clip::end))
+                .filter(|&place| place >= at && place < spot);
+            for place in earlier {
+                prop_assert!(covers(place), "{} was free too, before {}", place, spot);
+            }
+        }
+
         /// Cutting a range out (ripple delete) and inserting the cut back at the
         /// same place gives exactly the original sound.
         #[test]

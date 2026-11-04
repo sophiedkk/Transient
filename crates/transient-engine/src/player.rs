@@ -71,6 +71,10 @@ pub struct Player {
     /// A seek GStreamer has not finished yet. Seeks complete asynchronously, and
     /// until then the pipeline still reports the old position.
     pending_seek: Option<Frames>,
+    /// Where the last seek went, while not playing. GStreamer cannot always
+    /// report a position after a seek (not at the very end, for example), so
+    /// while stopped the player reports this one. Playing forgets it.
+    seeked_to: Option<Frames>,
     /// The latest output level per channel, in dBFS (see [`Player::levels`]).
     levels: Option<[f64; CHANNELS]>,
 }
@@ -128,6 +132,7 @@ impl Player {
             duration,
             playing: false,
             pending_seek: None,
+            seeked_to: None,
             levels: None,
         })
     }
@@ -143,6 +148,8 @@ impl Player {
         }
         self.pipeline.set_state(gstreamer::State::Playing)?;
         self.playing = true;
+        // From now on the pipeline's own position is the right one.
+        self.seeked_to = None;
         Ok(())
     }
 
@@ -175,6 +182,7 @@ impl Player {
             frames_to_time(frame, self.sample_rate),
         )?;
         self.pending_seek = Some(frame);
+        self.seeked_to = Some(frame);
         Ok(())
     }
 
@@ -182,6 +190,11 @@ impl Player {
     #[must_use]
     pub fn position(&self) -> Frames {
         if let Some(frame) = self.pending_seek {
+            return frame;
+        }
+        if !self.playing
+            && let Some(frame) = self.seeked_to
+        {
             return frame;
         }
         self.pipeline
@@ -398,5 +411,19 @@ mod tests {
         let _ = player.pipeline.state(gstreamer::ClockTime::from_seconds(5));
         player.poll_events();
         assert_eq!(player.position(), 6_000);
+    }
+
+    /// Seeking to the very end (after pasting at the end of the timeline, the
+    /// playhead goes there) must not show the position as 0:00.
+    #[test]
+    fn seeking_to_the_end_stays_at_the_end() {
+        crate::init().unwrap();
+        let mut player = Player::new(quarter_second(), AudioOutput::Silent).unwrap();
+        let end = player.duration();
+        player.seek(end).unwrap();
+        let _ = player.pipeline.state(gstreamer::ClockTime::from_seconds(5));
+        std::thread::sleep(Duration::from_millis(200));
+        player.poll_events();
+        assert_eq!(player.position(), end);
     }
 }

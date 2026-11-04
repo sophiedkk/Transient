@@ -3,8 +3,10 @@
 //!
 //! Copy takes the time selection if there is one, otherwise the selected
 //! clips. Paste puts the copy at the playhead, starting on the selected track
-//! (or the track it was copied from), and selects what it pasted. The maths is
-//! in `transient_core::clipboard`.
+//! (or the track it was copied from); if audio is there, right after it, so a
+//! paste never covers anything. It selects what it pasted and moves the
+//! playhead to its end, so pasting again lines the copies up. The maths is in
+//! `transient_core::clipboard`.
 
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
@@ -54,15 +56,23 @@ impl Window {
         }
     }
 
-    /// Pastes at the playhead (`win.paste`, Ctrl+V), or with `insert` first makes
-    /// room on every track (`win.paste-insert`, Shift+Ctrl+V).
+    /// Pastes at the playhead, or right after the audio there (`win.paste`,
+    /// Ctrl+V); with `insert`, first makes room at the playhead on every track
+    /// (`win.paste-insert`, Shift+Ctrl+V).
     pub(super) fn paste(&self, insert: bool) {
         let imp = self.imp();
         let Some(clipboard) = imp.clipboard.borrow().clone() else {
             return;
         };
-        let at = self.playhead_position().unwrap_or(0);
+        let playhead = self.playhead_position().unwrap_or(0);
         let first_track = self.selected_track().unwrap_or(clipboard.first_track);
+        let at = if insert {
+            playhead
+        } else {
+            imp.project
+                .borrow()
+                .free_spot(&clipboard, first_track, playhead)
+        };
         let name = gettext("Track");
         let mut pasted: Vec<ClipId> = Vec::new();
         self.apply_edit(|project| {
@@ -75,9 +85,11 @@ impl Window {
             // makes room); a paste of nothing changes nothing.
             insert || !pasted.is_empty()
         });
-        // What was pasted is selected, so it can be moved right away.
+        // What was pasted is selected, so it can be moved right away, and the
+        // playhead goes to its end, so pasting again puts the next copy after it.
         self.set_time_selection(None);
         self.select_clips(&pasted);
+        self.seek_to_frame(at.saturating_add(clipboard.length));
     }
 
     /// Forgets the clipboard: it refers to this project's audio files, so it

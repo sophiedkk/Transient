@@ -45,8 +45,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   all, also across tracks; Ctrl+Left/Right, Delete and S act on all of them.
 - Cut, Copy and Paste (Ctrl+X/C/V, also in the context menu) for clips and time
   selections: Paste puts the copy at the playhead, starting on the selected
-  track and keeping its arrangement; "Paste and Make Room" (Shift+Ctrl+V) first
-  moves everything after the playhead to the right on all tracks.
+  track and keeping its arrangement, or right after the audio there, so it
+  never covers anything; the playhead then moves to its end, so pasting again
+  lines the copies up. "Paste and Make Room" (Shift+Ctrl+V) first moves
+  everything after the playhead to the right on all tracks.
 - The bottom bar shows a time selection's start, end and length, and Export
   can export just the selection (its stretch of time on its tracks).
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
