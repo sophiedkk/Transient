@@ -1,15 +1,37 @@
+<div align="center">
+
+<img src="data/icons/hicolor/scalable/apps/io.github.sophiedkk.Transient.svg" width="128" height="128" alt="Transient's icon: five waveform bars in light blue, pink and white">
+
 # Transient
 
-A simple multitrack audio editor for GNOME: put audio files on tracks, trim and
-arrange them, balance their volume, and export the mix. Built with Rust, GTK 4,
-Libadwaita and GStreamer.
+A simple multitrack audio editor for GNOME
+
+[![CI](https://github.com/sophiedkk/Transient/actions/workflows/ci.yml/badge.svg)](https://github.com/sophiedkk/Transient/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/sophiedkk/Transient)](https://github.com/sophiedkk/Transient/releases/latest)
+[![Licence: MIT](https://img.shields.io/github/license/sophiedkk/Transient)](LICENSE)
+[![Made for GNOME](https://img.shields.io/badge/made_for-GNOME-4a86cf?logo=gnome&logoColor=white)](https://apps.gnome.org/)
+
+</div>
+
+Put audio files on tracks, trim and arrange them, record over them, balance
+their volume, and export the mix. Built with Rust, GTK 4, Libadwaita and
+GStreamer.
 
 ![Transient with four tracks: a voice clip selected, a piano bed and drums with
 fades, and applause at the end](data/screenshots/main-window.png)
 
-> **Status:** early development, no release yet. You can import audio files,
-> arrange, trim and cut them on tracks, add fades, mix the tracks and export
-> the result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
+> **Status:** early development (0.1). You can import or record audio,
+> arrange, trim and cut it on tracks, add fades, mix the tracks and export the
+> result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
+
+## Install
+
+Download a file from the [latest release](https://github.com/sophiedkk/Transient/releases/latest):
+
+- **Flatpak** (any distribution with Flatpak): `flatpak install --user
+  Transient-0.1.0.flatpak`. It fetches the GNOME runtime from Flathub by itself.
+- **AppImage** (Fedora 43+, Ubuntu 26.04+, Arch, openSUSE Tumbleweed): make it
+  executable (`chmod +x Transient-0.1.0-x86_64.AppImage`) and start it.
 
 ## Development
 
