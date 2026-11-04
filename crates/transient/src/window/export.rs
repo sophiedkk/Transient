@@ -45,9 +45,18 @@ impl Window {
             .iter()
             .map(|(id, source)| (*id, source.waveform.buffer().clone()))
             .collect();
-        let mix = Mix::new(&imp.project.borrow(), &pool);
+        let project = imp.project.borrow();
+        let mix = Mix::new(&project, &pool);
+        // The time selection: its stretch of time, on its tracks only.
+        let selection = self.time_selection().map(|selection| {
+            let mut selected = project.clone();
+            selected
+                .tracks
+                .retain(|track| selection.tracks.contains(&track.id));
+            Mix::new(&selected, &pool).excerpt(selection.range)
+        });
         let weak = self.downgrade();
-        ExportDialog::new(mix, &self.project_title(), move |outcome| {
+        ExportDialog::new(mix, selection, &self.project_title(), move |outcome| {
             if let Some(window) = weak.upgrade() {
                 window.export_finished(outcome);
             }

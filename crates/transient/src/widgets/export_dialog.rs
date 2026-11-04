@@ -94,6 +94,8 @@ mod imp {
         #[template_child]
         pub(super) quality_row: TemplateChild<adw::ComboRow>,
         #[template_child]
+        pub(super) range_row: TemplateChild<adw::ComboRow>,
+        #[template_child]
         pub(super) quality_list: TemplateChild<gtk::StringList>,
         #[template_child]
         pub(super) progress_page: TemplateChild<adw::StatusPage>,
@@ -103,6 +105,8 @@ mod imp {
         pub(super) stop_button: TemplateChild<gtk::Button>,
 
         pub(super) mix: RefCell<Option<Mix>>,
+        /// The time selection's mix (its stretch, its tracks), if there is one.
+        pub(super) selection_mix: RefCell<Option<Mix>>,
         pub(super) suggested_name: RefCell<String>,
         pub(super) cancel: Arc<AtomicBool>,
         pub(super) on_finished: RefCell<Option<FinishedCallback>>,
@@ -151,12 +155,24 @@ glib::wrapper! {
 }
 
 impl ExportDialog {
-    /// A dialog that exports `mix`, suggesting `name` (without extension) as the
-    /// file name. `on_finished` hears how it ended.
-    pub(crate) fn new(mix: Mix, name: &str, on_finished: impl Fn(ExportOutcome) + 'static) -> Self {
+    /// A dialog that exports `mix` (the whole project), or `selection` (the time
+    /// selection's mix) if there is one and it is chosen, which it is at first.
+    /// It suggests `name` (without extension) as the file name; `on_finished`
+    /// hears how it ended.
+    pub(crate) fn new(
+        mix: Mix,
+        selection: Option<Mix>,
+        name: &str,
+        on_finished: impl Fn(ExportOutcome) + 'static,
+    ) -> Self {
         let dialog: Self = glib::Object::new();
         let imp = dialog.imp();
         imp.mix.replace(Some(mix));
+        if selection.is_some() {
+            imp.range_row.set_visible(true);
+            imp.range_row.set_selected(1);
+        }
+        imp.selection_mix.replace(selection);
         imp.suggested_name.replace(name.to_owned());
         imp.on_finished.replace(Some(Box::new(on_finished)));
         dialog
@@ -236,7 +252,13 @@ impl ExportDialog {
     /// Exports to `file` (also used by `--export-to`, which skips the file chooser).
     pub(crate) async fn export_to(&self, file: gio::File, format: ExportFormat) {
         let imp = self.imp();
-        let (Some(path), Some(mix)) = (file.path(), imp.mix.borrow().clone()) else {
+        // The selection when it is chosen (the second entry), else the whole project.
+        let mix = if imp.range_row.is_visible() && imp.range_row.selected() == 1 {
+            imp.selection_mix.borrow().clone()
+        } else {
+            imp.mix.borrow().clone()
+        };
+        let (Some(path), Some(mix)) = (file.path(), mix) else {
             self.finish(ExportOutcome::Failed("not a local file".to_owned()));
             return;
         };

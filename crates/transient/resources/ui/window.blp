@@ -415,6 +415,18 @@ template $TransientWindow: Adw.ApplicationWindow {
             tooltip-text: _("Delete");
             action-name: "win.delete-clip";
           }
+
+          // The time selection's start, end and length (see selection.rs).
+          Label selection_label {
+            visible: false;
+            margin-start: 6;
+            tooltip-text: _("Time Selection");
+
+            styles [
+              "numeric",
+              "dimmed",
+            ]
+          }
         }
 
         // The output level: two thin bars (left and right) read as one meter.

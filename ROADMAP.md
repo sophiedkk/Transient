@@ -39,8 +39,8 @@ dialog, dark mode (Libadwaita), error toasts.
       symbolic icon (`hicolor/symbolic/apps/`) to match and check both in App
       Icon Preview.
 - [ ] **Preferences dialog** (e.g. default export format).
-- [ ] **Export a selection**, not only the whole project (planned for milestone
-      8; needs time selection from milestone 10).
+- [x] **Export a selection**: the export dialog offers Whole Project or
+      Selection (the selected stretch on the selected tracks).
 - [ ] **"Locate…" for missing audio files** in the missing-files banner.
 - [ ] **Keyboard focus and accessibility pass.**
 - [ ] **Release-ready MetaInfo**: screenshots, a releases list and a content
@@ -61,8 +61,7 @@ Inspired by Audacity 4's clip editing, kept GNOME-simple (no tool modes).
       the selection are moved, not cut.
 - [x] **Split a selection**: S splits at both ends of the time selection (no
       separate split-at-the-mouse gesture: click, then press S).
-- [ ] **Show the selection's start, end and length** in the bottom bar, like the
-      playhead position (Audacity shows these too).
+- [x] **Show the selection's start, end and length** in the bottom bar.
 
 ## 11 · Tracks
 

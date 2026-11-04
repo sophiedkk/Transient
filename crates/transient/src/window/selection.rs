@@ -12,6 +12,7 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use transient_core::project::TrackId;
 use transient_core::range::TimeRange;
+use transient_core::time::format_position;
 
 use super::Window;
 use crate::widgets::timeline_view::LaneRange;
@@ -91,6 +92,23 @@ impl Window {
             })
         };
         imp.timeline.set_time_selection(lanes);
+        self.show_selection_times();
+    }
+
+    /// Shows the time selection's start, end and length in the bottom bar (or
+    /// hides the label when there is no selection).
+    fn show_selection_times(&self) {
+        let imp = self.imp();
+        let rate = imp.project.borrow().sample_rate;
+        let text = imp.time_selection.borrow().as_ref().map(|selection| {
+            let range = selection.range;
+            gettext("Selected {start}–{end} ({length})")
+                .replace("{start}", &format_position(range.start, rate))
+                .replace("{end}", &format_position(range.end, rate))
+                .replace("{length}", &format_position(range.length(), rate))
+        });
+        imp.selection_label.set_visible(text.is_some());
+        imp.selection_label.set_label(&text.unwrap_or_default());
     }
 
     /// The time selection, if there is one.

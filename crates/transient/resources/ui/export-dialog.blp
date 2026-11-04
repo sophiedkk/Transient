@@ -38,7 +38,20 @@ template $TransientExportDialog: Adw.Dialog {
 
         child: Adw.PreferencesPage {
           Adw.PreferencesGroup {
-            description: _("The whole project is mixed into one file");
+            description: _("The tracks are mixed into one file");
+
+            // Only shown when there is a time selection (see export_dialog.rs).
+            Adw.ComboRow range_row {
+              title: _("Export");
+              visible: false;
+
+              model: StringList {
+                strings [
+                  _("Whole Project"),
+                  _("Selection"),
+                ]
+              };
+            }
 
             Adw.ComboRow format_row {
               title: _("Format");

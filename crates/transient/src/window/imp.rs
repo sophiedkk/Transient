@@ -37,6 +37,8 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) delete_button: TemplateChild<gtk::Button>,
     #[template_child]
+    pub(super) selection_label: TemplateChild<gtk::Label>,
+    #[template_child]
     pub(super) timeline_menu: TemplateChild<gio::MenuModel>,
     #[template_child]
     pub(super) track_headers: TemplateChild<gtk::Box>,

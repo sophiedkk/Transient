@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::audio::{AudioBuffer, CHANNELS};
 use crate::edit::visible_parts;
 use crate::project::{Project, SourceId};
+use crate::range::TimeRange;
 use crate::time::{Frames, SampleRate, frames_to_f64};
 
 /// Decoded audio for each source, by ID.
@@ -91,6 +92,9 @@ pub struct Mix {
     sample_rate: SampleRate,
     length: Frames,
     clips: Vec<MixClip>,
+    /// Where frame 0 of this mix is on the timeline: 0, except for an excerpt
+    /// (see [`Mix::excerpt`]).
+    offset: Frames,
 }
 
 impl Mix {
@@ -131,6 +135,7 @@ impl Mix {
             sample_rate: project.sample_rate,
             length: project.length(),
             clips,
+            offset: 0,
         }
     }
 
@@ -141,6 +146,19 @@ impl Mix {
             sample_rate,
             length: 0,
             clips: Vec::new(),
+            offset: 0,
+        }
+    }
+
+    /// Only the stretch `range` of this mix (for exporting a selection): its
+    /// frame 0 is `range.start`, and it ends at `range.end` (or where the mix
+    /// ends, if that is earlier). Fades sound exactly as in the whole mix.
+    #[must_use]
+    pub fn excerpt(&self, range: TimeRange) -> Self {
+        Self {
+            length: range.end.min(self.length).saturating_sub(range.start),
+            offset: self.offset + range.start,
+            ..self.clone()
         }
     }
 
@@ -161,6 +179,8 @@ impl Mix {
     /// (on one track, only the visible parts of clips play).
     pub fn render(&self, start: Frames, out: &mut [f32]) {
         out.fill(0.0);
+        // In timeline frames (an excerpt starts later on the timeline).
+        let start = start.saturating_add(self.offset);
         let frames = Frames::try_from(out.len() / CHANNELS).unwrap_or(0);
         let end = start.saturating_add(frames);
 
@@ -271,6 +291,27 @@ mod tests {
 
         let mix = Mix::new(&project, &pool);
         assert_eq!(render(&mix, 2, 4), [0.75, 0.75, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn an_excerpt_plays_its_stretch_of_the_mix_from_its_frame_0() {
+        let mut project = Project::default();
+        let track = project.import("ramp.wav".into(), 100, "r".to_owned());
+        let source = project.track(track).unwrap().clips[0].source;
+        let pool = AudioPool::from([(source, ramp(100))]);
+        let mix = Mix::new(&project, &pool);
+        let excerpt = mix.excerpt(TimeRange { start: 40, end: 60 });
+        assert_eq!(excerpt.length(), 20);
+        assert_eq!(render(&excerpt, 0, 20), render(&mix, 40, 20));
+        // Past the end of the mix, an excerpt is cut short.
+        assert_eq!(
+            mix.excerpt(TimeRange {
+                start: 90,
+                end: 200
+            })
+            .length(),
+            10
+        );
     }
 
     #[test]
