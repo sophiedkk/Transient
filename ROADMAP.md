@@ -41,7 +41,9 @@ dialog, dark mode (Libadwaita), error toasts.
 - [ ] **Preferences dialog** (e.g. default export format).
 - [x] **Export a selection**: the export dialog offers Whole Project or
       Selection (the selected stretch on the selected tracks).
-- [ ] **"Locate…" for missing audio files** in the missing-files banner.
+- [ ] **"Locate…" for missing audio files** in the missing-files banner. Only
+      projects saved before format 2 (and audio that was missing when saving)
+      can still lack audio, so this matters much less now.
 - [x] **Keyboard focus and accessibility pass**: the timeline is usable from
       the keyboard (arrows like a text cursor, Up/Down for tracks), every icon
       button has an accessible name, and the timeline describes and announces
@@ -101,8 +103,8 @@ Requested 2026-11-04: recording comes before 1.0, not after.
       recording.
 - [ ] **Play the other tracks while recording** (overdubbing), so a voice can be
       recorded over music; later, correct for the delay between them.
-- [ ] **Where takes are stored**: decide together with the project file question
-      under "Publishing" (a project folder would hold its recordings).
+- [ ] **Where takes are stored**: in the project file, like imported audio (as
+      FLAC), since projects hold their audio (decided 2026-11-04).
 - [ ] **Permissions**: there is no portal for the microphone yet, so the
       Flatpak needs PulseAudio/PipeWire access (`--socket=pulseaudio`), which
       Flathub accepts for audio apps; note it in the submission.
@@ -136,11 +138,12 @@ written with an AI agent):
 - [ ] **Development history**: Flathub wants sustained commits, tagged
       releases, real-world use and a commitment to maintenance. Tag releases
       regularly (0.1, 0.2, …) and use Transient for real work before 1.0.
-- [ ] **Permissions**: static permissions must be minimal, and portals are
-      mandatory where they cover the use case. A `.transient` project refers to
-      audio files by path, which the file chooser portal does not cover. Decide
-      before 1.0: a justified exception (for example `--filesystem=xdg-music`),
-      or a project format that keeps its audio inside the project folder.
+- [x] **Project files hold their audio** (decided 2026-11-04, like Audacity's
+      `.aup3`): a `.transient` file is a ZIP with the project and its audio as
+      is, so the file chooser portal covers opening and saving.
+- [ ] **Drop `--filesystem=home`** from the Flatpak, once checked by hand in
+      the installed Flatpak that opening, saving, recent projects and "Open
+      With" from Files work through the portal alone.
 - [ ] **MetaInfo**: screenshots, a `<releases>` list, a content rating
       (OARS), brand colours; must pass validation (already checked by
       `meson test`).

@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+tempfile.workspace = true
 transient-core.workspace = true
 transient-engine.workspace = true
 anyhow.workspace = true

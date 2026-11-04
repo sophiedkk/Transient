@@ -66,11 +66,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   letting the peak pass −1 dBFS.
 - Projects: New (Ctrl+N), Open (Ctrl+O), Save (Ctrl+S) and Save As
   (Shift+Ctrl+S) for `.transient` project files, also opened from the command
-  line, from Files and from the recent projects on the start screen. Audio
-  files inside the project folder are stored with relative paths, so the folder
-  can be moved. A "•" in the title marks unsaved changes; closing, quitting or
-  starting a new project asks to save them. Missing audio files are reported in
-  a banner and their clips stay, greyed out.
+  line, from Files and from the recent projects on the start screen. A project
+  file holds a copy of all its audio (as imported: an MP3 stays an MP3), so it
+  can be moved, backed up or shared as one file and never loses its audio.
+  A "•" in the title marks unsaved changes; closing, quitting or starting a new
+  project asks to save them. Projects from before this change still open (and
+  take in their audio when saved); audio missing there is reported in a
+  banner and its clips stay, greyed out.
 - Export (Ctrl+E, header bar button or menu): the whole mix to WAV or FLAC
   (16/24-bit), MP3, Opus or Ogg Vorbis, with a progress bar and Stop; a toast
   offers "Show in Folder". `transient-cli export` exports projects or files

@@ -1,8 +1,11 @@
 //! Project files: new, open, save, save as, unsaved changes and recent projects.
 //!
-//! A project file (`.transient`) is the project as JSON. Audio files inside the
-//! project's folder are stored with relative paths, so a project folder can be
-//! moved or copied as a whole. The audio itself is never copied into the project.
+//! A project file (`.transient`) holds the project and a copy of all its audio
+//! (see `transient_core::archive`), so it can be moved, backed up or shared as
+//! one file, and never loses its audio. Opening unpacks the audio into a
+//! temporary folder in the user's cache, which is deleted again when the window
+//! closes or opens another project. Saving and opening run on a background
+//! thread: copying audio can take a moment.
 //!
 //! Unsaved changes are found by comparing the project with the one last saved
 //! (or opened). Closing or replacing a project with unsaved changes asks first:
@@ -16,6 +19,7 @@ use adw::subclass::prelude::*;
 use gettextrs::{gettext, ngettext};
 use gtk::{gio, glib};
 use tracing::{info, warn};
+use transient_core::archive;
 use transient_core::project::Project;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::decode_file;
@@ -82,36 +86,40 @@ impl Window {
         }
     }
 
-    /// Writes the project to `file` (used by `--save-to` too).
+    /// Writes the project, with its audio, to `file` (used by `--save-to` too).
     pub(crate) async fn write_project(&self, file: &gio::File) -> bool {
         let imp = self.imp();
-        let Some(folder) = file.parent().and_then(|parent| parent.path()) else {
+        let Some(path) = file.path() else {
             self.show_toast(&gettext("Projects can only be saved on this computer"));
             return false;
         };
         let project = imp.project.borrow().clone();
-        let json = match project.with_paths_relative_to(&folder).to_json() {
-            Ok(json) => json,
-            Err(error) => {
-                warn!("could not serialize the project: {error}");
+        let to_save = project.clone();
+        let result = gio::spawn_blocking(move || archive::save(&to_save, &path)).await;
+        let not_included = match result {
+            Ok(Ok(not_included)) => not_included,
+            Ok(Err(error)) => {
+                warn!("could not save to {}: {error}", file.uri());
+                self.show_toast(&gettext("Could not save the project"));
+                return false;
+            }
+            Err(_) => {
+                warn!("saving {} stopped unexpectedly", file.uri());
                 self.show_toast(&gettext("Could not save the project"));
                 return false;
             }
         };
-        // replace_contents writes to a temporary file first, so a failed save
-        // never leaves a half-written project behind.
-        let result = file
-            .replace_contents_future(
-                json.into_bytes(),
-                None,
-                false,
-                gio::FileCreateFlags::REPLACE_DESTINATION,
-            )
-            .await;
-        if let Err((_, error)) = result {
-            warn!("could not save to {}: {error}", file.uri());
-            self.show_toast(&gettext("Could not save the project"));
-            return false;
+        if !not_included.is_empty() {
+            // Audio that was missing already: the project still points at it.
+            let count = u32::try_from(not_included.len()).unwrap_or(u32::MAX);
+            self.show_toast(
+                &ngettext(
+                    "Saved without {} missing audio file",
+                    "Saved without {} missing audio files",
+                    count,
+                )
+                .replace("{}", &not_included.len().to_string()),
+            );
         }
         info!("saved {}", file.uri());
         imp.saved_project.replace(project);
@@ -145,29 +153,44 @@ impl Window {
     /// cannot be found are reported in a banner; their clips stay, greyed out.
     pub(crate) async fn open_project(&self, file: &gio::File) {
         let imp = self.imp();
-        let (Some(path), Some(folder)) = (file.path(), file.parent().and_then(|p| p.path())) else {
+        let Some(path) = file.path() else {
             self.show_toast(&gettext("Only projects on this computer can be opened"));
             return;
         };
-        let project = match std::fs::read_to_string(&path)
-            .map_err(|error| error.to_string())
-            .and_then(|json| Project::from_json(&json).map_err(|error| error.to_string()))
-        {
-            Ok(project) => project.with_paths_resolved_from(&folder),
+        info!("opening project {}", path.display());
+        let previous_page = imp.stack.visible_child_name();
+        imp.loading_page
+            .set_title(&gettext("Opening “{}”").replace("{}", &display_name(&path)));
+        imp.stack.set_visible_child_name("loading");
+
+        let opened = match new_project_cache() {
+            Ok(cache) => {
+                let (file_path, cache_path) = (path.clone(), cache.path().to_owned());
+                gio::spawn_blocking(move || archive::open(&file_path, &cache_path))
+                    .await
+                    // The thread panicked; its payload says nothing useful to show.
+                    .map_err(|_panic| "opening stopped unexpectedly".to_owned())
+                    .and_then(|result| result.map_err(|error| error.to_string()))
+                    .map(|project| (project, cache))
+            }
+            Err(error) => Err(format!("no folder for its audio: {error}")),
+        };
+        let (project, cache) = match opened {
+            Ok(opened) => opened,
             Err(error) => {
                 warn!("could not open {}: {error}", path.display());
+                if let Some(page) = previous_page {
+                    imp.stack.set_visible_child_name(&page);
+                }
                 self.show_toast(
                     &gettext("Could not open “{}”").replace("{}", &display_name(&path)),
                 );
                 return;
             }
         };
-        info!("opening project {}", path.display());
-
-        imp.loading_page
-            .set_title(&gettext("Opening “{}”").replace("{}", &display_name(&path)));
-        imp.stack.set_visible_child_name("loading");
         let (sources, missing) = load_sources(&project).await;
+        // The old project's unpacked audio is deleted with its folder.
+        imp.project_cache.replace(Some(cache));
 
         imp.project.replace(project.clone());
         imp.saved_project.replace(project);
@@ -192,6 +215,7 @@ impl Window {
         imp.sources.replace(LoadedSources::new());
         imp.file.replace(None);
         imp.history.take();
+        imp.project_cache.replace(None);
         self.clear_clipboard();
         self.select(None);
         self.show_missing_sources(&[]);
@@ -295,6 +319,73 @@ impl Window {
 }
 
 /// Decodes a project's sources in the background. Returns the decoded ones and
+/// The folder holding an open project's unpacked audio. It is deleted when this
+/// is dropped (another project opened, the window closed). While it exists, the
+/// `in-use` file in it is locked, so another Transient never removes it (see
+/// [`remove_unused_project_caches`]).
+#[derive(Debug)]
+pub(super) struct ProjectCache {
+    // Fields drop in order: unlock first, then delete the folder.
+    _lock: std::fs::File,
+    folder: tempfile::TempDir,
+}
+
+impl ProjectCache {
+    fn path(&self) -> &Path {
+        self.folder.path()
+    }
+}
+
+/// Where the unpacked audio of open projects goes: `~/.cache/transient`.
+fn cache_base() -> PathBuf {
+    glib::user_cache_dir().join("transient")
+}
+
+/// A new, empty, locked folder for an opened project's audio.
+fn new_project_cache() -> std::io::Result<ProjectCache> {
+    let base = cache_base();
+    std::fs::create_dir_all(&base)?;
+    let folder = tempfile::Builder::new()
+        .prefix("project-")
+        .tempdir_in(base)?;
+    let lock = std::fs::File::create(folder.path().join(IN_USE_FILE))?;
+    lock.try_lock().map_err(std::io::Error::other)?;
+    Ok(ProjectCache {
+        _lock: lock,
+        folder,
+    })
+}
+
+/// The file in a project cache folder that its owner keeps locked.
+const IN_USE_FILE: &str = "in-use";
+
+/// Removes project cache folders left behind by a Transient that did not get
+/// to clean up (it quit abruptly). A folder is only removed when nobody holds
+/// the lock on its `in-use` file, so folders of running Transients stay.
+pub(crate) fn remove_unused_project_caches() {
+    let Ok(entries) = std::fs::read_dir(cache_base()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let folder = entry.path();
+        let is_project = entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| name.starts_with("project-"));
+        if !is_project {
+            continue;
+        }
+        let unused = std::fs::File::open(folder.join(IN_USE_FILE))
+            .map_or(true, |file| file.try_lock().is_ok());
+        if unused {
+            match std::fs::remove_dir_all(&folder) {
+                Ok(()) => info!("removed unused {}", folder.display()),
+                Err(error) => warn!("could not remove {}: {error}", folder.display()),
+            }
+        }
+    }
+}
+
 /// the paths that could not be read.
 async fn load_sources(project: &Project) -> (LoadedSources, Vec<PathBuf>) {
     let wanted: Vec<_> = project

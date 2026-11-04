@@ -40,6 +40,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 anyhow = "1"
+# Project files are ZIP archives holding the project and its audio. Everything
+# is stored uncompressed (audio is compressed already; project.json is tiny), so
+# no compression features (and their extra dependencies) are needed.
+zip = { version = "9.3", default-features = false }
+# Writing a file next to its destination and renaming it over it (safe saving).
+tempfile = "3"
 
 # Command line (transient-cli)
 clap = { version = "4", features = ["derive"] }
@@ -51,7 +57,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Testing (dev-dependencies only)
 insta = { version = "1", features = ["json"] }
 proptest = "1"
-tempfile = "3"
 
 # Lints are configured once here and inherited by every crate (`[lints] workspace = true`).
 # Clippy groups sit at priority -1 so the individual lints below can override them.

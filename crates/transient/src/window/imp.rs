@@ -102,6 +102,9 @@ pub(crate) struct Window {
     pub(super) updating_controls: Cell<bool>,
     /// The "Clip deleted" toast, closed when the deletion is undone.
     pub(super) undo_toast: RefCell<Option<adw::Toast>>,
+    /// The open project's audio, unpacked from its file (see `file.rs`). The
+    /// folder is deleted when this is replaced or the window closes.
+    pub(super) project_cache: RefCell<Option<super::file::ProjectCache>>,
     /// What Cut or Copy took (see `clipboard.rs`).
     pub(super) clipboard: RefCell<Option<transient_core::clipboard::Clipboard>>,
     /// The time selection (see `selection.rs`).

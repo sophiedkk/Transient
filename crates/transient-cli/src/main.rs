@@ -204,15 +204,13 @@ fn export(input: &[PathBuf], output: &Path) -> anyhow::Result<ExportReport> {
     })
 }
 
-/// Opens a saved project and decodes its sources, like the app does.
+/// Opens a saved project and decodes its sources, like the app does. The audio
+/// is unpacked into a temporary folder, deleted again when the decoding is done.
 fn open_project(file: &Path) -> anyhow::Result<(Project, AudioPool)> {
-    let json =
-        std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
-    let folder = std::path::absolute(file)?
-        .parent()
-        .map(Path::to_owned)
-        .unwrap_or_default();
-    let project = Project::from_json(&json)?.with_paths_resolved_from(&folder);
+    let cache = tempfile::tempdir().context("creating a folder for the project's audio")?;
+    let file = std::path::absolute(file)?;
+    let project = transient_core::archive::open(&file, cache.path())
+        .with_context(|| format!("reading {}", file.display()))?;
     let mut pool = AudioPool::new();
     for source in &project.sources {
         let decoded = decode_file(&source.path, project.sample_rate)

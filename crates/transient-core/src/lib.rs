@@ -3,6 +3,7 @@
 //! This crate deliberately knows nothing about GTK or GStreamer. Everything in it
 //! is plain Rust, which keeps it fast to compile and easy to test.
 
+pub mod archive;
 pub mod audio;
 pub mod clipboard;
 pub mod edit;

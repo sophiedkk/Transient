@@ -37,8 +37,11 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   inside the clip; trims and splits preserve that). `Mix` applies equal-power
   fades (`fade_shape`). `transient-core::normalize` computes peak/LUFS gains
   (ebur128). The clip pane (`window/clip_pane.rs`, F9) edits the selected clip.
-- Project files (`window/file.rs`): `.transient` JSON; `Project::with_paths_relative_to`
-  / `with_paths_resolved_from` make sources inside the project folder relative.
+- Project files (`window/file.rs`, `transient-core::archive`): a `.transient` file is
+  a ZIP with `project.json` and the audio as is (`audio/<source id>/<name>`).
+  Opening unpacks the audio into a locked folder in `~/.cache/transient` (deleted
+  with the window's `ProjectCache`; unlocked leftovers are removed at startup).
+  Old format-1 files (plain JSON with paths) still open.
   Unsaved changes = `project != saved_project`. Closing, quitting (app.quit closes
   each window) and New/Open ask "Save Changes?" via `confirm_discard_changes`.
   Clips whose audio is missing stay, drawn grey (`LaneClip::waveform` is `None`).

@@ -44,7 +44,7 @@ glib::wrapper! {
                     gtk::ConstraintTarget, gtk::Native, gtk::Root, gtk::ShortcutManager;
 }
 
-pub(crate) use file::is_project_file;
+pub(crate) use file::{is_project_file, remove_unused_project_caches};
 
 impl Window {
     /// Creates a new main window for `app`.

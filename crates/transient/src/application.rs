@@ -71,6 +71,9 @@ fn present_window(
 /// Shortcuts follow the GNOME HIG's standard keys where one exists.
 /// Keep resources/ui/shortcuts-dialog.blp in sync with this list.
 fn setup_actions(app: &adw::Application) {
+    // Unpacked audio left behind by a Transient that quit abruptly.
+    crate::window::remove_unused_project_caches();
+
     // Quit by closing every window, so each can ask about unsaved changes first;
     // the application ends by itself once the last window is gone.
     let quit = gio::ActionEntry::builder("quit")

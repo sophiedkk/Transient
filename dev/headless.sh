@@ -3,7 +3,7 @@
 # can be started, screenshotted and tested without a window appearing on screen.
 # It gets its own D-Bus session, so it cannot interfere with your desktop,
 # in-memory settings, so it does not change the saved window size, and its own
-# data folder, so it does not add to your recent files.
+# data and cache folders, so it does not add to your recent files or your cache.
 #
 #   dev/headless.sh cargo run -p transient -- --screenshot=target/screenshot.png
 #
@@ -34,11 +34,13 @@ if [ -n "${HEADLESS_KEYS:-}" ]; then
 fi
 
 display="transient-headless-$$"
-# A throwaway data folder, so test runs do not add to your recent files.
+# Throwaway data and cache folders, so test runs do not add to your recent
+# files or leave unpacked project audio in your cache.
 data_home="$(mktemp -d)"
-trap 'rm -rf "$data_home"' EXIT
+cache_home="$(mktemp -d)"
+trap 'rm -rf "$data_home" "$cache_home"' EXIT
 dbus-run-session -- \
     mutter --headless --no-x11 --virtual-monitor 1280x800 --wayland-display="$display" \
     -- env GTK_A11Y=none GDK_DEBUG=no-portals ADW_DISABLE_PORTAL=1 GSETTINGS_BACKEND=memory \
-    XDG_DATA_HOME="$data_home" "$@" \
+    XDG_DATA_HOME="$data_home" XDG_CACHE_HOME="$cache_home" "$@" \
     2> >(grep --line-buffered -v -E '^(libmutter-Message|\*\* Message|Gdk-Message: .*Broken pipe)' >&2)

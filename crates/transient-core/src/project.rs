@@ -24,7 +24,11 @@ use crate::time::{Frames, SampleRate};
 ///
 /// Raise it whenever a change means older versions of Transient could
 /// misread a new file. Files with a *higher* number are refused when opened.
-pub const FORMAT_VERSION: u32 = 1;
+///
+/// - 1: a plain JSON file, with paths to the audio files.
+/// - 2: a ZIP archive holding this JSON (`project.json`) and the audio
+///   (see [`crate::archive`]); source paths point into the archive.
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Defines a numeric ID type. Separate types for sources, tracks and clips mean
 /// the compiler refuses to mix them up.
@@ -334,7 +338,7 @@ mod tests {
         let json = project.to_json().unwrap();
         insta::assert_snapshot!(json, @r#"
         {
-          "format_version": 1,
+          "format_version": 2,
           "name": "",
           "sample_rate": 48000,
           "sources": [
