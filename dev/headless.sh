@@ -7,12 +7,30 @@
 #
 #   dev/headless.sh cargo run -p transient -- --screenshot=target/screenshot.png
 #
+# With HEADLESS_KEYS set, the keys are typed into the app once it has started
+# (after HEADLESS_KEYS_DELAY seconds, 4 by default), through dev/send-keys.py:
+#
+#   HEADLESS_KEYS="t e s t Return" dev/headless.sh target/debug/transient …
+#
 # Run inside the toolbox. Exits with 0 if the command succeeded, otherwise 1.
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
     echo "usage: dev/headless.sh COMMAND [ARGUMENTS…]" >&2
     exit 2
+fi
+
+if [ -n "${HEADLESS_KEYS:-}" ]; then
+    # Run the command in the background and type the keys into it.
+    send_keys="$(dirname "$0")/send-keys.py"
+    set -- bash -c 'set -u
+        "$@" &
+        app=$!
+        sleep "${HEADLESS_KEYS_DELAY:-4}"
+        # The keys are separate words on purpose.
+        # shellcheck disable=SC2086
+        python3 -I "$0" $HEADLESS_KEYS
+        wait "$app"' "$send_keys" "$@"
 fi
 
 display="transient-headless-$$"

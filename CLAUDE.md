@@ -55,8 +55,10 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 - Header bar: few icon buttons with tooltips, primary menu at the end. Transport
   controls go in a bottom bar; clip properties in a right utility pane (F9).
 - Standard shortcuts from the HIG (Ctrl+Z, Shift+Ctrl+Z, Ctrl+S, …); everything works
-  by keyboard. Keep `resources/ui/shortcuts-dialog.blp` in sync with
-  `src/application.rs`.
+  by keyboard. Shortcuts that could clash with typing (single keys, Ctrl+C/V/Z,
+  Delete, …) go in `src/window/shortcuts.rs` (run after the focused widget, so text
+  fields get their keys); only clash-free ones are app accels in `src/application.rs`.
+  Keep `resources/ui/shortcuts-dialog.blp` and the context menu in sync (tested).
 - Header capitalization for buttons and menus, sentence capitalization for labels;
   an ellipsis (…) only when more input follows. All UI text is translatable
   (`_()` in Blueprint, `gettext()` in Rust) and listed in `po/POTFILES.in`.
@@ -125,6 +127,11 @@ just test-audio                                 # decode the whole test collecti
   `.transient` file opens it — together they test a full save/open round trip.
   `--export-to=FILE.ext` exports through the app's export path. With `--play`, the level meter (red = clipping)
   shows whether the mix is as loud as expected.
+- Typing and real key presses: `HEADLESS_KEYS="t e s t Return Control_L+s"
+  just headless …` types GDK key names into the app ~4 s after it starts
+  (`dev/send-keys.py`, mutter's RemoteDesktop API; "+" = keys together). Use it
+  for anything keyboard-related (shortcuts, text fields), then check the saved
+  project or log; e.g. `--action=rename-track` first, then type a name.
   Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
   and `transient-core::range` (unit- and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.

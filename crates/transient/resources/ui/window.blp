@@ -566,21 +566,25 @@ menu timeline_menu {
     item {
       label: _("Cu_t");
       action: "win.cut";
+      accel: "<Control>x";
     }
 
     item {
       label: _("_Copy");
       action: "win.copy";
+      accel: "<Control>c";
     }
 
     item {
       label: _("_Paste");
       action: "win.paste";
+      accel: "<Control>v";
     }
 
     item {
       label: _("Paste and _Make Room");
       action: "win.paste-insert";
+      accel: "<Shift><Control>v";
     }
   }
 
@@ -588,16 +592,19 @@ menu timeline_menu {
     item {
       label: _("_Split");
       action: "win.split";
+      accel: "s";
     }
 
     item {
       label: _("_Delete");
       action: "win.delete-clip";
+      accel: "Delete";
     }
 
     item {
       label: _("Delete and Close _Gap");
       action: "win.ripple-delete";
+      accel: "<Control>Delete";
     }
   }
 
@@ -612,6 +619,7 @@ menu timeline_menu {
     item {
       label: _("Select _All");
       action: "win.select-all";
+      accel: "<Control>a";
     }
   }
 }

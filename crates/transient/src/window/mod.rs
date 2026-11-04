@@ -23,6 +23,7 @@ mod import;
 mod mixer;
 mod project;
 mod selection;
+mod shortcuts;
 mod transport;
 
 use std::path::Path;

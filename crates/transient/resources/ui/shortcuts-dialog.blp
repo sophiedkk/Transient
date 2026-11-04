@@ -5,19 +5,19 @@ translation-domain "transient";
 
 // Libadwaita shows this dialog for the app.shortcuts action (Ctrl+?).
 // The object id must be `shortcuts_dialog`. Keep this list in sync with
-// the accelerators set in src/application.rs.
+// the accelerators set in src/application.rs and src/window/shortcuts.rs.
 Adw.ShortcutsDialog shortcuts_dialog {
   Adw.ShortcutsSection {
     title: _("Playback");
 
     Adw.ShortcutsItem {
       title: _("Play or Pause");
-      action-name: "win.play-pause";
+      accelerator: "space";
     }
 
     Adw.ShortcutsItem {
       title: _("Go to Start");
-      action-name: "win.go-to-start";
+      accelerator: "Home";
     }
   }
 
@@ -26,72 +26,72 @@ Adw.ShortcutsDialog shortcuts_dialog {
 
     Adw.ShortcutsItem {
       title: _("Undo");
-      action-name: "win.undo";
+      accelerator: "<Control>z";
     }
 
     Adw.ShortcutsItem {
       title: _("Redo");
-      action-name: "win.redo";
+      accelerator: "<Shift><Control>z";
     }
 
     Adw.ShortcutsItem {
       title: _("Split at Playhead or Selection");
-      action-name: "win.split";
+      accelerator: "s";
     }
 
     Adw.ShortcutsItem {
       title: _("Delete Clip or Selection");
-      action-name: "win.delete-clip";
+      accelerator: "Delete";
     }
 
     Adw.ShortcutsItem {
       title: _("Delete and Close Gap");
-      action-name: "win.ripple-delete";
+      accelerator: "<Control>Delete";
     }
 
     Adw.ShortcutsItem {
       title: _("Select All");
-      action-name: "win.select-all";
+      accelerator: "<Control>a";
     }
 
     Adw.ShortcutsItem {
       title: _("Cut");
-      action-name: "win.cut";
+      accelerator: "<Control>x";
     }
 
     Adw.ShortcutsItem {
       title: _("Copy");
-      action-name: "win.copy";
+      accelerator: "<Control>c";
     }
 
     Adw.ShortcutsItem {
       title: _("Paste");
-      action-name: "win.paste";
+      accelerator: "<Control>v";
     }
 
     Adw.ShortcutsItem {
       title: _("Paste and Make Room");
-      action-name: "win.paste-insert";
+      accelerator: "<Shift><Control>v";
     }
 
     Adw.ShortcutsItem {
       title: _("Move Clip Left");
-      action-name: "win.nudge-left";
+      accelerator: "<Control>Left";
     }
 
     Adw.ShortcutsItem {
       title: _("Move Clip Right");
-      action-name: "win.nudge-right";
+      accelerator: "<Control>Right";
     }
 
     Adw.ShortcutsItem {
       title: _("Deselect");
-      action-name: "win.deselect";
+      accelerator: "Escape";
     }
 
     Adw.ShortcutsItem {
       title: _("Show Context Menu");
-      action-name: "win.context-menu";
+      accelerator: "Menu <Shift>F10";
     }
   }
 
@@ -105,12 +105,12 @@ Adw.ShortcutsDialog shortcuts_dialog {
 
     Adw.ShortcutsItem {
       title: _("Move Track Up");
-      action-name: "win.move-track-up";
+      accelerator: "<Alt>Up";
     }
 
     Adw.ShortcutsItem {
       title: _("Move Track Down");
-      action-name: "win.move-track-down";
+      accelerator: "<Alt>Down";
     }
   }
 
@@ -119,12 +119,12 @@ Adw.ShortcutsDialog shortcuts_dialog {
 
     Adw.ShortcutsItem {
       title: _("Mute Track of Selected Clip");
-      action-name: "win.toggle-mute";
+      accelerator: "m";
     }
 
     Adw.ShortcutsItem {
       title: _("Solo Track of Selected Clip");
-      action-name: "win.toggle-solo";
+      accelerator: "<Shift>m";
     }
   }
 

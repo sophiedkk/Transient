@@ -250,6 +250,7 @@ impl ObjectImpl for Window {
         window.setup_transport();
         window.setup_editing();
         window.setup_time_selection();
+        window.setup_shortcuts();
         window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();
