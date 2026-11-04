@@ -137,7 +137,7 @@ pub fn decode_file(path: &Path, sample_rate: SampleRate) -> Result<DecodedAudio,
 }
 
 /// The caps (GStreamer's word for "format description") Transient wants.
-fn target_caps(sample_rate: SampleRate) -> Result<gstreamer::Caps, EngineError> {
+pub(crate) fn target_caps(sample_rate: SampleRate) -> Result<gstreamer::Caps, EngineError> {
     let channels = u32::try_from(CHANNELS).unwrap_or(2);
     let info = gstreamer_audio::AudioInfo::builder(
         gstreamer_audio::AudioFormat::F32le,

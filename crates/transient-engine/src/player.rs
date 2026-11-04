@@ -280,7 +280,7 @@ impl Drop for Player {
 
 /// Reads a `level` message: the "decay" field holds the peak level per channel in
 /// dBFS, falling back slowly after a peak, which makes a calm meter.
-fn read_levels(structure: &gstreamer::StructureRef) -> Option<[f64; CHANNELS]> {
+pub(crate) fn read_levels(structure: &gstreamer::StructureRef) -> Option<[f64; CHANNELS]> {
     if structure.name() != "level" {
         return None;
     }
