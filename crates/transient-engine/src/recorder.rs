@@ -34,9 +34,10 @@ const LEVEL_INTERVAL: Duration = Duration::from_millis(50);
 const STOP_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Where to record from.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Input {
     /// The input chosen in the system's sound settings.
+    #[default]
     Default,
     /// A specific device (see [`inputs`]).
     Device(InputDevice),

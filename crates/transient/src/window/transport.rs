@@ -45,16 +45,31 @@ impl Window {
 
     /// Plays if paused, pauses if playing (the `win.play-pause` action, Space).
     pub(crate) fn toggle_playback(&self) {
+        // While recording, Space stops the recording (and with it, playback).
+        if self.is_recording() {
+            self.toggle_recording();
+            return;
+        }
+        let playing = self
+            .imp()
+            .player
+            .borrow()
+            .as_ref()
+            .is_some_and(Player::is_playing);
+        self.set_playing(!playing);
+    }
+
+    /// Starts or pauses playback (if there is anything to play).
+    pub(super) fn set_playing(&self, play: bool) {
         let result = {
             let mut player = self.imp().player.borrow_mut();
             let Some(player) = player.as_mut() else {
                 return;
             };
-            if player.is_playing() {
-                player.pause()
-            } else {
-                player.play()
+            if play == player.is_playing() {
+                return;
             }
+            if play { player.play() } else { player.pause() }
         };
         if let Err(error) = result {
             warn!("playback failed: {error}");
@@ -90,9 +105,16 @@ impl Window {
     /// Brings the controls up to date with the player, and handles its events.
     fn update_transport(&self) {
         let imp = self.imp();
+        // While recording, the meter shows the input instead of the output.
+        let recording = self.is_recording();
+        let input_levels = self.poll_recording();
         let (state, events) = {
             let mut player = imp.player.borrow_mut();
             let Some(player) = player.as_mut() else {
+                if recording {
+                    drop(player);
+                    self.update_level_meter(input_levels);
+                }
                 return;
             };
             let events = player.poll_events();
@@ -105,7 +127,7 @@ impl Window {
             (state, events)
         };
         let (position, rate, playing, levels) = state;
-        self.update_level_meter(levels);
+        self.update_level_meter(if recording { input_levels } else { levels });
 
         for event in events {
             if let PlayerEvent::Error(message) = event {

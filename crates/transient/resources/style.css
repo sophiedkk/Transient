@@ -26,3 +26,9 @@
 .level-meter.clipping levelbar block.filled {
   background-color: var(--destructive-bg-color);
 }
+
+/* The Record button: a red record icon (red is the convention for recording).
+   While recording it becomes a red "destructive-action" Stop button. */
+.record-button:not(.destructive-action) {
+  color: var(--destructive-color);
+}

@@ -411,6 +411,21 @@ template $TransientWindow: Adw.ApplicationWindow {
           }
         }
 
+        // Turns into a red Stop button while recording (see recording.rs).
+        Button record_button {
+          icon-name: "media-record-symbolic";
+          tooltip-text: _("Record");
+          action-name: "win.record";
+
+          styles [
+            "record-button",
+          ]
+
+          accessibility {
+            label: _("Record");
+          }
+        }
+
         Label position_label {
           label: "0:00.000";
 

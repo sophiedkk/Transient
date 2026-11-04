@@ -54,6 +54,8 @@ pub(crate) struct LaunchOptions {
     /// Add every clip playing at these positions (seconds) to the selection, as
     /// Ctrl+click would, before the actions.
     pub(crate) select_clips_at: Vec<f64>,
+    /// Record a test tone for this many seconds after the actions (for tests).
+    pub(crate) record_for: Option<u32>,
     /// Window actions to run after opening, in order (for example "split").
     pub(crate) actions: Vec<String>,
     /// Save the project to this file after the actions.
@@ -62,106 +64,125 @@ pub(crate) struct LaunchOptions {
     pub(crate) export_to: Option<PathBuf>,
 }
 
+/// One command-line option, as GApplication registers it (and `--help` lists it).
+struct Opt {
+    name: &'static str,
+    /// A one-letter alias (`-p`), if any.
+    short: Option<u8>,
+    arg: glib::OptionArg,
+    help: &'static str,
+    /// What `--help` calls the value (`--seek=SECONDS`).
+    arg_name: Option<&'static str>,
+}
+
+/// Every command-line option, in the order `--help` lists them.
+const OPTIONS: &[Opt] = &[
+    Opt {
+        name: "play",
+        short: Some(b'p'),
+        arg: glib::OptionArg::None,
+        help: "Start playing once the file is open",
+        arg_name: None,
+    },
+    Opt {
+        name: "silent",
+        short: None,
+        arg: glib::OptionArg::None,
+        help: "Play without sound output (for tests)",
+        arg_name: None,
+    },
+    Opt {
+        name: "screenshot",
+        short: None,
+        arg: glib::OptionArg::Filename,
+        help: "Save a PNG image of the window to FILE, then quit",
+        arg_name: Some("FILE"),
+    },
+    Opt {
+        name: "seek",
+        short: None,
+        arg: glib::OptionArg::Double,
+        help: "Move the playhead to SECONDS after opening",
+        arg_name: Some("SECONDS"),
+    },
+    Opt {
+        name: "zoom",
+        short: None,
+        arg: glib::OptionArg::Int,
+        help: "Zoom in STEPS times after opening",
+        arg_name: Some("STEPS"),
+    },
+    Opt {
+        name: "select",
+        short: None,
+        arg: glib::OptionArg::String,
+        help: "Select START..END seconds on every track before the actions",
+        arg_name: Some("START..END"),
+    },
+    Opt {
+        name: "select-clips-at",
+        short: None,
+        arg: glib::OptionArg::StringArray,
+        help: "Add every clip playing at SECONDS to the selection (repeatable)",
+        arg_name: Some("SECONDS"),
+    },
+    Opt {
+        name: "record-for",
+        short: None,
+        arg: glib::OptionArg::Int,
+        help: "Record a test tone for SECONDS (instead of a microphone) after the actions",
+        arg_name: Some("SECONDS"),
+    },
+    Opt {
+        name: "action",
+        short: None,
+        arg: glib::OptionArg::StringArray,
+        help: "Run the window action NAME after opening (repeatable), for example split or undo",
+        arg_name: Some("NAME"),
+    },
+    Opt {
+        name: "save-to",
+        short: None,
+        arg: glib::OptionArg::Filename,
+        help: "Save the project to FILE after the actions",
+        arg_name: Some("FILE"),
+    },
+    Opt {
+        name: "export-to",
+        short: None,
+        arg: glib::OptionArg::Filename,
+        help: "Export the mix to FILE (wav, flac, mp3, opus or ogg) after the actions",
+        arg_name: Some("FILE"),
+    },
+    Opt {
+        name: "screenshot-delay",
+        short: None,
+        arg: glib::OptionArg::Int,
+        help: "Wait SECONDS before taking the screenshot",
+        arg_name: Some("SECONDS"),
+    },
+    Opt {
+        name: "quit-after",
+        short: None,
+        arg: glib::OptionArg::Int,
+        help: "Quit after SECONDS",
+        arg_name: Some("SECONDS"),
+    },
+];
+
 impl LaunchOptions {
     /// Registers the options with GApplication, which then also lists them in `--help`.
     pub(crate) fn register(app: &adw::Application) {
-        let none = glib::OptionFlags::NONE;
-        app.add_main_option(
-            "play",
-            glib::Char::from(b'p'),
-            none,
-            glib::OptionArg::None,
-            "Start playing once the file is open",
-            None,
-        );
-        app.add_main_option(
-            "silent",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::None,
-            "Play without sound output (for tests)",
-            None,
-        );
-        app.add_main_option(
-            "screenshot",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Filename,
-            "Save a PNG image of the window to FILE, then quit",
-            Some("FILE"),
-        );
-        app.add_main_option(
-            "seek",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Double,
-            "Move the playhead to SECONDS after opening",
-            Some("SECONDS"),
-        );
-        app.add_main_option(
-            "zoom",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Int,
-            "Zoom in STEPS times after opening",
-            Some("STEPS"),
-        );
-        app.add_main_option(
-            "select",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::String,
-            "Select START..END seconds on every track before the actions",
-            Some("START..END"),
-        );
-        app.add_main_option(
-            "select-clips-at",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::StringArray,
-            "Add every clip playing at SECONDS to the selection (repeatable)",
-            Some("SECONDS"),
-        );
-        app.add_main_option(
-            "action",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::StringArray,
-            "Run the window action NAME after opening (repeatable), for example split or undo",
-            Some("NAME"),
-        );
-        app.add_main_option(
-            "save-to",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Filename,
-            "Save the project to FILE after the actions",
-            Some("FILE"),
-        );
-        app.add_main_option(
-            "export-to",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Filename,
-            "Export the mix to FILE (wav, flac, mp3, opus or ogg) after the actions",
-            Some("FILE"),
-        );
-        app.add_main_option(
-            "screenshot-delay",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Int,
-            "Wait SECONDS before taking the screenshot",
-            Some("SECONDS"),
-        );
-        app.add_main_option(
-            "quit-after",
-            glib::Char::from(0),
-            none,
-            glib::OptionArg::Int,
-            "Quit after SECONDS",
-            Some("SECONDS"),
-        );
+        for option in OPTIONS {
+            app.add_main_option(
+                option.name,
+                glib::Char::from(option.short.unwrap_or(0)),
+                glib::OptionFlags::NONE,
+                option.arg,
+                option.help,
+                option.arg_name,
+            );
+        }
     }
 
     /// Reads the options GApplication parsed from the command line.
@@ -191,6 +212,11 @@ impl LaunchOptions {
                 .ok()
                 .flatten()
                 .and_then(|text| parse_range(&text)),
+            record_for: dict
+                .lookup::<i32>("record-for")
+                .ok()
+                .flatten()
+                .and_then(|seconds| u32::try_from(seconds).ok()),
             select_clips_at: dict
                 .lookup::<Vec<String>>("select-clips-at")
                 .ok()
@@ -220,6 +246,7 @@ impl LaunchOptions {
             || self.zoom.is_some()
             || self.select.is_some()
             || !self.select_clips_at.is_empty()
+            || self.record_for.is_some()
             || !self.actions.is_empty()
             || self.save_to.is_some()
             || self.export_to.is_some()
@@ -261,6 +288,12 @@ impl LaunchOptions {
                 Ok(()) => info!("ran action {name}"),
                 Err(err) => error!("could not run action {name}: {err}"),
             }
+        }
+        if let Some(seconds) = self.record_for {
+            window.use_test_input();
+            window.toggle_recording();
+            glib::timeout_future_seconds(seconds).await;
+            window.stop_recording_now().await;
         }
         if let Some(path) = &self.save_to {
             let file = gio::File::for_path(std::path::absolute(path).unwrap_or(path.clone()));

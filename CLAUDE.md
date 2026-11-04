@@ -129,6 +129,8 @@ just test-audio                                 # decode the whole test collecti
   `toggle-clip-pane`, `new-project`, `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
   `.transient` file opens it — together they test a full save/open round trip.
   `--export-to=FILE.ext` exports through the app's export path.
+  `--record-for=SECONDS` records a test tone (no microphone needed) onto a new
+  track at the playhead, then continues with `--save-to` etc.
   `--screenshot-delay=SECONDS` waits before the screenshot (e.g. for keys typed
   with `HEADLESS_KEYS`; the headless window is never "active", so GTK's focus
   outline does not show there). With `--play`, the level meter (red = clipping)

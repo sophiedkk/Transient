@@ -336,6 +336,29 @@ impl ProjectCache {
     }
 }
 
+impl Window {
+    /// The folder for this project's own audio files that are not in a project
+    /// file yet (recordings): the project's cache folder, made if needed.
+    pub(super) fn audio_folder(&self) -> Option<PathBuf> {
+        let imp = self.imp();
+        if imp.project_cache.borrow().is_none() {
+            match new_project_cache() {
+                Ok(cache) => {
+                    imp.project_cache.replace(Some(cache));
+                }
+                Err(error) => {
+                    warn!("could not make a folder for new audio: {error}");
+                    return None;
+                }
+            }
+        }
+        imp.project_cache
+            .borrow()
+            .as_ref()
+            .map(|cache| cache.path().to_owned())
+    }
+}
+
 /// Where the unpacked audio of open projects goes: `~/.cache/transient`.
 fn cache_base() -> PathBuf {
     glib::user_cache_dir().join("transient")

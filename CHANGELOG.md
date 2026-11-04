@@ -99,6 +99,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--quit-after`, `--seek`, `--zoom`, `--action`, `--save-to`, `--export-to`; `transient-cli probe` decodes files and
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
+- Recording: the Record button (or R) records from the system's default input
+  onto a new track at the playhead, while the other tracks play along; the
+  level meter shows the input. Stop (or Space) ends the take, which is saved
+  as FLAC inside the project.
 - The timeline works from the keyboard: it gets focus when a project opens (or
   with Tab or a click); Left/Right move the playhead, Shift+Left/Right select
   time, Up/Down go to the track above or below and select the clip there, End

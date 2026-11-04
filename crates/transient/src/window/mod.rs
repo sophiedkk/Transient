@@ -22,6 +22,7 @@ mod imp;
 mod import;
 mod mixer;
 mod project;
+mod recording;
 mod selection;
 mod shortcuts;
 mod transport;

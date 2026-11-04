@@ -33,6 +33,8 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) start_page: TemplateChild<adw::StatusPage>,
     #[template_child]
+    pub(super) record_button: TemplateChild<gtk::Button>,
+    #[template_child]
     pub(super) split_button: TemplateChild<gtk::Button>,
     #[template_child]
     pub(super) delete_button: TemplateChild<gtk::Button>,
@@ -105,6 +107,10 @@ pub(crate) struct Window {
     /// The open project's audio, unpacked from its file (see `file.rs`). The
     /// folder is deleted when this is replaced or the window closes.
     pub(super) project_cache: RefCell<Option<super::file::ProjectCache>>,
+    /// The recording in progress, if any, and where to record from (see
+    /// `recording.rs`).
+    pub(super) recording: RefCell<Option<super::recording::Recording>>,
+    pub(super) record_input: RefCell<transient_engine::recorder::Input>,
     /// What Cut or Copy took (see `clipboard.rs`).
     pub(super) clipboard: RefCell<Option<transient_core::clipboard::Clipboard>>,
     /// The time selection (see `selection.rs`).
@@ -163,6 +169,7 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.deselect", None, |window, _, _| window.deselect_all());
         klass.install_action("win.select-all", None, |window, _, _| window.select_all());
+        klass.install_action("win.record", None, |window, _, _| window.toggle_recording());
         klass.install_action("win.cut", None, |window, _, _| window.cut());
         klass.install_action("win.copy", None, |window, _, _| {
             window.copy();

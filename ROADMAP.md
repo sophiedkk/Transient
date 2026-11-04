@@ -96,15 +96,19 @@ when needed instead of being managed by hand.
 
 Requested 2026-11-04: recording comes before 1.0, not after.
 
-- [ ] **Record onto a new track** at the playhead (a Record button in the
-      transport bar and a shortcut), with the level meter showing the input
-      while recording. Stop ends the take; it becomes an ordinary clip.
+- [x] **Record onto a new track** at the playhead (a Record button in the
+      transport bar and R), with the level meter showing the input while
+      recording. Stop (or Space) ends the take; it becomes an ordinary clip.
 - [ ] **Choose the input** (microphone, line in) and see its level before
       recording.
-- [ ] **Play the other tracks while recording** (overdubbing), so a voice can be
-      recorded over music; later, correct for the delay between them.
-- [ ] **Where takes are stored**: in the project file, like imported audio (as
-      FLAC), since projects hold their audio (decided 2026-11-04).
+- [x] **Play the other tracks while recording** (overdubbing), so a voice can be
+      recorded over music.
+- [ ] **Correct for the delay** between what plays and what is recorded
+      (latency), so overdubs line up exactly; measure it with a loopback test.
+- [ ] **Show the take growing** on the timeline while recording (now it
+      appears when recording stops).
+- [x] **Where takes are stored**: as FLAC in the project file, like imported
+      audio (decided 2026-11-04).
 - [ ] **Permissions**: there is no portal for the microphone yet, so the
       Flatpak needs PulseAudio/PipeWire access (`--socket=pulseaudio`), which
       Flathub accepts for audio apps; note it in the submission.

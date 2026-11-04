@@ -23,6 +23,7 @@ use super::Window;
 /// alternatives).
 pub(crate) const EDITING_SHORTCUTS: &[(&str, &str)] = &[
     ("win.play-pause", "space"),
+    ("win.record", "r"),
     ("win.go-to-start", "Home"),
     ("win.undo", "<Control>z"),
     ("win.redo", "<Shift><Control>z"),
