@@ -31,6 +31,8 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) loading_page: TemplateChild<adw::StatusPage>,
     #[template_child]
+    pub(super) start_page: TemplateChild<adw::StatusPage>,
+    #[template_child]
     pub(super) track_headers: TemplateChild<gtk::Box>,
     #[template_child]
     pub(super) timeline: TemplateChild<TimelineView>,
@@ -199,6 +201,8 @@ impl ObjectImpl for Window {
         if config::is_development() {
             window.add_css_class("devel");
         }
+        // The start page shows the app icon (striped for development builds).
+        self.start_page.set_icon_name(Some(config::APP_ID));
 
         if let Some(settings) = super::Window::open_settings() {
             self.settings.get_or_init(|| settings);

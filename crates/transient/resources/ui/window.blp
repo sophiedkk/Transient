@@ -213,8 +213,9 @@ template $TransientWindow: Adw.ApplicationWindow {
           Adw.ViewStackPage {
             name: "empty";
 
-            child: Adw.StatusPage {
-              icon-name: "audio-x-generic-symbolic";
+            // The icon is the app icon, set in code: its name is the app ID,
+            // which differs for development builds.
+            child: Adw.StatusPage start_page {
               title: _("Start a New Project");
               description: _("Import audio files to start mixing");
 

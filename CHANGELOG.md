@@ -75,5 +75,6 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `transient-cli mix` mixes them, both printing JSON.
 - Keyboard shortcuts dialog (Ctrl+?) and About dialog.
 - App icon: five waveform bars in the colours of the trans flag, the tall white
-  one in the middle being the "transient"; a matching symbolic icon.
+  one in the middle being the "transient"; a matching symbolic icon, and a
+  striped variant for development builds. The start screen shows the app icon.
 - The window remembers its size.

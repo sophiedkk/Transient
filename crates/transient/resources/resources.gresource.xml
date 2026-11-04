@@ -11,5 +11,9 @@
     <file>style.css</file>
     <!-- Libadwaita loads this file automatically and adds the app.shortcuts action (Ctrl+?). -->
     <file alias="shortcuts-dialog.ui" preprocess="xml-stripblanks">ui/shortcuts-dialog.ui</file>
+    <!-- The app icons (from data/icons). GTK looks for icons under the resource
+         base path's icons/ folder, so these work without installing Transient. -->
+    <file alias="icons/scalable/apps/io.github.sophiedkk.Transient.svg">io.github.sophiedkk.Transient.svg</file>
+    <file alias="icons/scalable/apps/io.github.sophiedkk.Transient.Devel.svg">io.github.sophiedkk.Transient.Devel.svg</file>
   </gresource>
 </gresources>

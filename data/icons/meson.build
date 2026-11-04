@@ -1,6 +1,7 @@
 # Icons are installed under the app ID, so the .Devel build gets its own copy.
+# Development builds get the striped icon, so the two installs are easy to tell apart.
 install_data(
-  'hicolor/scalable/apps' / base_id + '.svg',
+  'hicolor/scalable/apps' / application_id + '.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
   rename: application_id + '.svg',
 )

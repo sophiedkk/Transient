@@ -38,7 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     compile_blueprints(&out_dir)?;
 
     glib_build_tools::compile_resources(
-        &[PathBuf::from("resources"), out_dir],
+        // The app icons are bundled too (see the .gresource.xml), so the start
+        // page can show the icon even when Transient is not installed (`just run`).
+        &[
+            PathBuf::from("resources"),
+            out_dir,
+            PathBuf::from("../../data/icons/hicolor/scalable/apps"),
+        ],
         "resources/resources.gresource.xml",
         "transient.gresource",
     );
