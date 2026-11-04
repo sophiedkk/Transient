@@ -41,6 +41,27 @@ are what you look for when you cut audio, and the tall white bar in the middle
 of the icon is one. The icon's light blue, pink and white come from the
 transgender pride flag, which the name nods to as well.
 
+## How Transient is made
+
+Transient is largely written by an AI coding agent: **Claude Opus 5.5**, by
+Anthropic, used through **Claude Code**. That covers most of the Rust code and
+its tests, the build and packaging files (Meson, the Flatpak manifests, the
+AppImage script and the CI workflows), the app icon and the documentation.
+
+I decide what Transient is and does: the development workflow, the features, 
+how they work, and how they fit the GNOME guidelines. I steer each step, test the
+app by hand, and read the parts of the code that matter most to me or that I am 
+learning from; the rest I check by using the app.
+
+Besides that, every change goes through automated checks: unit, property and
+snapshot tests, strict lints (no warnings, no code that can crash the app),
+dependency and licence checks, and scripted runs of the real app in an invisible
+desktop, with screenshots and real key presses. CI repeats them on every push.
+
+Commit messages describe changes, not the tools used to make them, so this
+section is where the use of AI is recorded. Questions about it are welcome in
+the [issues](https://github.com/sophiedkk/Transient/issues).
+
 ## Development
 
 Development happens inside a [Toolbx](https://containertoolbx.org/) container, so
