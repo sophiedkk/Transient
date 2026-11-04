@@ -98,6 +98,18 @@ impl Window {
         self.selection_changed();
     }
 
+    /// Selects exactly `clips` (for example what was just pasted); the last one
+    /// becomes the primary clip.
+    pub(super) fn select_clips(&self, clips: &[ClipId]) {
+        let imp = self.imp();
+        if !clips.is_empty() && imp.time_selection.take().is_some() {
+            self.show_time_selection();
+        }
+        imp.selection.replace(clips.to_vec());
+        imp.selected.set(clips.last().copied());
+        self.selection_changed();
+    }
+
     /// Adds every clip playing at `seconds` to the selection (for `--select-clips-at`).
     pub(crate) fn add_clips_at_seconds(&self, seconds: f64) {
         let clips = {
@@ -230,11 +242,19 @@ impl Window {
         }
     }
 
-    /// The track of the selected clip, or else the first track of the time selection.
-    fn selected_track(&self) -> Option<TrackId> {
+    /// The selected track: the topmost track with a selected clip, or else the
+    /// first track of the time selection. Paste starts there; F2 and
+    /// Alt+Up/Down act on it.
+    pub(super) fn selected_track(&self) -> Option<TrackId> {
         let imp = self.imp();
-        if let Some(clip) = imp.selected.get() {
-            return imp.project.borrow().clip(clip).map(|(track, _)| track);
+        let selection = imp.selection.borrow();
+        if !selection.is_empty() {
+            let project = imp.project.borrow();
+            return project
+                .tracks
+                .iter()
+                .find(|track| track.clips.iter().any(|clip| selection.contains(&clip.id)))
+                .map(|track| track.id);
         }
         imp.time_selection
             .borrow()
@@ -412,6 +432,11 @@ impl Window {
         self.action_set_enabled("win.redo", history.can_redo());
         self.action_set_enabled("win.delete-clip", has_selection);
         self.action_set_enabled("win.ripple-delete", has_selection);
+        self.action_set_enabled("win.cut", has_selection);
+        self.action_set_enabled("win.copy", has_selection);
+        let can_paste = imp.clipboard.borrow().is_some();
+        self.action_set_enabled("win.paste", can_paste);
+        self.action_set_enabled("win.paste-insert", can_paste);
         self.action_set_enabled("win.deselect", has_selection);
         self.action_set_enabled("win.select-all", has_clips);
         self.action_set_enabled("win.rename-track", has_selection);

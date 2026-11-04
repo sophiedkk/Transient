@@ -120,6 +120,7 @@ just test-audio                                 # decode the whole test collecti
   `toggle-solo`, `fade-in-to-playhead`, `fade-out-from-playhead`,
   `normalize-peak`, `normalize-loudness`, `move-to-new-track`, `remove-track`,
   `rename-track` (opens the name field), `move-track-up`, `move-track-down`,
+  `cut`, `copy`, `paste`, `paste-insert` (paste at the playhead),
   `toggle-clip-pane`, `new-project`, `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
   `.transient` file opens it — together they test a full save/open round trip.
   `--export-to=FILE.ext` exports through the app's export path. With `--play`, the level meter (red = clipping)

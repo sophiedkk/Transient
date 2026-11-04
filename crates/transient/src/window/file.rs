@@ -174,6 +174,7 @@ impl Window {
         imp.sources.replace(sources);
         imp.file.replace(Some(file.clone()));
         imp.history.take();
+        self.clear_clipboard();
         self.select(None);
         add_to_recent(file);
         self.show_missing_sources(&missing);
@@ -191,6 +192,7 @@ impl Window {
         imp.sources.replace(LoadedSources::new());
         imp.file.replace(None);
         imp.history.take();
+        self.clear_clipboard();
         self.select(None);
         self.show_missing_sources(&[]);
         self.project_changed();

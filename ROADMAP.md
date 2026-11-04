@@ -85,8 +85,8 @@ when needed instead of being managed by hand.
 
 - [x] **Multiple selection**: Ctrl+click or Shift+click selects several clips; move, nudge and
       delete act on all of them.
-- [ ] **Cut, Copy, Paste** (Ctrl+X/C/V) for clips and time ranges, plus "Insert
-      and Keep Tracks in Sync" (Shift+Ctrl+V).
+- [x] **Cut, Copy, Paste** (Ctrl+X/C/V) for clips and time ranges, plus "Paste
+      and Make Room" (Shift+Ctrl+V), which keeps tracks in sync.
 
 ## Publishing (1.0 and Flathub)
 

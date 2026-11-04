@@ -101,6 +101,10 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.delete-clip", &["Delete"]);
     app.set_accels_for_action("win.ripple-delete", &["<Control>Delete"]);
     app.set_accels_for_action("win.select-all", &["<Control>a"]);
+    app.set_accels_for_action("win.cut", &["<Control>x"]);
+    app.set_accels_for_action("win.copy", &["<Control>c"]);
+    app.set_accels_for_action("win.paste", &["<Control>v"]);
+    app.set_accels_for_action("win.paste-insert", &["<Shift><Control>v"]);
     app.set_accels_for_action("win.context-menu", &["Menu", "<Shift>F10"]);
     app.set_accels_for_action("win.rename-track", &["F2"]);
     app.set_accels_for_action("win.move-track-up", &["<Alt>Up"]);

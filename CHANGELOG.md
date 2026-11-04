@@ -43,6 +43,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Several clips at once: Ctrl+click or Shift+click adds a clip to the
   selection (or removes it). Dragging one of them by its name strip moves them
   all, also across tracks; Ctrl+Left/Right, Delete and S act on all of them.
+- Cut, Copy and Paste (Ctrl+X/C/V, also in the context menu) for clips and time
+  selections: Paste puts the copy at the playhead, starting on the selected
+  track and keeping its arrangement; "Paste and Make Room" (Shift+Ctrl+V) first
+  moves everything after the playhead to the right on all tracks.
 - Mixer: each track header has mute, solo, volume (−60 to +12 dB) and pan
   sliders; the mute button shows whether the track is heard. The bottom bar
   has a master volume and a slim stereo output level meter (red when the mix

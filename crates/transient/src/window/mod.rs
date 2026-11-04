@@ -14,6 +14,7 @@
 //! <https://gtk-rs.org/gtk4-rs/stable/latest/book/g_object_subclassing.html>
 
 mod clip_pane;
+mod clipboard;
 mod edit;
 mod export;
 mod file;

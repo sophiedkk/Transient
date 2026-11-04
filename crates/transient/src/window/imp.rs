@@ -100,6 +100,8 @@ pub(crate) struct Window {
     pub(super) updating_controls: Cell<bool>,
     /// The "Clip deleted" toast, closed when the deletion is undone.
     pub(super) undo_toast: RefCell<Option<adw::Toast>>,
+    /// What Cut or Copy took (see `clipboard.rs`).
+    pub(super) clipboard: RefCell<Option<transient_core::clipboard::Clipboard>>,
     /// The time selection (see `selection.rs`).
     pub(super) time_selection: RefCell<Option<super::selection::TimeSelection>>,
     /// Plays the project's mix; `None` until something is imported.
@@ -156,6 +158,12 @@ impl ObjectSubclass for Window {
         });
         klass.install_action("win.deselect", None, |window, _, _| window.deselect_all());
         klass.install_action("win.select-all", None, |window, _, _| window.select_all());
+        klass.install_action("win.cut", None, |window, _, _| window.cut());
+        klass.install_action("win.copy", None, |window, _, _| {
+            window.copy();
+        });
+        klass.install_action("win.paste", None, |window, _, _| window.paste(false));
+        klass.install_action("win.paste-insert", None, |window, _, _| window.paste(true));
         klass.install_action("win.context-menu", None, |window, _, _| {
             window.imp().timeline.show_context_menu();
         });

@@ -552,6 +552,28 @@ SizeGroup {
 menu timeline_menu {
   section {
     item {
+      label: _("Cu_t");
+      action: "win.cut";
+    }
+
+    item {
+      label: _("_Copy");
+      action: "win.copy";
+    }
+
+    item {
+      label: _("_Paste");
+      action: "win.paste";
+    }
+
+    item {
+      label: _("Paste and _Make Room");
+      action: "win.paste-insert";
+    }
+  }
+
+  section {
+    item {
       label: _("_Split");
       action: "win.split";
     }
@@ -562,7 +584,7 @@ menu timeline_menu {
     }
 
     item {
-      label: _("Delete and _Close Gap");
+      label: _("Delete and Close _Gap");
       action: "win.ripple-delete";
     }
   }
