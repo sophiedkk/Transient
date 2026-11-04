@@ -141,9 +141,17 @@ written with an AI agent):
 - [x] **Project files hold their audio** (decided 2026-11-04, like Audacity's
       `.aup3`): a `.transient` file is a ZIP with the project and its audio as
       is, so the file chooser portal covers opening and saving.
-- [ ] **Drop `--filesystem=home`** from the Flatpak, once checked by hand in
-      the installed Flatpak that opening, saving, recent projects and "Open
-      With" from Files work through the portal alone.
+- [ ] **Drop `--filesystem=home`** from the Flatpak. To do (by hand, later):
+      remove the line from `build-aux/*.Devel.json`, reinstall the Flatpak
+      (`just flatpak`), and check that these work without it:
+      1. Open a project (Ctrl+O).
+      2. Save, and Save As to a new place.
+      3. Double-click a `.transient` file in Files.
+      4. Recent projects on the start screen (most likely to fail: the saved
+         paths may not be reachable without the permission).
+      5. Import audio (Ctrl+I), then save.
+      If all work, commit the removal; if not, keep the permission for now and
+      look into the failing case.
 - [ ] **MetaInfo**: screenshots, a `<releases>` list, a content rating
       (OARS), brand colours; must pass validation (already checked by
       `meson test`).
