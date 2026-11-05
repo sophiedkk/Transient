@@ -75,8 +75,7 @@ dev/setup.sh
 ```
 
 This builds the `transient-dev` image from [`dev/Containerfile`](dev/Containerfile),
-creates the toolbox, installs the Rust version from `rust-toolchain.toml`, enables the
-git hooks. After changing `dev/Containerfile` or `dev/packages.txt`, run
+creates the toolbox, installs the Rust version from `rust-toolchain.toml`. After changing `dev/Containerfile` or `dev/packages.txt`, run
 `dev/setup.sh --rebuild`.
 
 ### RustRover
@@ -87,13 +86,17 @@ wrappers (`cargo`, `rustc`, `rustup`, `rustfmt`, …) that do that.
 
 1. Open `~/Projects/Transient` in RustRover.
 2. *Settings → Rust → Toolchain location*: the `dev/toolbox-bin` folder of this
-   repository. Leave *Standard library* on automatic. Decline offers to
-   download a toolchain.
+   repository, as a full path (RustRover does not expand `~`), e.g.
+   `/home/you/Projects/Transient/dev/toolbox-bin`; `dev/setup.sh` prints it.
+   Leave *Standard library* on automatic. Decline offers to download a toolchain.
 3. *Settings → Rust → External Linters*: **Clippy**, run on the fly.
    *Settings → Rust → Rustfmt*: use rustfmt, run on save.
 4. Run the app with a Cargo configuration: command `run -p transient`,
    environment `GSETTINGS_SCHEMA_DIR=target/gschemas` (after one `just run`, so
-   the schema is compiled). It runs in the toolbox, like `just run`.
+   the schema is compiled). Files to open go after a separate `--`:
+   `run -p transient -- test-audio/piano.flac`. RustRover builds in the
+   toolbox, then starts the app on the desktop, using the desktop's GTK and
+   GStreamer.
 5. In RustRover's terminal, `toolbox enter transient-dev` first, then `just …`.
 
 ### Everyday work (inside the toolbox)

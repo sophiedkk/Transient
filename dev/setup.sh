@@ -29,8 +29,10 @@ fi
 echo "==> Installing the Rust toolchain from rust-toolchain.toml"
 (cd "$repo" && rustup toolchain install)
 
-echo "==> Enabling the git hooks in .githooks/"
-git -C "$repo" config core.hooksPath .githooks
+# Earlier versions enabled a commit-msg hook from .githooks/ (now removed).
+if [ "$(git -C "$repo" config core.hooksPath || true)" = ".githooks" ]; then
+    git -C "$repo" config --unset core.hooksPath
+fi
 
 # Earlier versions added a launcher that ran RustRover inside the toolbox; RustRover
 # now runs on the desktop with dev/toolbox-bin as its toolchain (see README.md).

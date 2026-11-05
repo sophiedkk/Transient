@@ -173,7 +173,8 @@ release with notes from `dev/release-notes.sh`.
 ## Git
 
 - Branches: `feat/…`, `fix/…`, `chore/…`, `docs/…`; Conventional Commit messages.
-- **Never add AI attribution** (`Co-Authored-By: Claude`, "Generated with Claude
-  Code", 🤖) to commits, PRs or comments. `.githooks/commit-msg` strips it as a backstop.
+- No AI attribution lines (`Co-Authored-By: Claude`, "Generated with Claude
+  Code", 🤖) in commits, PRs or comments: messages describe the change, and the
+  README's AI disclosure section is where the use of AI is recorded.
 - User-visible changes get an entry under `[Unreleased]` in `CHANGELOG.md`.
 - Commit or push only when asked.
