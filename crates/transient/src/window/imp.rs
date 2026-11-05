@@ -136,31 +136,12 @@ impl ObjectSubclass for Window {
         TimelineView::ensure_type();
         klass.bind_template();
 
-        // `win.import-audio`: used by the header bar button, the empty-state button
-        // and Ctrl+I. An async action can await the file chooser.
-        klass.install_action_async("win.import-audio", None, |window, _, _| async move {
-            window.choose_and_import().await;
-        });
+        install_project_actions(klass);
         klass.install_action("win.play-pause", None, |window, _, _| {
             window.toggle_playback();
         });
         klass.install_action("win.go-to-start", None, |window, _, _| {
             window.seek_to_frame(0);
-        });
-        klass.install_action_async("win.new-project", None, |window, _, _| async move {
-            window.new_project().await;
-        });
-        klass.install_action_async("win.open-project", None, |window, _, _| async move {
-            window.open_project_dialog().await;
-        });
-        klass.install_action_async("win.save", None, |window, _, _| async move {
-            window.save().await;
-        });
-        klass.install_action_async("win.save-as", None, |window, _, _| async move {
-            window.save_as().await;
-        });
-        klass.install_action("win.export", None, |window, _, _| {
-            window.show_export_dialog();
         });
         klass.install_action("win.undo", None, |window, _, _| window.undo());
         klass.install_action("win.redo", None, |window, _, _| window.redo());
@@ -299,3 +280,31 @@ impl WindowImpl for Window {
 
 impl ApplicationWindowImpl for Window {}
 impl AdwApplicationWindowImpl for Window {}
+
+/// The actions for projects and files: import, new, open, save, export and
+/// preferences (the main menu's commands). Called once, from `class_init`.
+fn install_project_actions(klass: &mut <Window as ObjectSubclass>::Class) {
+    // `win.import-audio`: used by the header bar button, the empty-state button
+    // and Ctrl+I. An async action can await the file chooser.
+    klass.install_action_async("win.import-audio", None, |window, _, _| async move {
+        window.choose_and_import().await;
+    });
+    klass.install_action_async("win.new-project", None, |window, _, _| async move {
+        window.new_project().await;
+    });
+    klass.install_action_async("win.open-project", None, |window, _, _| async move {
+        window.open_project_dialog().await;
+    });
+    klass.install_action_async("win.save", None, |window, _, _| async move {
+        window.save().await;
+    });
+    klass.install_action_async("win.save-as", None, |window, _, _| async move {
+        window.save_as().await;
+    });
+    klass.install_action("win.export", None, |window, _, _| {
+        window.show_export_dialog();
+    });
+    klass.install_action("win.preferences", None, |window, _, _| {
+        window.show_preferences();
+    });
+}

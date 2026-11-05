@@ -17,21 +17,21 @@ Put audio files on tracks, trim and arrange them, record over them, balance
 their volume, and export the mix. Built with Rust, GTK 4, Libadwaita and
 GStreamer.
 
-![Transient with four tracks: a voice clip selected, a piano bed and drums with
-fades, and applause at the end](data/screenshots/main-window.png)
+![Transient with four coloured tracks: a voice clip selected, a purple piano bed
+and orange drums with fades, and green applause at the end](data/screenshots/main-window.png)
 
-> **Status:** early development (0.1). You can import or record audio,
-> arrange, trim and cut it on tracks, add fades, mix the tracks and export the
-> result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
+> **Status:** early development (0.2). You can import or record audio,
+> arrange, trim and cut it on tracks, give tracks a colour, add fades, mix the
+> tracks and export the result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
 
 ## Install
 
 Download a file from the [latest release](https://github.com/sophiedkk/Transient/releases/latest):
 
 - **Flatpak** (any distribution with Flatpak): `flatpak install --user
-  Transient-0.1.0.flatpak`. It fetches the GNOME runtime from Flathub by itself.
+  Transient-0.2.0.flatpak`. It fetches the GNOME runtime from Flathub by itself.
 - **AppImage** (Fedora 43+, Ubuntu 26.04+, Arch, openSUSE Tumbleweed): make it
-  executable (`chmod +x Transient-0.1.0-x86_64.AppImage`) and start it.
+  executable (`chmod +x Transient-0.2.0-x86_64.AppImage`) and start it.
 
 ## The name
 

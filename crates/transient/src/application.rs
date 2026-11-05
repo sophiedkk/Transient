@@ -100,6 +100,7 @@ fn setup_actions(app: &adw::Application) {
     app.set_accels_for_action("win.save", &["<Control>s"]);
     app.set_accels_for_action("win.save-as", &["<Shift><Control>s"]);
     app.set_accels_for_action("win.export", &["<Control>e"]);
+    app.set_accels_for_action("win.preferences", &["<Control>comma"]);
     app.set_accels_for_action("win.rename-track", &["F2"]);
     app.set_accels_for_action("win.toggle-clip-pane", &["F9"]);
     app.set_accels_for_action(

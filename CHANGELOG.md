@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The Record button's input menu shows the input's level live, to set the
+  microphone's volume before recording.
+- Recordings made while other tracks play are lined up with what you heard,
+  correcting for the delay of the sound input. Preferences (Ctrl+,) has a
+  Recording Offset to fine-tune it.
+
 ## [0.2.0] - 2026-11-05
 
 ### Added

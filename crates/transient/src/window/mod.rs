@@ -21,6 +21,7 @@ mod file;
 mod imp;
 mod import;
 mod mixer;
+mod preferences;
 mod project;
 mod recording;
 mod selection;

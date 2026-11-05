@@ -169,7 +169,7 @@ lints cannot be met because the warnings come from `glib`'s macros
 (`#[glib::object_subclass]`, `glib::Properties`), not our code: `same_name_method`
 and `unused_lifetimes`.
 
-## 13 · Recording (before 1.0)
+## 13 · Recording (before 1.0, done 2026-11-05)
 
 Requested 2026-11-04: recording comes before 1.0, not after.
 
@@ -178,19 +178,22 @@ Requested 2026-11-04: recording comes before 1.0, not after.
       recording. Stop (or Space) ends the take; it becomes an ordinary clip.
 - [x] **Choose the input** (microphone, line in) from the arrow on the Record
       button; remembered in the settings. `transient-cli inputs` lists them.
-- [ ] **See the input's level before recording** (to set the microphone's
-      volume), for example while the input menu is open.
+- [x] **See the input's level before recording** (to set the microphone's
+      volume): a live meter at the top of the Record button's input menu.
 - [x] **Play the other tracks while recording** (overdubbing), so a voice can be
       recorded over music.
-- [ ] **Correct for the delay** between what plays and what is recorded
-      (latency), so overdubs line up exactly; measure it with a loopback test.
+- [x] **Correct for the delay** between what plays and what is recorded
+      (latency), so overdubs line up: takes are placed by the measured delay
+      (`transient-core::take`), plus a "Recording Offset" in Preferences
+      (decided 2026-11-05). Not yet checked with a real microphone and
+      speakers. Later: a loopback assistant that measures the offset.
 - [x] **Show the take growing** on the timeline while recording, with its
       outline, below the last track; the start page has a Record Audio button.
 - [x] **Where takes are stored**: as FLAC in the project file, like imported
       audio (decided 2026-11-04).
-- [ ] **Permissions**: there is no portal for the microphone yet, so the
-      Flatpak needs PulseAudio/PipeWire access (`--socket=pulseaudio`), which
-      Flathub accepts for audio apps; note it in the submission.
+- [x] **Permissions**: both Flatpak manifests have `--socket=pulseaudio` (there
+      is no portal for the microphone yet). Explaining it to Flathub is in
+      "Publishing".
 
 ## Publishing (1.0 and Flathub)
 
@@ -235,6 +238,9 @@ written with an AI agent):
       5. Import audio (Ctrl+I), then save.
       If all work, commit the removal; if not, keep the permission for now and
       look into the failing case.
+- [ ] **Explain `--socket=pulseaudio`** in the Flathub submission: recording
+      needs it, as there is no portal for the microphone yet; Flathub accepts
+      it for audio apps.
 - [ ] **MetaInfo**: screenshots, a `<releases>` list, a content rating
       (OARS), brand colours; must pass validation (already checked by
       `meson test`).

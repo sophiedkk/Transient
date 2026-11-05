@@ -38,6 +38,8 @@ pub(crate) struct LaunchOptions {
     pub(crate) play: bool,
     /// Send audio nowhere (still in real time).
     pub(crate) silent: bool,
+    /// Record and measure a test tone instead of a microphone.
+    pub(crate) test_input: bool,
     /// Save a PNG of the window to this path, then quit.
     pub(crate) screenshot: Option<PathBuf>,
     /// Wait this many seconds before the screenshot (for example until keys
@@ -89,6 +91,13 @@ const OPTIONS: &[Opt] = &[
         short: None,
         arg: glib::OptionArg::None,
         help: "Play without sound output (for tests)",
+        arg_name: None,
+    },
+    Opt {
+        name: "test-input",
+        short: None,
+        arg: glib::OptionArg::None,
+        help: "Use a test tone instead of a microphone (for recording and the input level)",
         arg_name: None,
     },
     Opt {
@@ -190,6 +199,7 @@ impl LaunchOptions {
         Self {
             play: dict.contains("play"),
             silent: dict.contains("silent"),
+            test_input: dict.contains("test-input"),
             screenshot: dict.lookup::<PathBuf>("screenshot").ok().flatten(),
             screenshot_delay: dict
                 .lookup::<i32>("screenshot-delay")
@@ -240,6 +250,7 @@ impl LaunchOptions {
     pub(crate) fn is_automated(&self) -> bool {
         self.play
             || self.silent
+            || self.test_input
             || self.screenshot.is_some()
             || self.quit_after.is_some()
             || self.seek.is_some()
@@ -256,6 +267,9 @@ impl LaunchOptions {
     pub(crate) async fn run(self, window: Window, files: Vec<gio::File>) {
         if self.silent {
             window.set_audio_output(AudioOutput::Silent);
+        }
+        if self.test_input {
+            window.use_test_input();
         }
         // A project file is opened; anything else is imported as audio.
         if let Some(project) = files.iter().find(|file| is_project_file(file)) {

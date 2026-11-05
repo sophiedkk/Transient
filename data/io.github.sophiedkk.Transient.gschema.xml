@@ -24,6 +24,12 @@
       <summary>Style</summary>
       <description>Light or dark style; "default" follows the system.</description>
     </key>
+    <key name="recording-offset" type="i">
+      <range min="-1000" max="1000"/>
+      <default>0</default>
+      <summary>Recording offset</summary>
+      <description>Milliseconds added to where recordings are placed, on top of the measured delay; negative moves them earlier.</description>
+    </key>
     <key name="record-input" type="s">
       <default>''</default>
       <summary>Recording input</summary>

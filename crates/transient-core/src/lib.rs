@@ -16,6 +16,7 @@ pub mod project;
 pub mod range;
 pub mod report;
 pub mod ruler;
+pub mod take;
 pub mod time;
 pub mod view;
 pub mod waveform;

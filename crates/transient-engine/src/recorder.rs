@@ -10,11 +10,14 @@
 //! tone for automated tests. The samples collect in memory; [`Recorder::stop`]
 //! hands them over as an [`AudioBuffer`]. Like the player, the `level`
 //! element measures the input for the level meter ([`Recorder::poll_levels`]).
+//!
+//! [`InputMonitor`] runs the same chain without keeping the audio, to show the
+//! input's level before recording (to set the microphone's volume).
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gstreamer::prelude::*;
 use gstreamer_app::{AppSink, AppSinkCallbacks};
@@ -102,6 +105,8 @@ pub fn inputs() -> Vec<InputDevice> {
 pub struct Recorder {
     pipeline: gstreamer::Pipeline,
     samples: Arc<Mutex<Vec<f32>>>,
+    /// When the first audio arrived (see [`Recorder::capture_started`]).
+    first_arrival: Arc<Mutex<Option<Instant>>>,
     sample_rate: SampleRate,
 }
 
@@ -113,37 +118,21 @@ impl Recorder {
     /// Returns [`EngineError`] if the input cannot be opened (no microphone,
     /// no permission) or GStreamer is missing an element.
     pub fn start(input: &Input, sample_rate: SampleRate) -> Result<Self, EngineError> {
-        let source = match input {
-            Input::Default => make_element("pulsesrc")?,
-            Input::Device(device) => device.device.create_element(None)?,
-            Input::TestTone => {
-                let tone = make_element("audiotestsrc")?;
-                tone.set_property("is-live", true);
-                tone.set_property("freq", 440.0_f64);
-                tone.set_property("volume", 0.5_f64);
-                tone
-            }
-        };
-        let convert = make_element("audioconvert")?;
-        let resample = make_element("audioresample")?;
-        let format = make_element("capsfilter")?;
-        format.set_property("caps", target_caps(sample_rate)?);
-        let level = make_element("level")?;
-        level.set_property(
-            "interval",
-            u64::try_from(LEVEL_INTERVAL.as_nanos()).unwrap_or(u64::MAX),
-        );
-        level.set_property("post-messages", true);
         let sink = AppSink::builder().sync(false).build();
 
         let samples = Arc::new(Mutex::new(Vec::new()));
         let collected = Arc::clone(&samples);
+        let first_arrival = Arc::new(Mutex::new(None));
+        let arrived = Arc::clone(&first_arrival);
         sink.set_callbacks(
             AppSinkCallbacks::builder()
                 .new_sample(move |sink| {
                     let sample = sink
                         .pull_sample()
                         .map_err(|_stopped| gstreamer::FlowError::Eos)?;
+                    if let Ok(mut first) = arrived.lock() {
+                        first.get_or_insert_with(Instant::now);
+                    }
                     if let Some(buffer) = sample.buffer()
                         && let Ok(map) = buffer.map_readable()
                         && let Ok(mut samples) = collected.lock()
@@ -160,23 +149,31 @@ impl Recorder {
                 .build(),
         );
 
-        let pipeline = gstreamer::Pipeline::new();
-        let elements = [
-            &source,
-            &convert,
-            &resample,
-            &format,
-            &level,
-            sink.upcast_ref(),
-        ];
-        pipeline.add_many(elements)?;
-        gstreamer::Element::link_many(elements)?;
-        pipeline.set_state(gstreamer::State::Playing)?;
+        let pipeline = input_pipeline(input, sample_rate, sink.upcast_ref())?;
         Ok(Self {
             pipeline,
             samples,
+            first_arrival,
             sample_rate,
         })
+    }
+
+    /// When the first recorded sample was captured: the moment its audio
+    /// arrived, minus the input's latency (how long audio takes from the
+    /// microphone to here, as GStreamer reports it). `None` before any audio
+    /// arrived. Used to line the take up with what was playing (see
+    /// `transient_core::take`).
+    #[must_use]
+    pub fn capture_started(&self) -> Option<Instant> {
+        let arrival = (*self.first_arrival.lock().ok()?)?;
+        let mut query = gstreamer::query::Latency::new();
+        let latency = if self.pipeline.query(&mut query) {
+            let (_live, min, _max) = query.result();
+            Duration::from_nanos(min.nseconds())
+        } else {
+            Duration::ZERO
+        };
+        arrival.checked_sub(latency)
     }
 
     /// How much has been recorded so far.
@@ -211,30 +208,10 @@ impl Recorder {
     ///
     /// # Errors
     ///
-    /// Returns [`EngineError::Pipeline`] if the input stopped with an error
+    /// Returns [`EngineError::Stream`] if the input stopped with an error
     /// (for example, the microphone was unplugged).
     pub fn poll_levels(&self) -> Result<Option<[f64; CHANNELS]>, EngineError> {
-        let Some(bus) = self.pipeline.bus() else {
-            return Ok(None);
-        };
-        let mut levels = None;
-        while let Some(message) = bus.pop_filtered(&[
-            gstreamer::MessageType::Element,
-            gstreamer::MessageType::Error,
-        ]) {
-            match message.view() {
-                gstreamer::MessageView::Element(element) => {
-                    if let Some(measured) = element.structure().and_then(read_levels) {
-                        levels = Some(measured);
-                    }
-                }
-                gstreamer::MessageView::Error(error) => {
-                    return Err(EngineError::Stream(error.error()));
-                }
-                _ => {}
-            }
-        }
-        Ok(levels)
+        latest_levels(&self.pipeline)
     }
 
     /// Stops recording and returns what was recorded.
@@ -262,6 +239,109 @@ impl Recorder {
             .unwrap_or_default();
         Ok(AudioBuffer::new(self.sample_rate, samples)?)
     }
+}
+
+/// Measures an input without recording it: its level, to set the microphone's
+/// volume before recording. Stops when dropped.
+#[derive(Debug)]
+pub struct InputMonitor {
+    pipeline: gstreamer::Pipeline,
+}
+
+impl InputMonitor {
+    /// Starts measuring `input`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError`] if the input cannot be opened (no microphone,
+    /// no permission) or GStreamer is missing an element.
+    pub fn start(input: &Input) -> Result<Self, EngineError> {
+        // The audio itself is thrown away; only the `level` element matters.
+        let sink = make_element("fakesink")?;
+        let pipeline = input_pipeline(input, SampleRate::default(), &sink)?;
+        Ok(Self { pipeline })
+    }
+
+    /// The input's latest level per channel in dBFS, or `None` if nothing new
+    /// was measured. Call this regularly.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Stream`] if the input stopped with an error.
+    pub fn poll_levels(&self) -> Result<Option<[f64; CHANNELS]>, EngineError> {
+        latest_levels(&self.pipeline)
+    }
+}
+
+impl Drop for InputMonitor {
+    fn drop(&mut self) {
+        if let Err(error) = self.pipeline.set_state(gstreamer::State::Null) {
+            tracing::warn!("could not stop measuring the input: {error}");
+        }
+    }
+}
+
+/// Builds and starts the input chain both [`Recorder`] and [`InputMonitor`]
+/// use: `input → audioconvert → audioresample → capsfilter → level → sink`.
+fn input_pipeline(
+    input: &Input,
+    sample_rate: SampleRate,
+    sink: &gstreamer::Element,
+) -> Result<gstreamer::Pipeline, EngineError> {
+    let source = match input {
+        Input::Default => make_element("pulsesrc")?,
+        Input::Device(device) => device.device.create_element(None)?,
+        Input::TestTone => {
+            let tone = make_element("audiotestsrc")?;
+            tone.set_property("is-live", true);
+            tone.set_property("freq", 440.0_f64);
+            tone.set_property("volume", 0.5_f64);
+            tone
+        }
+    };
+    let convert = make_element("audioconvert")?;
+    let resample = make_element("audioresample")?;
+    let format = make_element("capsfilter")?;
+    format.set_property("caps", target_caps(sample_rate)?);
+    let level = make_element("level")?;
+    level.set_property(
+        "interval",
+        u64::try_from(LEVEL_INTERVAL.as_nanos()).unwrap_or(u64::MAX),
+    );
+    level.set_property("post-messages", true);
+
+    let pipeline = gstreamer::Pipeline::new();
+    let elements = [&source, &convert, &resample, &format, &level, sink];
+    pipeline.add_many(elements)?;
+    gstreamer::Element::link_many(elements)?;
+    pipeline.set_state(gstreamer::State::Playing)?;
+    Ok(pipeline)
+}
+
+/// The latest level an input chain measured, per channel in dBFS, or `None` if
+/// nothing new was measured; an error if the input failed.
+fn latest_levels(pipeline: &gstreamer::Pipeline) -> Result<Option<[f64; CHANNELS]>, EngineError> {
+    let Some(bus) = pipeline.bus() else {
+        return Ok(None);
+    };
+    let mut levels = None;
+    while let Some(message) = bus.pop_filtered(&[
+        gstreamer::MessageType::Element,
+        gstreamer::MessageType::Error,
+    ]) {
+        match message.view() {
+            gstreamer::MessageView::Element(element) => {
+                if let Some(measured) = element.structure().and_then(read_levels) {
+                    levels = Some(measured);
+                }
+            }
+            gstreamer::MessageView::Error(error) => {
+                return Err(EngineError::Stream(error.error()));
+            }
+            _ => {}
+        }
+    }
+    Ok(levels)
 }
 
 /// Writes a recording to `path` as a 24-bit FLAC file (lossless, about half the
@@ -295,11 +375,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_monitor_measures_an_input_without_recording_it() {
+        crate::init().unwrap();
+        let monitor = InputMonitor::start(&Input::TestTone).unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        let levels = monitor
+            .poll_levels()
+            .unwrap()
+            .expect("a level was measured");
+        // The tone plays at half volume: about −6 dBFS.
+        assert!(
+            levels.iter().all(|db| (-8.0..-4.0).contains(db)),
+            "levels {levels:?}"
+        );
+    }
+
+    #[test]
     fn records_a_test_tone() {
         crate::init().unwrap();
+        let started = Instant::now();
         let recorder = Recorder::start(&Input::TestTone, SampleRate::HZ_48000).unwrap();
         std::thread::sleep(Duration::from_millis(500));
         let levels = recorder.poll_levels().unwrap();
+        // The first audio was captured after recording started, and soon after.
+        let captured = recorder.capture_started().expect("audio arrived");
+        let delay = captured.checked_duration_since(started);
+        assert!(
+            delay.is_some_and(|delay| delay < Duration::from_millis(300)),
+            "captured {delay:?} after the start"
+        );
         // The outline for drawing: one peak per block, about half (the tone's volume).
         let peaks = recorder.peaks_from(0);
         assert!(!peaks.is_empty());

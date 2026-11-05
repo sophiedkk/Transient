@@ -20,8 +20,10 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   file, render the mix), `export PROJECT|FILES --output OUT.ext` and `inputs`
   (recording inputs) — the engine without a window, JSON output.
 - Recording: `transient-engine::recorder` (input → f32 in memory, level meter,
-  `save_flac`); `window/recording.rs` (Record button/R, input menu, takes as new
-  tracks).
+  `save_flac`, `InputMonitor` for the level before recording);
+  `window/recording.rs` (Record button/R, input menu with level, takes as new
+  tracks). `transient-core::take` lines takes up with what was heard (measured
+  delay plus the `recording-offset` setting, in Preferences).
 - Export: `transient-engine::export` (appsrc → encoder → filesink, blocking
   push, progress + cancel, removes unfinished files; round-trip tested for every
   format). `ExportDialog` runs it on a background thread with an async-channel.
@@ -162,6 +164,8 @@ just test-audio                                 # decode the whole test collecti
   `--export-to=FILE.ext` exports through the app's export path.
   `--record-for=SECONDS` records a test tone (no microphone needed) onto a new
   track at the playhead, then continues with `--save-to` etc.
+  `--test-input` uses that test tone for the Record button too, and for the input
+  level in its menu (opening the menu logs "measuring the input level").
   `--screenshot-delay=SECONDS` waits before the screenshot (e.g. for keys typed
   with `HEADLESS_KEYS`; the headless window is never "active", so GTK's focus
   outline does not show there). With `--play`, the level meter (red = clipping)

@@ -133,22 +133,34 @@ impl Window {
     /// Updates the level meter from the player's latest measurement.
     pub(super) fn update_level_meter(&self, levels: Option<[f64; 2]>) {
         let imp = self.imp();
-        let [left, right] = levels.unwrap_or([f64::NEG_INFINITY; 2]);
-        let fill = |db: f64| ((db - METER_FLOOR_DB) / -METER_FLOOR_DB).clamp(0.0, 1.0);
-        imp.left_meter.set_value(fill(left));
-        imp.right_meter.set_value(fill(right));
-        if left > 0.0 || right > 0.0 {
-            imp.level_meter.add_css_class("clipping");
-        } else {
-            imp.level_meter.remove_css_class("clipping");
-        }
-        // No levels means nothing is playing: dim the empty meter, so it reads as
-        // "resting" rather than as two empty progress bars. `dimmed` is
-        // Libadwaita's own style class for this.
-        if levels.is_some() {
-            imp.level_meter.remove_css_class("dimmed");
-        } else {
-            imp.level_meter.add_css_class("dimmed");
-        }
+        show_levels(
+            &imp.level_meter,
+            [&imp.left_meter, &imp.right_meter],
+            levels,
+        );
+    }
+}
+
+/// Shows `levels` (left and right, in dBFS) on a level meter: a `level-meter`
+/// box with a bar per channel (see `style.css`). Also used for the input level
+/// in the Record button's menu.
+pub(super) fn show_levels(meter: &gtk::Box, bars: [&gtk::LevelBar; 2], levels: Option<[f64; 2]>) {
+    let channels = levels.unwrap_or([f64::NEG_INFINITY; 2]);
+    let fill = |db: f64| ((db - METER_FLOOR_DB) / -METER_FLOOR_DB).clamp(0.0, 1.0);
+    for (bar, db) in bars.into_iter().zip(channels) {
+        bar.set_value(fill(db));
+    }
+    if channels.iter().any(|&db| db > 0.0) {
+        meter.add_css_class("clipping");
+    } else {
+        meter.remove_css_class("clipping");
+    }
+    // No levels means nothing is playing: dim the empty meter, so it reads as
+    // "resting" rather than as two empty progress bars. `dimmed` is
+    // Libadwaita's own style class for this.
+    if levels.is_some() {
+        meter.remove_css_class("dimmed");
+    } else {
+        meter.add_css_class("dimmed");
     }
 }
