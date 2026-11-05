@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs a Rust tool (cargo, rustc, …) inside the transient-dev toolbox, where GTK,
-# GStreamer and Blueprint are installed. The tool is named after this script's
-# link name: dev/toolbox-bin/cargo runs ~/.cargo/bin/cargo in the toolbox.
+# GStreamer, Blueprint and the pinned Rust toolchain are installed (see
+# dev/Containerfile). The tool is named after this script's link name:
+# dev/toolbox-bin/cargo runs the image's cargo.
 #
 # RustRover runs on the desktop and uses this folder as its Rust toolchain
 # (Settings → Rust → Toolchain location), so builds happen in the toolbox.
@@ -10,14 +11,18 @@ set -euo pipefail
 
 tool="$(basename "$0")"
 container="transient-dev"
+# Where the image keeps Rust (not ~/.cargo, which belongs to the desktop).
+rust_env=(RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo)
+binary="/usr/local/cargo/bin/$tool"
 
 # Already inside a toolbox: run the tool directly.
 if [ -f /run/.toolboxenv ]; then
-    exec "$HOME/.cargo/bin/$tool" "$@"
+    exec env "${rust_env[@]}" "$binary" "$@"
 fi
 
 # toolbox run does not pass on environment variables; RustRover sets some for
 # Cargo (RUSTC_BOOTSTRAP, CARGO_TERM_COLOR, …), so forward Cargo's and Rust's.
+# They come after rust_env, so RustRover's own choices win.
 forwarded=()
 while IFS='=' read -r name _; do
     case "$name" in
@@ -26,4 +31,4 @@ while IFS='=' read -r name _; do
 done < <(env)
 
 exec toolbox run --container "$container" \
-    env "${forwarded[@]}" "$HOME/.cargo/bin/$tool" "$@"
+    env "${rust_env[@]}" "${forwarded[@]}" "$binary" "$@"

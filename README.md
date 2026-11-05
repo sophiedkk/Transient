@@ -66,7 +66,9 @@ the [issues](https://github.com/sophiedkk/Transient/issues).
 
 Development happens inside a [Toolbx](https://containertoolbx.org/) container, so
 nothing has to be installed on your system except Podman, Toolbx and Flatpak
-(all included in Fedora Workstation) and [rustup](https://rustup.rs/).
+(all included in Fedora Workstation). The container is self-contained: it holds
+the libraries, the Rust version pinned in `rust-toolchain.toml`, and the test
+and dependency-check tools.
 
 ### First-time setup (on the host)
 
@@ -74,21 +76,24 @@ nothing has to be installed on your system except Podman, Toolbx and Flatpak
 dev/setup.sh
 ```
 
-This builds the `transient-dev` image from [`dev/Containerfile`](dev/Containerfile),
-creates the toolbox, installs the Rust version from `rust-toolchain.toml`. After changing `dev/Containerfile` or `dev/packages.txt`, run
-`dev/setup.sh --rebuild`.
+This builds the `transient-dev` image from [`dev/Containerfile`](dev/Containerfile)
+(Rust included) and creates the toolbox. After changing `dev/Containerfile`,
+`dev/packages.txt` or `rust-toolchain.toml`, run `dev/setup.sh --rebuild`; the
+script also says so when the toolbox's Rust no longer matches.
 
 ### RustRover
 
 RustRover runs normally on the desktop; only the Rust tools run in the toolbox,
-where GTK, GStreamer and Blueprint are installed. `dev/toolbox-bin/` holds small
-wrappers (`cargo`, `rustc`, `rustup`, `rustfmt`, …) that do that.
+where GTK, GStreamer, Blueprint and Rust itself are installed. `dev/toolbox-bin/`
+holds small wrappers (`cargo`, `rustc`, `rustup`, `rustfmt`, …) that do that.
 
 1. Open `~/Projects/Transient` in RustRover.
 2. *Settings → Rust → Toolchain location*: the `dev/toolbox-bin` folder of this
    repository, as a full path (RustRover does not expand `~`), e.g.
    `/home/you/Projects/Transient/dev/toolbox-bin`; `dev/setup.sh` prints it.
-   Leave *Standard library* on automatic. Decline offers to download a toolchain.
+   *Standard library*: `~/.cache/transient-dev/rust-src-1.97.1`, as a full path
+   too (`dev/setup.sh` copies it there and prints it: RustRover cannot see the
+   Rust inside the container). Decline offers to download a toolchain.
 3. *Settings → Rust → External Linters*: **Clippy**, run on the fly.
    *Settings → Rust → Rustfmt*: use rustfmt, run on save.
 4. Run the app with a Cargo configuration: command `run -p transient`,

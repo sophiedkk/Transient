@@ -1,15 +1,50 @@
 # Development image for Transient, used as a Toolbx container.
 #
 # Build and create the toolbox with `dev/setup.sh` (runs on the host, no sudo).
-# Rust itself is NOT installed here: Toolbx shares your home directory, so the
-# rustup toolchain in ~/.cargo is used, pinned by rust-toolchain.toml.
+# The image is self-contained: the system packages (GTK, Libadwaita, GStreamer,
+# Blueprint, Meson, just), the Rust toolchain pinned by rust-toolchain.toml, and
+# cargo-nextest and cargo-deny all live in it, not in your home folder. After
+# changing any of them, run `dev/setup.sh --rebuild`.
 FROM registry.fedoraproject.org/fedora-toolbox:44
 
 LABEL com.github.containers.toolbox="true" \
       name="transient-dev" \
-      summary="Development environment for Transient (GTK 4, Libadwaita, GStreamer)"
+      summary="Development environment for Transient (GTK 4, Libadwaita, GStreamer, Rust)"
 
 COPY packages.txt /tmp/packages.txt
-RUN dnf -y install $(grep -v -e '^#' -e '^$' /tmp/packages.txt) \
+RUN dnf -y install rustup $(grep -v -e '^#' -e '^$' /tmp/packages.txt) \
  && dnf clean all \
  && rm /tmp/packages.txt
+
+# Rust lives in /usr/local, not in the default ~/.cargo: Toolbx shares the home
+# folder with your desktop, so ~/.cargo would be outside the container. Fedora's
+# rustup package installs exactly the version in rust-toolchain.toml (copied in
+# from the repository by `podman build --build-context repo=…`).
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+COPY --from=repo rust-toolchain.toml /tmp/toolchain/rust-toolchain.toml
+# One step for all of Rust: each RUN is an image layer, and changing files made
+# in an earlier layer (the chmod below) would store a second copy of them.
+#
+# 1. The toolchain, then cargo-nextest and cargo-deny (the test runner and the
+#    dependency checker `just check` uses), at fixed versions, built with the
+#    versions of their dependencies their authors locked.
+# 2. You work in the container as yourself, not as root: Cargo must be able to
+#    write its crate cache in CARGO_HOME (and rustup to add a component). Fine
+#    for a container only you use.
+RUN rustup-init -y --no-modify-path --profile minimal --default-toolchain none \
+ && cd /tmp/toolchain \
+ && rustup toolchain install \
+ && rustup default "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" \
+ && cargo install --locked cargo-nextest@0.9.145 cargo-deny@0.20.2 \
+ && rm -rf /tmp/toolchain "$CARGO_HOME/registry" "$CARGO_HOME/git" \
+ && chmod -R a+rwX "$RUSTUP_HOME" "$CARGO_HOME"
+
+# Shells started with `toolbox enter` read /etc/profile.d; set the same there,
+# in case a login shell resets the environment.
+RUN printf '%s\n' \
+      'export RUSTUP_HOME=/usr/local/rustup' \
+      'export CARGO_HOME=/usr/local/cargo' \
+      'case ":$PATH:" in *:/usr/local/cargo/bin:*) ;; *) PATH="/usr/local/cargo/bin:$PATH" ;; esac' \
+      > /etc/profile.d/transient-rust.sh

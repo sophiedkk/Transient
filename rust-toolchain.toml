@@ -1,5 +1,7 @@
 # rustup reads this file and installs exactly this toolchain for the project.
+# "minimal" plus these components: everything we use, without the 0.9 GB of
+# offline documentation that the "default" profile adds.
 [toolchain]
 channel = "1.97.1"
 components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
-profile = "default"
+profile = "minimal"
