@@ -96,6 +96,18 @@
   </branding>
 
   <releases>
+    <release version="0.3.0" date="2026-11-05">
+      <description>
+        <p>Better recording, and tidying up projects.</p>
+        <ul>
+          <li>See the microphone's level before recording</li>
+          <li>Recordings line up with what was playing, with an offset to fine-tune in Preferences</li>
+          <li>Drag tracks up or down to reorder them</li>
+          <li>Locate audio files that were moved</li>
+          <li>The Export dialog remembers the last format</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-05">
       <description>
         <p>Track colours, a light or dark style of your own, and smoother editing.</p>

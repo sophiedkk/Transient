@@ -18,6 +18,14 @@ change.
 | 6 | Fades, clip gain, normalize (peak/LUFS), clip pane | `7210ccf` |
 | 7 | Save and open projects, recent projects | `f603d76` |
 | 8 | Export to WAV, FLAC, MP3, Opus, Ogg Vorbis | `33e85b2` |
+| 9 | Polish: icon, preferences, Locate…, accessibility, MetaInfo | `b5f7479` |
+| 10 | Cutting: time selection, ripple delete | `97272fd` |
+| 11 | Tracks: new by dropping, rename, reorder, remove | `fb16a12` |
+| 12 | Clipboard and multiple selection | `488f091` |
+| 13 | Recording, with overdubbing and latency correction | `e5eaf9f` |
+| 14 | Stricter Rust rules | `30a6aad` |
+
+Next: the Effects milestone (see "Later"), after the 0.3.0 release.
 
 Already there from the original milestone 9 list: shortcuts dialog, About
 dialog, dark mode (Libadwaita), error toasts.
@@ -323,7 +331,11 @@ instead of the simpler alternative.
   top clip make a crossfade. A clip covered completely is hidden and cannot be
   clicked until the clip on top is moved away; it may need a marker, or a
   "Bring to Front"/"Send to Back" command.
-- Mouse interaction (dragging clips, trim and fade handles, header sliders,
-  spin rows, file choosers) is not covered by automation, only the maths behind
-  it and the scripted actions. Needs testing by hand.
+- Mouse drags can be scripted headlessly since 2026-11-05 (`press`, `glide`,
+  `release` in `dev/send-keys.py`), but only track reordering has been tested
+  that way. Dragging clips, trim and fade handles, header sliders, spin rows and
+  file choosers still need testing by hand.
 - Waveforms show clip gain but not fades.
+- A fade's handle can cover the clip's name when the fade is short or the view
+  zoomed out (e.g. a 2-second fade-in at the default zoom: "pi◯o"). Perhaps
+  start the name after the handle, or draw the handle below the title bar.

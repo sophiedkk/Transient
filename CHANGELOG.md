@@ -6,6 +6,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
 ### Added
 
 - The Record button's input menu shows the input's level live, to set the
@@ -28,6 +30,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   up-to-date feature list and a blue banner in dark mode.
 - Recent projects show folders in your home folder as "~/Music" instead of
   the full path.
+
+### Fixed
+
+- Projects from the first version of the file format are saved in the
+  current format once saved again.
 
 ## [0.2.0] - 2026-11-05
 

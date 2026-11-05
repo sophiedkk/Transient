@@ -1703,7 +1703,7 @@ dependencies = [
 
 [[package]]
 name = "transient"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-channel",
  "gettext-rs",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "transient-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1733,7 +1733,7 @@ dependencies = [
 
 [[package]]
 name = "transient-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ebur128",
  "insta",
@@ -1748,7 +1748,7 @@ dependencies = [
 
 [[package]]
 name = "transient-engine"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "gstreamer",
  "gstreamer-app",

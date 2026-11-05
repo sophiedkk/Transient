@@ -4,7 +4,7 @@ members = ["crates/*"]
 
 # Shared package metadata; each crate inherits it with `<key>.workspace = true`.
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 # The oldest Rust that can build Transient (gtk4 0.11 and gstreamer 0.25 need 1.92).
 # Day-to-day development uses the newer toolchain pinned in rust-toolchain.toml;
