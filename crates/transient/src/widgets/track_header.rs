@@ -10,8 +10,8 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use gtk::{gio, glib};
-use transient_core::convert::f32_from_f64;
+use gtk::{gdk, gio, glib};
+use transient_core::convert::{f32_from_f64, i32_from_f64};
 use transient_core::mix::SILENT_DB;
 use transient_core::project::{Track, TrackColor, TrackId};
 
@@ -246,6 +246,39 @@ impl TrackHeader {
         }
     }
 
+    /// Dragging the header reorders the tracks. The drag carries the track's
+    /// ID (a `u64`); the header column is the drop target (see
+    /// `window/track_order.rs`). It starts from the header's empty space and its
+    /// name: the buttons and sliders claim their own presses, so they keep
+    /// working. Called once, from `setup_controls`.
+    fn setup_drag(&self) {
+        let source = gtk::DragSource::builder()
+            .actions(gdk::DragAction::MOVE)
+            .build();
+        let weak = self.downgrade();
+        source.connect_prepare(move |source, x, y| {
+            let header = weak.upgrade()?;
+            // A picture of the header follows the pointer, held where it was grabbed.
+            let picture = gtk::WidgetPaintable::new(Some(&header));
+            source.set_icon(Some(&picture), i32_from_f64(x), i32_from_f64(y));
+            let id = header.imp().track.get().0;
+            Some(gdk::ContentProvider::for_value(&id.to_value()))
+        });
+        self.add_controller(source);
+    }
+
+    /// Shows where a dragged track would land: a line above this header
+    /// (`before`), below it (`after`), or neither.
+    pub(crate) fn show_drop_line(&self, before: bool, after: bool) {
+        for (class, shown) in [("drop-before", before), ("drop-after", after)] {
+            if shown {
+                self.add_css_class(class);
+            } else {
+                self.remove_css_class(class);
+            }
+        }
+    }
+
     /// The colour circles in the track menu, like the accent colour picker in
     /// Settings. They share one stateful action, `trackcolor.set`, whose state
     /// is the track's colour id ("" for the default accent colour); each circle
@@ -324,7 +357,7 @@ impl TrackHeader {
         let escape = gtk::EventControllerKey::new();
         let weak = self.downgrade();
         escape.connect_key_pressed(move |_, key, _, _| {
-            if key != gtk::gdk::Key::Escape {
+            if key != gdk::Key::Escape {
                 return glib::Propagation::Proceed;
             }
             if let Some(header) = weak.upgrade() {
@@ -357,6 +390,7 @@ impl TrackHeader {
     fn setup_controls(&self) {
         self.setup_rename();
         self.setup_color_picker();
+        self.setup_drag();
         let imp = self.imp();
         let weak = self.downgrade();
         let changed = move || {

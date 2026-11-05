@@ -247,6 +247,7 @@ impl ObjectImpl for Window {
         window.setup_shortcuts();
         window.setup_record_input();
         window.setup_style_menu();
+        window.setup_track_reordering();
         window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();

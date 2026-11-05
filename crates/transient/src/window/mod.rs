@@ -28,6 +28,7 @@ mod recording;
 mod selection;
 mod shortcuts;
 mod style;
+mod track_order;
 mod transport;
 
 use std::path::Path;

@@ -181,9 +181,16 @@ just test-audio                                 # decode the whole test collecti
   `click`, `double-click`, e.g. `HEADLESS_KEYS="move:600,225 double-click"` with
   `--screenshot-delay=6`. `HEADLESS_DATA_HOME=DIR` starts with a prepared data
   folder instead of an empty one (e.g. a `recently-used.xbel` for the start
-  screen's recent projects). Mouse drags cannot be scripted; their maths lives in
-  `transient-core::clip`, `::edit` and `transient-core::range` (unit- and
-  property-tested).
+  screen's recent projects). Drags: `press`, `glide:X,Y` (moves in small
+  steps, so GTK sees a drag), `release`; `wait:SECONDS` holds the session (e.g.
+  a drag or an open text field for a screenshot: ending the session lets go of
+  the button and takes focus away). The first click of a run can get lost, so start
+  pointer scripts with a click on empty space, e.g. `HEADLESS_KEYS="move:600,600
+  click move:100,160 press glide:100,355 release"`. `--screenshot-delay` counts
+  from when the files are loaded, not from launch. Arguments with spaces must go
+  to `dev/headless.sh` directly (`just headless` splits them). The drag maths
+  lives in `transient-core::clip`, `::edit` and `transient-core::range` (unit-
+  and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.
 - Never play audio through the speakers in automated runs: always pass `--silent`.
 - `test-audio/` is downloaded by `dev/fetch-test-audio.sh` from `dev/test-audio.tsv`

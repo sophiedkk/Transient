@@ -148,6 +148,24 @@ impl Project {
         true
     }
 
+    /// Moves a track to `slot`, a place between tracks as you see them while
+    /// dragging: 0 is above the first track, `tracks.len()` below the last.
+    /// Returns whether it moved (dropping a track just above or below itself
+    /// leaves it where it is).
+    pub fn move_track_to(&mut self, id: TrackId, slot: usize) -> bool {
+        let Some(from) = self.tracks.iter().position(|track| track.id == id) else {
+            return false;
+        };
+        // The slots after the track shift up by one once it is taken out.
+        let to = if slot > from { slot - 1 } else { slot }.min(self.tracks.len() - 1);
+        if to == from {
+            return false;
+        }
+        let track = self.tracks.remove(from);
+        self.tracks.insert(to, track);
+        true
+    }
+
     /// Removes a track and its clips, returning it. The sources stay, so undo
     /// (a snapshot) and other clips of the same file keep working.
     pub fn remove_track(&mut self, id: TrackId) -> Option<Track> {
@@ -485,6 +503,45 @@ mod tests {
             !project.set_track_color(TrackId(999), None),
             "unknown track"
         );
+    }
+
+    #[test]
+    fn a_track_can_be_dragged_to_any_place() {
+        let mut project = Project::default();
+        let [a, b, c] =
+            ["a", "b", "c"].map(|name| project.import(name.into(), 1000, name.to_owned(), 0));
+        assert!(project.move_track_to(a, 3), "below the last track");
+        assert_eq!(project.track_ids(), vec![b, c, a]);
+        assert!(project.move_track_to(a, 0), "above the first track");
+        assert_eq!(project.track_ids(), vec![a, b, c]);
+        assert!(project.move_track_to(c, 1), "between a and b");
+        assert_eq!(project.track_ids(), vec![a, c, b]);
+        assert!(!project.move_track_to(c, 1), "just above itself");
+        assert!(!project.move_track_to(c, 2), "just below itself");
+        assert!(!project.move_track_to(TrackId(999), 0), "unknown track");
+    }
+
+    proptest! {
+        /// Dragging only reorders: the same tracks, and the dragged one ends up
+        /// where it was dropped (its new index counts the tracks above the slot).
+        #[test]
+        fn dragging_a_track_keeps_every_track(count in 1_usize..8, from in 0_usize..8, slot in 0_usize..12) {
+            let mut project = Project::default();
+            let ids: Vec<TrackId> = (0..count)
+                .map(|n| project.import(format!("{n}.wav").into(), 10, n.to_string(), 0))
+                .collect();
+            let from = from % count;
+            let slot = slot % (count + 1);
+            let moved = project.move_track_to(ids[from], slot);
+            let mut after = project.track_ids();
+            let expected_index = if slot > from { slot - 1 } else { slot }.min(count - 1);
+            prop_assert_eq!(moved, expected_index != from);
+            prop_assert_eq!(after[expected_index], ids[from]);
+            after.sort();
+            let mut before = ids.clone();
+            before.sort();
+            prop_assert_eq!(after, before);
+        }
     }
 
     #[test]

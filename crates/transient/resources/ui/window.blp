@@ -358,8 +358,13 @@ template $TransientWindow: Adw.ApplicationWindow {
                         height-request: 28;
                       }
 
+                      // The drop target for dragged headers (window/track_order.rs).
                       Box track_headers {
                         orientation: vertical;
+
+                        styles [
+                          "track-header-list",
+                        ]
                       }
                     };
                   }

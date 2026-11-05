@@ -95,7 +95,9 @@ when needed instead of being managed by hand.
       still gets a new track, starting at the playhead instead of 0:00.
 - [x] **Rename** (double-click the name, Rename… in the track menu, or F2) and
       **Move Up / Move Down** in the track menu (Alt+Up / Alt+Down).
-- [ ] **Reorder by dragging** a track header (later; the menu covers it for now).
+- [x] **Reorder by dragging** a track header: a line shows where it lands,
+      one undo step (`Project::move_track_to`, unit- and property-tested;
+      `window/track_order.rs`; checked headlessly with a real drag).
 - [x] **Remove Track** in the track menu (Undo toast, no confirmation). A track
       whose last clip is dragged to another track is removed automatically
       (decided 2026-11-04: tracks come from imported files).
@@ -288,16 +290,31 @@ account), the MIT licence, the SVG icon and the desktop file.
 
 ## Later (after the MVP)
 
-- Effects (the model leaves room for per-track effects)
-- Volume automation
+- **Effects milestone** (ideas from Audacity, 2026-11-05; in order of value for
+  effort):
+  1. **Real-time effects per track**: a small, curated set with plain-language
+     controls (low cut / EQ, compressor, noise gate; a limiter on the master),
+     in an "Effects" section of a track pane. Non-destructive, saved in the
+     project, written in Rust in `transient-core` (unit-tested), since our own
+     mixer renders the audio.
+  2. **Noise reduction** for voice recordings, Audacity's most-used effect.
+     Needs a library choice first (for example an RNNoise port: check its
+     licence and quality).
+  3. **Volume automation**: points on a clip's volume line; automatic ducking
+     of music under a voice track.
+  4. **Export at a loudness target** (for example −16 LUFS for podcasts) for the
+     whole mix; normalizing already measures loudness.
+- Truncate silence (shorten long pauses), and a spectrogram view (repair work)
 - Level meters per track, in the track headers (the master meter is under the
   master volume)
 - Clip names and colours (a fixed set that works in light and dark themes)
 - Markers and regions, and exporting one file per region
 - GitHub issue-based workflow instead of this file (not yet)
 
-Deliberately left out: changing a clip's speed by stretching it, drawing
-individual samples, workspaces, plugin hosting.
+Deliberately left out: changing a clip's speed or pitch by stretching it,
+drawing individual samples, workspaces, plugin hosting (VST, LV2), macros and
+batch processing: powerful, but they would turn Transient into another Audacity
+instead of the simpler alternative.
 
 ## Open questions and known gaps
 

@@ -18,6 +18,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Locate… in the "could not be found" banner: point a project at an audio file
   that was moved. Other missing files in the same folder are found with it.
   Undoable.
+- Drag a track's header up or down to reorder the tracks; a line shows where
+  it will go.
 
 ### Changed
 
