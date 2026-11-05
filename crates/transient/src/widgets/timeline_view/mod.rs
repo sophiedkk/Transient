@@ -428,6 +428,26 @@ impl TimelineView {
         );
     }
 
+    /// Calls `callback` when the user clicks empty space (not a clip or the ruler,
+    /// and without dragging).
+    pub(crate) fn connect_empty_clicked<F: Fn(&Self) + 'static>(&self, callback: F) {
+        self.connect_closure(
+            "empty-clicked",
+            false,
+            glib::closure_local!(move |view: Self| callback(&view)),
+        );
+    }
+
+    /// Calls `callback` with the clip the user double-clicked (to show its
+    /// properties).
+    pub(crate) fn connect_clip_activated<F: Fn(&Self, ClipId) + 'static>(&self, callback: F) {
+        self.connect_closure(
+            "clip-activated",
+            false,
+            glib::closure_local!(move |view: Self, id: u64| callback(&view, ClipId(id))),
+        );
+    }
+
     /// Calls `callback` with the changed clip and its (possibly new) lane, after
     /// the user moved or trimmed it. A lane one past the last means "a new track".
     pub(crate) fn connect_clip_changed<F: Fn(&Self, Clip, usize) + 'static>(&self, callback: F) {
@@ -479,6 +499,7 @@ impl TimelineView {
     /// Mouse, touchpad and touchscreen handling. Called once, from `constructed`.
     fn setup_controllers(&self) {
         let drag = self.drag_gesture();
+        self.setup_double_click(&drag);
         // The pinch is added before the drag, so that when a second finger lands
         // the pinch can take over from a drag the first finger started.
         self.setup_pinch(&drag);

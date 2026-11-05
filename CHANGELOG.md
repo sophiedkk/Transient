@@ -6,6 +6,24 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Double-clicking a clip opens the clip pane with its properties; clicking empty
+  space (which deselects) closes it again. Clicking below the last track now
+  deselects too.
+- Recent projects on the start screen can be removed from the list with their ×
+  button, for example one that was moved or can no longer be opened.
+
+### Changed
+
+- Deleting or cutting the last clip of a track also removes the track, as dragging
+  it away already did. Undo brings both back.
+
+### Fixed
+
+- The export dialog is taller, so the Stop Exporting button has room below it
+  and neither page needs to scroll.
+
 ## [0.1.0] - 2026-11-04
 
 The first release.

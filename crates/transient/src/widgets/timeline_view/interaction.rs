@@ -83,8 +83,10 @@ enum Zone {
 /// What is under the pointer.
 #[derive(Debug, Clone)]
 enum Hit {
-    /// The time ruler, or below the last lane.
+    /// The time ruler.
     Ruler,
+    /// The empty space below the last lane.
+    Below,
     /// A lane (this one), but no clip.
     Empty(usize),
     /// A clip (its lane index, its data and which part of it).
@@ -139,9 +141,33 @@ pub(crate) struct Drag {
     snap_points: Vec<Frames>,
     /// Whether the pointer moved far enough to count as a drag.
     moved: bool,
+    /// Whether it started on empty space (no clip, not the ruler): a click
+    /// there deselects and emits `empty-clicked`.
+    on_empty: bool,
 }
 
 impl TimelineView {
+    /// Double-clicking a clip emits `clip-activated` (the window shows the clip
+    /// pane). Called once, from `setup_controllers`.
+    pub(super) fn setup_double_click(&self, drag: &gtk::GestureDrag) {
+        let click = gtk::GestureClick::builder()
+            .button(gdk::BUTTON_PRIMARY)
+            .build();
+        // Grouped with the drag gesture, both see every press: a press that
+        // starts a drag (and claims it) still counts towards a double-click.
+        click.group_with(drag);
+        let weak = self.downgrade();
+        click.connect_pressed(move |_, presses, x, y| {
+            if presses == 2
+                && let Some(view) = weak.upgrade()
+                && let Some(clip) = view.clip_at(x, y)
+            {
+                view.emit_by_name::<()>("clip-activated", &[&clip.0]);
+            }
+        });
+        self.add_controller(click);
+    }
+
     /// Creates the drag gesture (the caller adds it to the view). Called once,
     /// from `setup_controllers`.
     pub(super) fn drag_gesture(&self) -> gtk::GestureDrag {
@@ -205,7 +231,7 @@ impl TimelineView {
             ) => Some("col-resize"),
             Hit::Clip(_, _, Zone::Strip) => Some("grab"),
             Hit::Clip(_, _, Zone::Waveform) | Hit::Empty(_) => Some("text"),
-            Hit::Ruler => None,
+            Hit::Ruler | Hit::Below => None,
         };
         self.set_cursor_from_name(cursor);
     }
@@ -236,7 +262,7 @@ impl TimelineView {
     pub(super) fn clip_at(&self, x: f64, y: f64) -> Option<ClipId> {
         match self.hit(x, y, POINTER_GRAB) {
             Hit::Clip(_, clip, _) => Some(clip.clip.id),
-            Hit::Ruler | Hit::Empty(_) => None,
+            Hit::Ruler | Hit::Below | Hit::Empty(_) => None,
         }
     }
 
@@ -244,7 +270,11 @@ impl TimelineView {
     /// count (see `visible_parts`), and later parts are drawn on top, so they win.
     fn hit(&self, x: f64, y: f64, grab: Grab) -> Hit {
         let Some(lane) = self.lane_at(y) else {
-            return Hit::Ruler;
+            return if y < f64::from(RULER_HEIGHT) {
+                Hit::Ruler
+            } else {
+                Hit::Below
+            };
         };
         let lanes = self.imp().lanes.borrow();
         let Some(clips) = lanes.get(lane).map(|lane| &lane.clips) else {
@@ -321,12 +351,19 @@ impl TimelineView {
         let mut start_lane = 0;
         let mut group = Vec::new();
         let mut collapse_to = None;
+        let on_empty = matches!(hit, Hit::Empty(_) | Hit::Below);
         let (kind, original) = match hit {
             Hit::Clip(_, clip, _) if extend => {
                 self.emit_by_name::<()>("clip-selected", &[&clip.clip.id.0, &true]);
                 (DragKind::Nothing, None)
             }
             Hit::Ruler => (DragKind::Seek, None),
+            Hit::Below => {
+                // Like the ruler it moves the playhead; being empty space, it
+                // also selects nothing.
+                self.emit_by_name::<()>("clip-selected", &[&0_u64, &false]);
+                (DragKind::Seek, None)
+            }
             Hit::Empty(lane) => {
                 // Clicking empty space selects nothing; dragging selects time.
                 self.emit_by_name::<()>("clip-selected", &[&0_u64, &false]);
@@ -386,6 +423,7 @@ impl TimelineView {
             group_preview: Vec::new(),
             collapse_to,
             moved: false,
+            on_empty,
         };
         self.imp().drag.replace(Some(drag));
         claims
@@ -526,6 +564,9 @@ impl TimelineView {
             }
             if !matches!(drag.kind, DragKind::Seek | DragKind::Nothing) {
                 self.seek_to_x(drag.start_x);
+            }
+            if drag.on_empty {
+                self.emit_by_name::<()>("empty-clicked", &[]);
             }
             return;
         }

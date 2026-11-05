@@ -84,6 +84,16 @@ impl Window {
         imp.pane_stack.set_visible_child_name("clip");
     }
 
+    /// Shows the pane (double-clicking a clip).
+    pub(super) fn show_clip_pane(&self) {
+        self.imp().split_view.set_show_sidebar(true);
+    }
+
+    /// Hides the pane (clicking empty space, which deselects).
+    pub(super) fn hide_clip_pane(&self) {
+        self.imp().split_view.set_show_sidebar(false);
+    }
+
     /// Shows or hides the pane (`win.toggle-clip-pane`, F9).
     pub(super) fn toggle_clip_pane(&self) {
         let split_view = &self.imp().split_view;

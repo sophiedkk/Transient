@@ -76,16 +76,22 @@ impl Clip {
 }
 
 impl Project {
-    /// Cuts `range` out of every clip on `tracks`, leaving a gap. Returns whether
+    /// Cuts `range` out of every clip on `tracks`, leaving a gap. A track left
+    /// without clips is removed (see [`Project::delete_clips`]). Returns whether
     /// anything changed.
     pub fn delete_range(&mut self, tracks: &[TrackId], range: TimeRange) -> bool {
         let mut next_id = self.next_id;
         let mut changed = false;
+        let mut emptied = Vec::new();
         for track in self
             .tracks
             .iter_mut()
             .filter(|track| tracks.contains(&track.id))
         {
+            if !track.clips.is_empty() {
+                // Checked again below: only tracks this cut emptied are removed.
+                emptied.push(track.id);
+            }
             let clips = std::mem::take(&mut track.clips);
             for clip in clips {
                 let (before, after) = clip.without(range, ClipId(next_id));
@@ -102,6 +108,7 @@ impl Project {
             }
         }
         self.next_id = next_id;
+        self.remove_emptied_tracks(&emptied);
         changed
     }
 
@@ -190,10 +197,20 @@ mod tests {
     }
 
     #[test]
-    fn deleting_a_range_over_a_whole_clip_removes_it() {
-        let (mut project, a, _) = two_tracks();
+    fn deleting_a_range_over_a_whole_clip_removes_it_and_its_emptied_track() {
+        let (mut project, a, b) = two_tracks();
         assert!(project.delete_range(&[a], range(0, 2000)));
-        assert!(clips(&project, a).is_empty());
+        assert!(project.track(a).is_none(), "track a has no clips left");
+        assert_eq!(project.track_ids(), vec![b]);
+    }
+
+    #[test]
+    fn a_range_delete_keeps_tracks_with_clips_left_and_empty_ones_it_did_not_empty() {
+        let (mut project, a, _) = two_tracks();
+        let empty = project.add_track("empty".to_owned());
+        assert!(project.delete_range(&[a, empty], range(300, 600)));
+        assert!(project.track(a).is_some(), "a still has two pieces");
+        assert!(project.track(empty).is_some(), "it was empty already");
     }
 
     #[test]

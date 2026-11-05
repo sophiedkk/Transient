@@ -151,6 +151,26 @@ impl Project {
         })
     }
 
+    /// Deletes clips (Delete, Cut). Tracks come from imported files and
+    /// recordings, so a track whose last clip is deleted has no use left and is
+    /// removed too, as when its last clip is dragged away. Returns whether
+    /// anything changed.
+    pub fn delete_clips(&mut self, ids: &[ClipId]) -> bool {
+        let emptied: Vec<TrackId> = ids
+            .iter()
+            .filter_map(|&id| self.remove_clip(id).map(|(track, _)| track))
+            .collect();
+        self.remove_emptied_tracks(&emptied);
+        !emptied.is_empty()
+    }
+
+    /// Removes those of `tracks` that have no clips left: the tracks an edit
+    /// emptied. Tracks that are not listed stay, even when empty.
+    pub(crate) fn remove_emptied_tracks(&mut self, tracks: &[TrackId]) {
+        self.tracks
+            .retain(|track| !(track.clips.is_empty() && tracks.contains(&track.id)));
+    }
+
     /// Splits a clip at timeline frame `at`. Returns the ID of the new (second) clip.
     pub fn split_clip(&mut self, id: ClipId, at: Frames) -> Option<ClipId> {
         let (track, clip) = self.clip(id).map(|(track, clip)| (track, *clip))?;
@@ -418,6 +438,24 @@ mod tests {
             "unknown clip"
         );
         assert_eq!(project.tracks.len(), 2, "no track for an unknown clip");
+    }
+
+    #[test]
+    fn deleting_the_last_clip_of_a_track_removes_the_track() {
+        let mut project = Project::default();
+        let a = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
+        let b = project.import("b.wav".into(), 1000, "b".to_owned(), 0);
+        let source = clips(&project, a)[0].source;
+        let second = project.add_clip(a, source, 2000).unwrap();
+        let only_b = clips(&project, b)[0].id;
+
+        assert!(project.delete_clips(&[second, only_b]));
+        assert_eq!(
+            project.track_ids(),
+            vec![a],
+            "a keeps its first clip; b is gone"
+        );
+        assert!(!project.delete_clips(&[second]), "already deleted");
     }
 
     #[test]

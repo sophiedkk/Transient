@@ -8,6 +8,9 @@ translation-domain "transient";
 template $TransientExportDialog: Adw.Dialog {
   title: _("Export");
   content-width: 440;
+  // Tall enough for both pages (and the extra "Export" row with a time
+  // selection) with room to spare, so neither page ever needs to scroll.
+  content-height: 340;
 
   child: Adw.ToolbarView {
     [top]

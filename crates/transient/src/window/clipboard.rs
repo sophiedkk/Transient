@@ -45,13 +45,7 @@ impl Window {
             self.set_time_selection(None);
         } else {
             let clips = self.selected_clips();
-            self.apply_edit(|project| {
-                let mut changed = false;
-                for clip in &clips {
-                    changed |= project.remove_clip(*clip).is_some();
-                }
-                changed
-            });
+            self.apply_edit(|project| project.delete_clips(&clips));
             self.select(None);
         }
     }

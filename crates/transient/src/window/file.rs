@@ -280,6 +280,7 @@ impl Window {
                 .subtitle(folder)
                 .activatable(true)
                 .build();
+            row.add_suffix(&self.remove_recent_button(item.uri().to_string()));
             row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
             let weak = self.downgrade();
             row.connect_activated(move |_| {
@@ -294,6 +295,28 @@ impl Window {
             });
             list.append(&row);
         }
+    }
+
+    /// A small button on a recent project's row that takes it off the list (for
+    /// a project that was moved, deleted or cannot be opened). The file itself
+    /// is left alone.
+    fn remove_recent_button(&self, uri: String) -> gtk::Button {
+        let button = gtk::Button::builder()
+            .icon_name("window-close-symbolic")
+            .valign(gtk::Align::Center)
+            .css_classes(["flat", "circular"])
+            .build();
+        crate::widgets::set_button_text(&button, &gettext("Remove From Recent Projects"));
+        let weak = self.downgrade();
+        button.connect_clicked(move |_| {
+            if let Err(error) = gtk::RecentManager::default().remove_item(&uri) {
+                warn!("could not remove {uri} from the recent files: {error}");
+            }
+            if let Some(window) = weak.upgrade() {
+                window.update_recent_projects();
+            }
+        });
+        button
     }
 
     /// Shows or hides the "missing audio" banner.

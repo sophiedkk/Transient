@@ -35,10 +35,17 @@ fi
 
 display="transient-headless-$$"
 # Throwaway data and cache folders, so test runs do not add to your recent
-# files or leave unpacked project audio in your cache.
-data_home="$(mktemp -d)"
+# files or leave unpacked project audio in your cache. HEADLESS_DATA_HOME uses
+# a prepared data folder instead (for example with a recently-used.xbel, to test
+# the recent projects); it is left in place afterwards.
 cache_home="$(mktemp -d)"
-trap 'rm -rf "$data_home" "$cache_home"' EXIT
+if [ -n "${HEADLESS_DATA_HOME:-}" ]; then
+    data_home="$HEADLESS_DATA_HOME"
+    trap 'rm -rf "$cache_home"' EXIT
+else
+    data_home="$(mktemp -d)"
+    trap 'rm -rf "$data_home" "$cache_home"' EXIT
+fi
 dbus-run-session -- \
     mutter --headless --no-x11 --virtual-monitor 1280x800 --wayland-display="$display" \
     -- env GTK_A11Y=none GDK_DEBUG=no-portals ADW_DISABLE_PORTAL=1 GSETTINGS_BACKEND=memory \

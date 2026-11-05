@@ -96,6 +96,8 @@ impl ObjectImpl for TimelineView {
     ///   this many frames to the right and lanes down (negative: left or up).
     /// - `clip-changed(clip id, start, offset, length, fade in, fade out, lane)`: a
     ///   clip was moved, trimmed or had its fades changed by dragging.
+    /// - `clip-activated(clip id)`: a clip was double-clicked.
+    /// - `empty-clicked`: empty space was clicked (not dragged).
     /// - `range-selected(start, end, first lane, last lane)`: time was selected.
     fn signals() -> &'static [Signal] {
         static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
@@ -103,6 +105,10 @@ impl ObjectImpl for TimelineView {
             let u64_type = u64::static_type();
             vec![
                 Signal::builder("seek").param_types([u64_type]).build(),
+                Signal::builder("empty-clicked").build(),
+                Signal::builder("clip-activated")
+                    .param_types([u64_type])
+                    .build(),
                 Signal::builder("clip-selected")
                     .param_types([u64_type, bool::static_type()])
                     .build(),

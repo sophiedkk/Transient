@@ -33,6 +33,24 @@ impl Window {
             }
         });
         let weak = self.downgrade();
+        timeline.connect_empty_clicked(move |_| {
+            if let Some(window) = weak.upgrade() {
+                // The click deselected the clip (`clip-selected`); the pane
+                // closes with it, as double-clicking a clip opens it.
+                window.hide_clip_pane();
+            }
+        });
+        let weak = self.downgrade();
+        timeline.connect_clip_activated(move |_, clip| {
+            if let Some(window) = weak.upgrade() {
+                // The first click of the double-click selected it already; with
+                // Ctrl or Shift held it may have toggled it off, so select it again.
+                window.set_time_selection(None);
+                window.select(Some(clip));
+                window.show_clip_pane();
+            }
+        });
+        let weak = self.downgrade();
         timeline.connect_clips_moved(move |_, frames, lanes| {
             if let Some(window) = weak.upgrade() {
                 window.move_selected_clips(frames, lanes);
@@ -199,13 +217,7 @@ impl Window {
         if clips.is_empty() {
             return;
         }
-        self.apply_edit(|project| {
-            let mut changed = false;
-            for clip in &clips {
-                changed |= project.remove_clip(*clip).is_some();
-            }
-            changed
-        });
+        self.apply_edit(|project| project.delete_clips(&clips));
         self.select(None);
         let count = u32::try_from(clips.len()).unwrap_or(u32::MAX);
         self.show_undo_toast(

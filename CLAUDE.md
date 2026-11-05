@@ -171,8 +171,13 @@ just test-audio                                 # decode the whole test collecti
   (`dev/send-keys.py`, mutter's RemoteDesktop API; "+" = keys together). Use it
   for anything keyboard-related (shortcuts, text fields), then check the saved
   project or log; e.g. `--action=rename-track` first, then type a name.
-  Mouse drags cannot be scripted; their maths lives in `transient-core::clip`, `::edit`
-  and `transient-core::range` (unit- and property-tested).
+  Clicks too: `move:X,Y` (screen pixels; the window fills the 1280×800 monitor),
+  `click`, `double-click`, e.g. `HEADLESS_KEYS="move:600,225 double-click"` with
+  `--screenshot-delay=6`. `HEADLESS_DATA_HOME=DIR` starts with a prepared data
+  folder instead of an empty one (e.g. a `recently-used.xbel` for the start
+  screen's recent projects). Mouse drags cannot be scripted; their maths lives in
+  `transient-core::clip`, `::edit` and `transient-core::range` (unit- and
+  property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.
 - Never play audio through the speakers in automated runs: always pass `--silent`.
 - `test-audio/` is downloaded by `dev/fetch-test-audio.sh` from `dev/test-audio.tsv`
