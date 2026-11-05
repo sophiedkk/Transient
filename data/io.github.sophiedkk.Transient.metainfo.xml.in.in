@@ -44,6 +44,17 @@
   </branding>
 
   <releases>
+    <release version="0.2.0" date="2026-11-05">
+      <description>
+        <p>Track colours, a light or dark style of your own, and smoother editing.</p>
+        <ul>
+          <li>Give tracks one of nine colours</li>
+          <li>Choose a light, dark or system style in the main menu</li>
+          <li>Double-click a clip to open its properties</li>
+          <li>Remove projects from the recent list</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-04">
       <description>
         <p>The first release of Transient: a simple multitrack audio editor.</p>
