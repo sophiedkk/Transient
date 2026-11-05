@@ -61,9 +61,10 @@ impl Window {
         self.imp().audio_output.set(output);
     }
 
-    /// Zooms the timeline in one step (also used by `--zoom`).
-    pub(crate) fn zoom_in(&self) {
-        self.imp().timeline.zoom_in();
+    /// Zooms the timeline in by `steps` steps, out for a negative number (also
+    /// used by `--zoom`).
+    pub(crate) fn zoom(&self, steps: f64) {
+        self.imp().timeline.zoom(steps);
     }
 
     /// Whether the timeline has been given a size yet.

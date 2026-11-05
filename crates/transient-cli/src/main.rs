@@ -21,6 +21,7 @@ use serde::Serialize;
 use transient_core::audio::{AudioBuffer, CHANNELS, to_dbfs};
 use transient_core::mix::{AudioPool, Mix};
 use transient_core::project::Project;
+use transient_core::report::Report;
 use transient_core::time::SampleRate;
 
 use transient_engine::decode::decode_file;
@@ -253,7 +254,7 @@ fn import_files(files: &[PathBuf]) -> anyhow::Result<(Project, AudioPool)> {
             .file_stem()
             .map(|stem| stem.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let track = project.import(file.clone(), decoded.buffer.frames(), name);
+        let track = project.import(file.clone(), decoded.buffer.frames(), name, 0);
         let source = project
             .track(track)
             .and_then(|track| track.clips.first())
@@ -288,7 +289,7 @@ fn probe(file: &Path) -> ProbeReport {
         Err(error) => ProbeReport {
             file: file.to_owned(),
             ok: false,
-            error: Some(error.to_string()),
+            error: Some(Report(&error).to_string()),
             decoded: None,
         },
     }

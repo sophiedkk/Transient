@@ -260,14 +260,10 @@ impl TimelineView {
         self.width() > 0
     }
 
-    /// Zooms in one step, around the playhead if it is visible.
-    pub(crate) fn zoom_in(&self) {
-        self.zoom_by(1.0 / ZOOM_STEP, self.zoom_anchor());
-    }
-
-    /// Zooms out one step.
-    pub(crate) fn zoom_out(&self) {
-        self.zoom_by(ZOOM_STEP, self.zoom_anchor());
+    /// Zooms in by `steps` steps (out for a negative number), around the playhead
+    /// if it is visible. One step in shows `ZOOM_STEP` times fewer frames per pixel.
+    pub(crate) fn zoom(&self, steps: f64) {
+        self.zoom_by(ZOOM_STEP.powf(-steps), self.zoom_anchor());
     }
 
     /// Shows the whole timeline.

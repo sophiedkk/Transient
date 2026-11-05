@@ -5,13 +5,20 @@
 
 pub mod archive;
 pub mod audio;
+pub mod clip;
 pub mod clipboard;
+pub mod convert;
 pub mod edit;
+pub mod history;
 pub mod mix;
 pub mod normalize;
 pub mod project;
 pub mod range;
+pub mod report;
 pub mod ruler;
 pub mod time;
 pub mod view;
 pub mod waveform;
+
+#[cfg(test)]
+mod test_support;

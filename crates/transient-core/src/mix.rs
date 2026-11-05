@@ -9,7 +9,8 @@
 use std::collections::HashMap;
 
 use crate::audio::{AudioBuffer, CHANNELS};
-use crate::edit::visible_parts;
+use crate::clip::visible_parts;
+use crate::convert::f32_from_f64;
 use crate::project::{Project, SourceId};
 use crate::range::TimeRange;
 use crate::time::{Frames, SampleRate, frames_to_f64};
@@ -56,13 +57,7 @@ fn fade_gain(position: Frames, length: Frames, fade_in: Frames, fade_out: Frames
     if remaining < fade_out {
         gain *= fade_shape(frames_to_f64(remaining) / frames_to_f64(fade_out));
     }
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "a gain between 0 and 1 fits an f32"
-    )]
-    let gain = gain as f32;
-    gain
+    f32_from_f64(gain)
 }
 
 /// Decibels to a multiplier: 0 dB → 1.0, −6 dB → about 0.5, +6 dB → about 2.
@@ -225,6 +220,15 @@ impl Mix {
 mod tests {
     use super::*;
 
+    /// A project with one track playing a 100-frame [`ramp`] from frame 0, and
+    /// its audio.
+    fn ramp_project() -> (Project, AudioPool) {
+        let mut project = Project::default();
+        let track = project.import("ramp.wav".into(), 100, "r".to_owned(), 0);
+        let source = project.track(track).unwrap().clips[0].source;
+        (project, AudioPool::from([(source, ramp(100))]))
+    }
+
     /// A buffer of `frames` frames, every sample `value`.
     fn constant(value: f32, frames: usize) -> AudioBuffer {
         AudioBuffer::new(SampleRate::HZ_48000, vec![value; frames * CHANNELS]).unwrap()
@@ -283,8 +287,8 @@ mod tests {
     #[test]
     fn overlapping_tracks_are_added_together() {
         let mut project = Project::default();
-        let a = project.import("a.wav".into(), 4, "a".to_owned());
-        let b = project.import("b.wav".into(), 4, "b".to_owned());
+        let a = project.import("a.wav".into(), 4, "a".to_owned(), 0);
+        let b = project.import("b.wav".into(), 4, "b".to_owned(), 0);
         let source_a = project.track(a).unwrap().clips[0].source;
         let source_b = project.track(b).unwrap().clips[0].source;
         let pool = AudioPool::from([(source_a, constant(0.25, 4)), (source_b, constant(0.5, 4))]);
@@ -295,10 +299,7 @@ mod tests {
 
     #[test]
     fn an_excerpt_plays_its_stretch_of_the_mix_from_its_frame_0() {
-        let mut project = Project::default();
-        let track = project.import("ramp.wav".into(), 100, "r".to_owned());
-        let source = project.track(track).unwrap().clips[0].source;
-        let pool = AudioPool::from([(source, ramp(100))]);
+        let (project, pool) = ramp_project();
         let mix = Mix::new(&project, &pool);
         let excerpt = mix.excerpt(TimeRange { start: 40, end: 60 });
         assert_eq!(excerpt.length(), 20);
@@ -316,10 +317,7 @@ mod tests {
 
     #[test]
     fn rendering_starts_anywhere_and_past_the_end_is_silent() {
-        let mut project = Project::default();
-        let track = project.import("ramp.wav".into(), 100, "r".to_owned());
-        let source = project.track(track).unwrap().clips[0].source;
-        let pool = AudioPool::from([(source, ramp(100))]);
+        let (project, pool) = ramp_project();
         let mix = Mix::new(&project, &pool);
 
         assert_eq!(render(&mix, 97, 5), [97.0, 98.0, 99.0, 0.0, 0.0]);
@@ -329,8 +327,8 @@ mod tests {
     /// Two tracks of constant 0.5, for the mixer setting tests.
     fn two_tracks() -> (Project, AudioPool) {
         let mut project = Project::default();
-        let a = project.import("a.wav".into(), 4, "a".to_owned());
-        let b = project.import("b.wav".into(), 4, "b".to_owned());
+        let a = project.import("a.wav".into(), 4, "a".to_owned(), 0);
+        let b = project.import("b.wav".into(), 4, "b".to_owned(), 0);
         let pool = [a, b]
             .iter()
             .map(|track| {
@@ -412,7 +410,7 @@ mod tests {
     #[test]
     fn fades_start_and_end_in_silence() {
         let mut project = Project::default();
-        let track = project.import("a.wav".into(), 100, "a".to_owned());
+        let track = project.import("a.wav".into(), 100, "a".to_owned(), 0);
         let source = project.track(track).unwrap().clips[0].source;
         project.tracks[0].clips[0] = project.tracks[0].clips[0].with_fades(10, 20);
         let pool = AudioPool::from([(source, constant(1.0, 100))]);
@@ -446,7 +444,7 @@ mod tests {
     #[test]
     fn a_source_without_audio_is_silent() {
         let mut project = Project::default();
-        project.import("missing.wav".into(), 10, "m".to_owned());
+        project.import("missing.wav".into(), 10, "m".to_owned(), 0);
         let mix = Mix::new(&project, &AudioPool::new());
         assert_eq!(render(&mix, 0, 3), [0.0, 0.0, 0.0]);
     }

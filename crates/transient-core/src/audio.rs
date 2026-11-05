@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
+use crate::convert::{f32_from_f64, f64_from_usize};
 use crate::time::{Frames, SampleRate};
 
 /// Transient always works in stereo.
@@ -100,19 +101,8 @@ impl AudioBuffer {
             return 0.0;
         }
         let sum_of_squares: f64 = self.samples.iter().map(|s| f64::from(*s).powi(2)).sum();
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_precision_loss,
-            reason = "a sample count is far below 2^53, so the conversion is exact"
-        )]
-        let count = self.samples.len() as f64;
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_possible_truncation,
-            reason = "an RMS of f32 samples always fits in an f32"
-        )]
-        let rms = (sum_of_squares / count).sqrt() as f32;
-        rms
+        let count = f64_from_usize(self.samples.len());
+        f32_from_f64((sum_of_squares / count).sqrt())
     }
 }
 

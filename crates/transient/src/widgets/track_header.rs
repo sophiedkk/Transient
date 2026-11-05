@@ -11,6 +11,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::glib;
+use transient_core::convert::f32_from_f64;
 use transient_core::mix::SILENT_DB;
 use transient_core::project::{Track, TrackId};
 
@@ -278,8 +279,8 @@ impl TrackHeader {
     fn settings(&self) -> TrackSettings {
         let imp = self.imp();
         TrackSettings {
-            volume_db: to_f32(imp.volume_scale.value()),
-            pan: to_f32(imp.pan_scale.value()),
+            volume_db: f32_from_f64(imp.volume_scale.value()),
+            pan: f32_from_f64(imp.pan_scale.value()),
             mute: imp.mute_button.is_active(),
             solo: imp.solo_button.is_active(),
         }
@@ -359,15 +360,4 @@ impl TrackHeader {
         };
         imp.pan_scale.set_tooltip_text(Some(&pan));
     }
-}
-
-/// A slider value as `f32` (slider ranges are small).
-fn to_f32(value: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "slider values are within -60..12, far inside f32's range"
-    )]
-    let value = value as f32;
-    value
 }

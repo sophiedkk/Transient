@@ -23,8 +23,12 @@ pub(crate) enum ExportOutcome {
     Done(gio::File),
     /// The user stopped it.
     Cancelled,
-    /// It failed; the message is for the log.
-    Failed(String),
+    /// The chosen file is not on this computer (the export writes to a path).
+    NotLocal,
+    /// The export failed.
+    Failed(ExportError),
+    /// The export thread stopped unexpectedly (a bug).
+    Crashed,
 }
 
 type FinishedCallback = Box<dyn Fn(ExportOutcome)>;
@@ -259,7 +263,7 @@ impl ExportDialog {
             imp.mix.borrow().clone()
         };
         let (Some(path), Some(mix)) = (file.path(), mix) else {
-            self.finish(ExportOutcome::Failed("not a local file".to_owned()));
+            self.finish(ExportOutcome::NotLocal);
             return;
         };
         imp.exporting.set(true);
@@ -302,8 +306,8 @@ impl ExportDialog {
         let outcome = match result {
             Ok(Ok(())) => ExportOutcome::Done(file),
             Ok(Err(ExportError::Cancelled)) => ExportOutcome::Cancelled,
-            Ok(Err(error)) => ExportOutcome::Failed(error.to_string()),
-            Err(_panic) => ExportOutcome::Failed("the export crashed".to_owned()),
+            Ok(Err(error)) => ExportOutcome::Failed(error),
+            Err(_panic) => ExportOutcome::Crashed,
         };
         self.finish(outcome);
     }

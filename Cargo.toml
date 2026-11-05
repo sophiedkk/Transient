@@ -34,6 +34,9 @@ gstreamer = "0.25"
 gstreamer-app = "0.25"     # appsrc/appsink: moving audio between Rust and GStreamer
 gstreamer-audio = "0.25"   # audio formats and caps
 ebur128 = "0.1"            # EBU R128 loudness measurement (for normalizing)
+# Checked conversions between number types (f64 → f32, f64 → i32, …) that
+# return `None` instead of silently truncating like `as` does.
+num-traits = "0.2"
 
 # Data and errors
 serde = { version = "1", features = ["derive"] }
@@ -61,8 +64,11 @@ proptest = "1"
 # Lints are configured once here and inherited by every crate (`[lints] workspace = true`).
 # Clippy groups sit at priority -1 so the individual lints below can override them.
 [workspace.lints.clippy]
+# Lint levels follow FerroEHR's Rust rules (ROADMAP.md, milestone 14). CI runs
+# clippy with `-D warnings`, so "warn" fails CI too; "deny" also fails locally.
+# Groups have priority -1 so the single lints below override them.
 all = { level = "deny", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
 
 # No panics in application code: a panic inside a GTK callback aborts the whole app.
 # Return a `Result` instead. (clippy.toml allows these in tests.)
@@ -72,20 +78,37 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
+panic_in_result_fn = "deny"       # a function returning `Result` reports, it does not panic
+missing_assert_message = "deny"   # an assert outside tests says what went wrong
+string_slice = "deny"             # `&s[a..b]` panics in the middle of a character
 dbg_macro = "deny"
 print_stdout = "deny"   # use `tracing` for logging
 print_stderr = "deny"
 
-# Audio code converts between number types constantly. Warn (not deny) on `as`
-# and on panicking indexing, and prefer iterators, `TryFrom` or a commented `#[expect]`.
-as_conversions = "warn"
-indexing_slicing = "warn"
+# No `as` between number types: it silently rounds, truncates or saturates.
+# Use `From`/`TryFrom`, or `transient_core::convert` (checked, tested). No
+# panicking indexing (`v[i]`) either: use `get`, iterators or slice patterns.
+as_conversions = "deny"
+indexing_slicing = "deny"
+unchecked_time_subtraction = "deny"   # `Instant - Instant` can panic; use `checked_sub`
+
+# Suppressions: `#[expect(lint, reason = "…")]` only. `expect` (unlike `allow`)
+# warns when the lint no longer fires, so stale suppressions are noticed.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 
 # Don't throw away information silently.
 map_err_ignore = "warn"
 unused_result_ok = "deny"
 float_cmp_const = "deny"
 lossy_float_literal = "deny"
+iter_over_hash_type = "deny"   # a HashMap's order changes between runs; sort, or use a BTreeMap
+
+# Clear code.
+pub_use = "deny"                       # no re-exports: import from where a thing is defined
+too_long_first_doc_paragraph = "deny"  # a doc comment starts with one short sentence
+clone_on_ref_ptr = "deny"              # `Rc::clone(&x)`, so a cheap clone looks cheap
+try_err = "deny"
 
 [workspace.lints.rust]
 # No unsafe code anywhere. `forbid` cannot be overridden by an `#[allow]` further down.
@@ -93,9 +116,25 @@ unsafe_code = "forbid"
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unreachable_pub = "warn"
+dead_code = "deny"
 let_underscore_drop = "deny"
+let_underscore_lock = "deny"
 non_ascii_idents = "forbid"
 unexpected_cfgs = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unused_qualifications = "deny"
+redundant_lifetimes = "deny"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+bare_urls = "deny"
+invalid_html_tags = "deny"
+invalid_codeblock_attributes = "deny"
+invalid_rust_codeblocks = "deny"
+redundant_explicit_links = "deny"
+unescaped_backticks = "deny"
 
 [profile.dev]
 debug = "line-tables-only"

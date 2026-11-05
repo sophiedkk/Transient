@@ -9,6 +9,7 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio};
+use transient_core::convert::i32_from_f64;
 use transient_core::time::frames_to_f64;
 
 use super::{LANE_HEIGHT, RULER_HEIGHT, TimelineView};
@@ -92,8 +93,8 @@ impl TimelineView {
             return;
         };
         menu.set_pointing_to(Some(&gdk::Rectangle::new(
-            whole_pixel(x),
-            whole_pixel(y),
+            i32_from_f64(x),
+            i32_from_f64(y),
             1,
             1,
         )));
@@ -113,17 +114,4 @@ impl TimelineView {
         (selection.first_lane..=selection.last_lane).contains(&lane)
             && (selection.range.start..selection.range.end).contains(&frame)
     }
-}
-
-/// A position in the view as a whole pixel, for `gdk::Rectangle`.
-fn whole_pixel(value: f64) -> i32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "a position inside the widget, rounded and clamped to the i32 range"
-    )]
-    let pixel = value
-        .round()
-        .clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32;
-    pixel
 }

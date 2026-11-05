@@ -33,7 +33,7 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   line up via `RULER_HEIGHT`/`LANE_HEIGHT`.
 - Dependencies point downward only: `transient`/`transient-cli` → `transient-engine` →
   `transient-core`.
-- Undo/redo = snapshots of the whole project (`transient-core::edit::History`).
+- Undo/redo = snapshots of the whole project (`transient-core::history::History`).
   Every change goes through `Window::apply_edit`, which records the snapshot.
   The timeline only previews drags and emits `clip-changed` on release.
 - Clips carry `gain_db`, `fade_in`, `fade_out` (`Clip::with_fades` keeps fades
@@ -72,16 +72,44 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
 
 ## Code rules
 
-- Lints are set in the root `Cargo.toml` (`[workspace.lints]`), clippy settings in
-  `clippy.toml`. CI runs clippy with `-D warnings`: fix warnings, don't silence them.
-  An exception is a narrow `#[expect(lint, reason = "...")]` at the site.
-- No `unwrap`/`expect`/`panic!` outside tests: a panic in a GTK callback aborts the
-  app. Return `Result`; show the user a toast; log with `tracing`.
+Based on the general-purpose parts of FerroEHR's Rust rules (ROADMAP.md,
+milestone 14). Each rule says what checks it; "review" means no tool does.
+
+- Lints are set in the root `Cargo.toml` (`[workspace.lints]`, `pedantic` at deny),
+  clippy settings in `clippy.toml`. CI runs clippy with `-D warnings`: fix
+  warnings, don't silence them.
+- **No suppressions in production code.** Rewrite the code instead. Tests may use
+  `#[expect(lint, reason = "…")]`; never `#[allow]` (clippy:
+  `allow_attributes`, `allow_attributes_without_reason`). The only exceptions are a
+  lint firing inside a third-party macro (glib's `Properties` derive) and the CLI
+  writing errors to stderr; their reason says so. (review)
+- No panics: no `unwrap`/`expect`/`panic!`/`unreachable!`/`todo!`, no `v[i]`
+  indexing or `&s[a..b]` slicing outside tests: a panic in a GTK callback aborts
+  the app. Return `Result`; show the user a toast; log with `tracing` (clippy).
+- No `as` between number types (clippy `as_conversions`): `From`/`TryFrom`, frame
+  conversions in `transient_core::time`, everything else through
+  `transient_core::convert` (checked with `num-traits`, tested).
+- Errors are types that keep their cause: `thiserror` enums with `#[source]`/
+  `#[from]`, never `.to_string()` into a `String` variant, and a variant's message
+  does not repeat its source. Log with `Report(&error)` (`transient_core::report`),
+  which prints the whole chain. (review; `map_err_ignore` catches dropped errors)
 - `unsafe_code` is forbidden in the whole workspace.
-- `thiserror` for errors in library crates; the app logs and reports them.
+- At most 800 lines per `.rs` file, tests included; split by concern
+  (`dev/check-file-size.sh`, in `just check` and CI).
+- No function that only forwards to another (a body that is one call with the
+  same or fixed arguments): call the target. Trait methods are exempt; reaching
+  into a field (`self.imp().timeline.zoom(…)`) is fine. (review)
+- Code is written once: logic with one reason to change has one owner, never a
+  `util`/`helpers` module ("one copy is fine, two are looked at, three are
+  extracted"). Shared test helpers live in `transient-core`'s `test_support`.
+  Measure with `npx jscpd@4.0.5 --format rust crates` when in doubt. (review)
+- Doc comments start with one short summary sentence, then a blank `///` line
+  (clippy `too_long_first_doc_paragraph`); rustdoc lints are deny.
+- No re-exports (`pub use`, clippy `pub_use`): import from where a thing is defined.
 - One `impl Default` per struct, and container-level `#[serde(default)]` on project
-  file structs so older files keep opening. Changing the file format means raising
-  `project::FORMAT_VERSION` and updating the snapshot test.
+  file structs so older files keep opening (never `#[serde(default = "path")]`).
+  Changing the file format means raising `project::FORMAT_VERSION` and updating
+  the snapshot test.
 - New dependencies go in `[workspace.dependencies]` with a version; crates use
   `name.workspace = true`.
 - Tests: `cargo nextest`; `insta` snapshots for file formats; `proptest` for maths
@@ -143,7 +171,7 @@ just test-audio                                 # decode the whole test collecti
   (`dev/send-keys.py`, mutter's RemoteDesktop API; "+" = keys together). Use it
   for anything keyboard-related (shortcuts, text fields), then check the saved
   project or log; e.g. `--action=rename-track` first, then type a name.
-  Mouse drags cannot be scripted; their maths lives in `transient-core::edit`
+  Mouse drags cannot be scripted; their maths lives in `transient-core::clip`, `::edit`
   and `transient-core::range` (unit- and property-tested).
   Add a new option in `src/launch.rs` when a feature needs scripted testing.
 - Never play audio through the speakers in automated runs: always pass `--silent`.

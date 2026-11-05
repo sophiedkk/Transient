@@ -15,6 +15,7 @@
 use std::ops::Range;
 
 use crate::audio::{AudioBuffer, CHANNELS};
+use crate::convert::f64_from_usize;
 use crate::time::{Frames, frames_from_f64};
 
 /// Frames per peak at level 0.
@@ -124,7 +125,7 @@ impl Waveform {
         let level = self.level_for(frames_per_column);
         (0..columns)
             .map(|column| {
-                let first = start + column_offset(column) * frames_per_column;
+                let first = start + f64_from_usize(column) * frames_per_column;
                 let first_frame = frames_from_f64(first.floor())?;
                 // Every column covers at least one frame, even when zoomed in very far.
                 let end_frame =
@@ -153,7 +154,7 @@ impl Waveform {
         let mut block = BASE_BLOCK;
         let mut level = None;
         for index in 0..self.levels.len() {
-            if column_offset(block) > frames_per_column {
+            if f64_from_usize(block) > frames_per_column {
                 break;
             }
             level = Some(index);
@@ -179,19 +180,8 @@ impl Waveform {
     }
 }
 
-/// A column index or block size as `f64` (exact for any realistic value).
-fn column_offset(value: usize) -> f64 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_precision_loss,
-        reason = "column counts and block sizes are far below 2^53"
-    )]
-    let value = value as f64;
-    value
-}
-
 #[cfg(test)]
-#[allow(
+#[expect(
     clippy::as_conversions,
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,

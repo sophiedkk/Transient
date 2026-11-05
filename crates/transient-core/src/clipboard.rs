@@ -1,6 +1,8 @@
-//! Cut, Copy and Paste: a [`Clipboard`] holds clips (or the parts of clips inside
-//! a time selection) together with where they were relative to each other, so
-//! pasting puts them back in the same arrangement somewhere else.
+//! Cut, Copy and Paste.
+//!
+//! A [`Clipboard`] holds clips (or the parts of clips inside a time selection)
+//! together with where they were relative to each other, so pasting puts them
+//! back in the same arrangement somewhere else.
 //!
 //! The clipboard lives in the app, not in the system clipboard: it refers to the
 //! project's sources (audio files) by ID, so it only makes sense within the
@@ -246,23 +248,16 @@ mod tests {
 
     use super::*;
     use crate::audio::AudioBuffer;
-    use crate::mix::{AudioPool, Mix};
+    use crate::mix::AudioPool;
+    use crate::test_support::{clips, range, render};
     use crate::time::SampleRate;
-
-    fn range(start: Frames, end: Frames) -> TimeRange {
-        TimeRange { start, end }
-    }
 
     /// Two tracks: a at 0..1000, b at 500..1500.
     fn two_tracks() -> (Project, TrackId, TrackId) {
         let mut project = Project::default();
-        let a = project.import("a.wav".into(), 1000, "a".to_owned());
-        let b = project.import_at("b.wav".into(), 1000, "b".to_owned(), 500);
+        let a = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
+        let b = project.import("b.wav".into(), 1000, "b".to_owned(), 500);
         (project, a, b)
-    }
-
-    fn clips(project: &Project, track: TrackId) -> Vec<Clip> {
-        project.track(track).unwrap().clips.clone()
     }
 
     #[test]
@@ -332,7 +327,7 @@ mod tests {
     #[test]
     fn paste_uses_a_gap_that_is_big_enough() {
         let mut project = Project::default();
-        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let track = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
         let source = clips(&project, track)[0].source;
         project.add_clip(track, source, 2500).unwrap();
         let short = Clipboard {
@@ -398,14 +393,6 @@ mod tests {
         assert_eq!((start.fade_in, start.fade_out), (100, 0));
     }
 
-    /// Renders the whole project, left channel only.
-    fn render(project: &Project, pool: &AudioPool) -> Vec<f32> {
-        let mix = Mix::new(project, pool);
-        let mut out = vec![0.0; usize::try_from(mix.length()).unwrap() * 2];
-        mix.render(0, &mut out);
-        out.into_iter().step_by(2).collect()
-    }
-
     proptest! {
         /// Wherever the clips and the playhead are, the free spot is at or after
         /// the playhead, the pasted copy covers no clip, and no earlier place
@@ -418,7 +405,7 @@ mod tests {
             at in 0_u64..5000,
         ) {
             let mut project = Project::default();
-            let track = project.import("a.wav".into(), 10_000, "a".to_owned());
+            let track = project.import("a.wav".into(), 10_000, "a".to_owned(), 0);
             let source = clips(&project, track)[0].source;
             project.remove_clip(clips(&project, track)[0].id);
             for (start, length) in starts.iter().zip(&lengths) {
@@ -455,7 +442,7 @@ mod tests {
         #[test]
         fn cut_and_insert_back_changes_nothing(start in 0_u64..1000, length in 1_u64..600) {
             let mut project = Project::default();
-            let track = project.import("ramp.wav".into(), 1000, "r".to_owned());
+            let track = project.import("ramp.wav".into(), 1000, "r".to_owned(), 0);
             let samples: Vec<f32> = (0..1000_u16).flat_map(|n| [f32::from(n) + 1.0, 0.0]).collect();
             let pool = AudioPool::from([(
                 clips(&project, track)[0].source,

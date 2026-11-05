@@ -51,10 +51,19 @@ pub enum DecodeError {
     /// The engine itself failed (a missing plugin, for example).
     #[error(transparent)]
     Engine(#[from] EngineError),
+    /// The file's full path could not be worked out.
+    #[error("could not find the file")]
+    Path(#[source] std::io::Error),
+    /// The path cannot be turned into a `file://` URI for GStreamer.
+    #[error("the file's name is not usable")]
+    Uri(#[source] gstreamer::glib::Error),
     /// GStreamer could not read the file: it does not exist, is not audio,
     /// or no decoder is installed for its format.
-    #[error("could not read the file: {0}")]
-    Unreadable(String),
+    #[error("could not read the file")]
+    Unreadable(#[source] gstreamer::glib::Error),
+    /// The decoder stopped before it said why.
+    #[error("the decoder could not start")]
+    NotStarted,
     /// The file was read but contained no audio.
     #[error("the file contains no audio")]
     NoAudio,
@@ -67,10 +76,8 @@ pub enum DecodeError {
 /// See [`DecodeError`].
 pub fn decode_file(path: &Path, sample_rate: SampleRate) -> Result<DecodedAudio, DecodeError> {
     // GStreamer wants a URI (file:///…), and that needs an absolute path.
-    let path =
-        std::path::absolute(path).map_err(|error| DecodeError::Unreadable(error.to_string()))?;
-    let uri = gstreamer::glib::filename_to_uri(&path, None)
-        .map_err(|error| DecodeError::Unreadable(error.to_string()))?;
+    let path = std::path::absolute(path).map_err(DecodeError::Path)?;
+    let uri = gstreamer::glib::filename_to_uri(&path, None).map_err(DecodeError::Uri)?;
 
     let pipeline = gstreamer::Pipeline::new();
     let decoder = make_element("uridecodebin")?;
@@ -127,8 +134,7 @@ pub fn decode_file(path: &Path, sample_rate: SampleRate) -> Result<DecodedAudio,
         return Err(DecodeError::NoAudio);
     }
 
-    let buffer = AudioBuffer::new(sample_rate, samples)
-        .map_err(|error| DecodeError::Unreadable(error.to_string()))?;
+    let buffer = AudioBuffer::new(sample_rate, samples).map_err(EngineError::from)?;
     let source_format = source_format.lock().ok().and_then(|slot| *slot);
     Ok(DecodedAudio {
         buffer,
@@ -175,9 +181,7 @@ fn pull_all_samples(
             read_error(pipeline)
         })?;
 
-    let bus = pipeline
-        .bus()
-        .ok_or(EngineError::Pipeline("no bus".into()))?;
+    let bus = pipeline.bus().ok_or(EngineError::NoBus)?;
     let poll_interval = gstreamer::ClockTime::from_mseconds(100);
     let mut samples = Vec::new();
 
@@ -213,15 +217,15 @@ fn read_error(pipeline: &gstreamer::Pipeline) -> DecodeError {
         .bus()
         .and_then(|bus| bus.pop_filtered(&[gstreamer::MessageType::Error]))
         .map_or_else(
-            || DecodeError::Unreadable("the decoder could not start".into()),
+            || DecodeError::NotStarted,
             |message| error_from_message(&message),
         )
 }
 
 fn error_from_message(message: &gstreamer::Message) -> DecodeError {
     match message.view() {
-        gstreamer::MessageView::Error(error) => DecodeError::Unreadable(error.error().to_string()),
-        _ => DecodeError::Unreadable("unknown error".into()),
+        gstreamer::MessageView::Error(error) => DecodeError::Unreadable(error.error()),
+        _ => DecodeError::NotStarted,
     }
 }
 

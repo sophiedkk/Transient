@@ -9,7 +9,8 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gdk, graphene, gsk, pango};
-use transient_core::edit::visible_parts;
+use transient_core::clip::visible_parts;
+use transient_core::convert::{f32_from_f64, f64_from_usize, i32_from_f64, u32_from_f64};
 use transient_core::mix::{db_to_gain, fade_shape};
 use transient_core::project::{Clip, ClipId};
 use transient_core::ruler;
@@ -34,6 +35,19 @@ const HEADROOM: f32 = 0.92;
 struct Palette {
     foreground: gdk::RGBA,
     accent: gdk::RGBA,
+}
+
+/// One clip to draw (see `draw_clip`).
+#[derive(Clone, Copy)]
+struct ClipToDraw<'a> {
+    /// Its waveform and name.
+    drawn: &'a LaneClip,
+    /// Where it is: the whole clip, a drag preview, or a visible part.
+    clip: &'a Clip,
+    /// The top of its lane, in pixels.
+    lane_top: f32,
+    /// Whether to draw it highlighted.
+    selected: bool,
 }
 
 /// What every drawing step needs to know about the view.
@@ -108,20 +122,7 @@ impl TimelineView {
             if !lane.audible {
                 snapshot.push_opacity(SILENT_LANE_OPACITY);
             }
-            // This lane's clips as they would be if the drag ended now: moved clips
-            // go on top, like on release.
-            let mut stack: Vec<Clip> = lane
-                .clips
-                .iter()
-                .map(|clip| clip.clip)
-                .filter(|clip| !is_moved(clip.id))
-                .collect();
-            stack.extend(
-                moved
-                    .iter()
-                    .filter(|(lane, _)| *lane == index)
-                    .map(|(_, clip)| *clip),
-            );
+            let stack = lane_stack(&lane.clips, index, &moved);
             let parts = visible_parts(&stack);
             for &part in &parts {
                 let Some(drawn) = drawn_clip(part.id) else {
@@ -134,7 +135,13 @@ impl TimelineView {
                         .find(|clip| clip.id == part.id)
                         .map(|whole| (*whole, top, parts.clone()));
                 }
-                self.draw_clip(snapshot, &view, &palette, drawn, &part, top, is_selected);
+                let item = ClipToDraw {
+                    drawn,
+                    clip: &part,
+                    lane_top: top,
+                    selected: is_selected,
+                };
+                self.draw_clip(snapshot, &view, &palette, item);
             }
             if !lane.audible {
                 snapshot.pop();
@@ -190,7 +197,13 @@ impl TimelineView {
             &palette.foreground.with_alpha(0.04),
             &graphene::Rect::new(0.0, top, view.width, pixels(LANE_HEIGHT)),
         );
-        self.draw_clip(snapshot, view, palette, drawn, moved, top, true);
+        let item = ClipToDraw {
+            drawn,
+            clip: moved,
+            lane_top: top,
+            selected: true,
+        };
+        self.draw_clip(snapshot, view, palette, item);
     }
 
     /// A take being recorded, in `lane` (the empty one below the last track): a
@@ -212,8 +225,8 @@ impl TimelineView {
         let top = lane_top(lane) + CLIP_INSET;
         let height = pixels(LANE_HEIGHT) - 2.0 * CLIP_INSET;
         let (box_left, box_right) = (
-            pixels_f64(left.max(-4.0)),
-            pixels_f64(right.min(f64::from(view.width) + 4.0)),
+            f32_from_f64(left.max(-4.0)),
+            f32_from_f64(right.min(f64::from(view.width) + 4.0)),
         );
         let bounds = graphene::Rect::new(box_left, top, (box_right - box_left).max(1.0), height);
         snapshot.push_rounded_clip(&gsk::RoundedRect::from_rect(bounds, CLIP_RADIUS));
@@ -249,7 +262,7 @@ impl TimelineView {
             let bar = (peak.min(1.0) * half).max(0.5);
             snapshot.append_color(
                 &palette.accent,
-                &graphene::Rect::new(pixels_f64(column), wave_middle - bar, 1.0, 2.0 * bar),
+                &graphene::Rect::new(f32_from_f64(column), wave_middle - bar, 1.0, 2.0 * bar),
             );
             column += 1.0;
         }
@@ -299,7 +312,7 @@ impl TimelineView {
         let y = lane_top + CLIP_INSET + CLIP_LABEL_HEIGHT / 2.0;
         for x in [fade_in_x, fade_out_x] {
             if self.is_visible_at(parts, clip.id, x) {
-                draw_handle(snapshot, palette, pixels_f64(x), y);
+                draw_handle(snapshot, palette, f32_from_f64(x), y);
             }
         }
     }
@@ -322,7 +335,7 @@ impl TimelineView {
         );
         let dimmed = palette.foreground.with_alpha(0.55);
         for tick in ticks {
-            let x = pixels_f64(tick.x);
+            let x = f32_from_f64(tick.x);
             snapshot.append_color(
                 &dimmed,
                 &graphene::Rect::new(x, ruler_height - 7.0, 1.0, 6.0),
@@ -335,24 +348,23 @@ impl TimelineView {
         }
     }
 
-    /// One clip: a rounded box with its name and waveform. `clip` is where to draw
-    /// it (its own position, or a drag preview); `drawn` supplies waveform and name.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "drawing state is passed explicitly rather than hidden in a struct"
-    )]
-    /// Draws `clip`: a whole clip, or the visible part of one that other clips
-    /// partly cover (see `visible_parts`). `drawn` has its waveform and name.
+    /// Draws one clip: a rounded box with its name and waveform.
+    ///
+    /// The clip can be a whole clip, a drag preview, or the visible part of one
+    /// that other clips partly cover (see `visible_parts`).
     fn draw_clip(
         &self,
         snapshot: &gtk::Snapshot,
         view: &View,
         palette: &Palette,
-        drawn: &LaneClip,
-        clip: &Clip,
-        lane_top: f32,
-        selected: bool,
+        item: ClipToDraw<'_>,
     ) {
+        let ClipToDraw {
+            drawn,
+            clip,
+            lane_top,
+            selected,
+        } = item;
         let left = view.x(frames_to_f64(clip.start));
         let right = view.x(frames_to_f64(clip.end()));
         if right < 0.0 || left > f64::from(view.width) {
@@ -360,8 +372,8 @@ impl TimelineView {
         }
         // Clamp to just outside the view: GTK draws huge rectangles badly.
         let (box_left, box_right) = (
-            pixels_f64(left.max(-f64::from(CLIP_RADIUS))),
-            pixels_f64(right.min(f64::from(view.width) + f64::from(CLIP_RADIUS))),
+            f32_from_f64(left.max(-f64::from(CLIP_RADIUS))),
+            f32_from_f64(right.min(f64::from(view.width) + f64::from(CLIP_RADIUS))),
         );
         let top = lane_top + CLIP_INSET;
         let height = pixels(LANE_HEIGHT) - 2.0 * CLIP_INSET;
@@ -387,7 +399,7 @@ impl TimelineView {
         let half_height = (height - CLIP_LABEL_HEIGHT) / 2.0;
         let first_column = left.max(0.0).floor();
         let last_column = right.min(f64::from(view.width)).ceil();
-        let columns = usize::try_from(column_count(last_column - first_column)).unwrap_or(0);
+        let columns = usize::try_from(u32_from_f64(last_column - first_column)).unwrap_or(0);
         let source_start =
             frames_to_f64(clip.offset) + view.start + first_column * view.frames_per_pixel
                 - frames_to_f64(clip.start);
@@ -402,7 +414,7 @@ impl TimelineView {
         // Drawn with the clip's gain applied, so normalizing visibly changes it.
         if let Some(path) = waveform_path(
             &peaks,
-            pixels_f64(first_column),
+            f32_from_f64(first_column),
             wave_top + half_height,
             half_height,
             db_to_gain(clip.gain_db),
@@ -410,31 +422,15 @@ impl TimelineView {
             snapshot.append_fill(&path, gsk::FillRule::Winding, &palette.accent);
         }
 
-        // Fades: the part of the waveform a fade takes away is shaded, with the
-        // fade's curve drawn on top.
-        let bottom = top + height;
-        let fade_width = |frames| pixels_f64(frames_to_f64(frames) / view.frames_per_pixel);
-        let (clip_left, clip_right) = (pixels_f64(left), pixels_f64(right));
-        if clip.fade_in > 0 {
-            let end = clip_left + fade_width(clip.fade_in);
-            draw_fade(
-                snapshot,
-                palette,
-                (clip_left, end),
-                (wave_top, bottom),
-                true,
-            );
-        }
-        if clip.fade_out > 0 {
-            let start = clip_right - fade_width(clip.fade_out);
-            draw_fade(
-                snapshot,
-                palette,
-                (start, clip_right),
-                (wave_top, bottom),
-                false,
-            );
-        }
+        let edges = (f32_from_f64(left), f32_from_f64(right));
+        draw_clip_fades(
+            snapshot,
+            view,
+            palette,
+            clip,
+            edges,
+            (wave_top, top + height),
+        );
 
         // The name, starting at the visible left edge so it stays readable when scrolled.
         let label = if drawn.waveform.is_some() {
@@ -489,7 +485,7 @@ fn draw_playhead(
     let x = view.x(frames_to_f64(frame));
     if (0.0..=f64::from(view.width)).contains(&x) {
         // Keep the 2-pixel line fully visible at the very start and end.
-        let x = pixels_f64(x).clamp(1.0, view.width - 1.0);
+        let x = f32_from_f64(x).clamp(1.0, view.width - 1.0);
         snapshot.append_color(
             &palette.foreground,
             &graphene::Rect::new(x - 1.0, 0.0, 2.0, height),
@@ -508,8 +504,8 @@ fn draw_time_selection(
     if selection.range.is_empty() {
         return;
     }
-    let left = pixels_f64(view.x(frames_to_f64(selection.range.start)));
-    let right = pixels_f64(view.x(frames_to_f64(selection.range.end)));
+    let left = f32_from_f64(view.x(frames_to_f64(selection.range.start)));
+    let right = f32_from_f64(view.x(frames_to_f64(selection.range.end)));
     let top = lane_top(selection.first_lane);
     let bottom = lane_top(selection.last_lane + 1);
     let span = (right - left).max(1.0);
@@ -529,6 +525,45 @@ fn draw_time_selection(
     }
 }
 
+/// A lane's clips as they would be if the drag ended now: the clips being moved
+/// (`moved`, with the lane each is over) go on top, like on release.
+fn lane_stack(clips: &[LaneClip], lane: usize, moved: &[(usize, Clip)]) -> Vec<Clip> {
+    let is_moved = |id: ClipId| moved.iter().any(|(_, clip)| clip.id == id);
+    clips
+        .iter()
+        .map(|clip| clip.clip)
+        .filter(|clip| !is_moved(clip.id))
+        .chain(
+            moved
+                .iter()
+                .filter(|(over, _)| *over == lane)
+                .map(|(_, clip)| *clip),
+        )
+        .collect()
+}
+
+/// A clip's fades: the part of the waveform a fade takes away is shaded, with
+/// the fade's curve drawn on top. `edges` are the clip's left and right in
+/// pixels, `wave` the top and bottom of its waveform area.
+fn draw_clip_fades(
+    snapshot: &gtk::Snapshot,
+    view: &View,
+    palette: &Palette,
+    clip: &Clip,
+    (left, right): (f32, f32),
+    wave: (f32, f32),
+) {
+    let fade_width = |frames| f32_from_f64(frames_to_f64(frames) / view.frames_per_pixel);
+    if clip.fade_in > 0 {
+        let end = left + fade_width(clip.fade_in);
+        draw_fade(snapshot, palette, (left, end), wave, true);
+    }
+    if clip.fade_out > 0 {
+        let start = right - fade_width(clip.fade_out);
+        draw_fade(snapshot, palette, (start, right), wave, false);
+    }
+}
+
 fn draw_fade(
     snapshot: &gtk::Snapshot,
     palette: &Palette,
@@ -540,8 +575,8 @@ fn draw_fade(
         .map(|step| {
             let t = f64::from(step) / f64::from(FADE_STEPS);
             let gain = fade_shape(if rising { t } else { 1.0 - t });
-            let x = x0 + (x1 - x0) * pixels_f64(t);
-            (x, bottom - pixels_f64(gain) * (bottom - top))
+            let x = x0 + (x1 - x0) * f32_from_f64(t);
+            (x, bottom - f32_from_f64(gain) * (bottom - top))
         })
         .collect();
     let Some((&(first_x, first_y), rest)) = curve.split_first() else {
@@ -627,44 +662,16 @@ fn lane_top(index: usize) -> f32 {
 
 /// A widget size in pixels as `f32`, the unit GTK draws in.
 fn pixels(value: i32) -> f32 {
-    pixels_f64(f64::from(value))
+    f32_from_f64(f64::from(value))
 }
 
 fn index_f32(index: usize) -> f32 {
-    pixels_f64(f64::from(u32::try_from(index).unwrap_or(u32::MAX)))
-}
-
-fn pixels_f64(value: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "pixel coordinates are small; f32 is what GTK draws with"
-    )]
-    let value = value as f32;
-    value
-}
-
-/// A whole number of columns (the input is already rounded and non-negative).
-fn column_count(columns: f64) -> u32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a column count is a small whole number; `as` saturates out-of-range values"
-    )]
-    let columns = columns.max(0.0) as u32;
-    columns
+    f32_from_f64(f64_from_usize(index))
 }
 
 /// Pixels to Pango units (Pango measures text in 1/1024ths of a pixel).
 fn pango_units(pixels: f32) -> i32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "text widths are small; `as` saturates out-of-range values"
-    )]
-    let units = (pixels.max(0.0) * 1024.0) as i32;
-    units
+    i32_from_f64(f64::from(pixels.max(0.0)) * 1024.0)
 }
 
 /// A block number from a fractional one (rounded down; negative counts as 0).

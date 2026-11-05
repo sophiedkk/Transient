@@ -11,6 +11,7 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::glib;
 use tracing::warn;
+use transient_core::report::Report;
 use transient_core::time::{Frames, format_position};
 use transient_engine::player::{Player, PlayerEvent};
 
@@ -72,7 +73,7 @@ impl Window {
             if play { player.play() } else { player.pause() }
         };
         if let Err(error) = result {
-            warn!("playback failed: {error}");
+            warn!("playback failed: {}", Report(&error));
             self.show_toast(&gettext("Playback failed"));
         }
         self.update_transport();
@@ -87,7 +88,7 @@ impl Window {
             .as_mut()
             .map(|player| player.seek(frame));
         if let Some(Err(error)) = result {
-            warn!("seeking failed: {error}");
+            warn!("seeking failed: {}", Report(&error));
         }
         // After a deliberate jump, make sure the playhead is in view.
         self.imp().timeline.set_playhead(frame, true);
@@ -130,8 +131,8 @@ impl Window {
         self.update_level_meter(if recording { input_levels } else { levels });
 
         for event in events {
-            if let PlayerEvent::Error(message) = event {
-                warn!("playback error: {message}");
+            if let PlayerEvent::Error(error) = event {
+                warn!("playback error: {}", Report(&error));
                 self.show_toast(&gettext("Playback failed"));
             }
         }

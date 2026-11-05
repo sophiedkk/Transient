@@ -26,7 +26,7 @@ use transient_core::audio::CHANNELS;
 use transient_core::mix::Mix;
 use transient_core::time::{Frames, SampleRate, frames_to_f64};
 
-use crate::{EngineError, make_element};
+use crate::{EngineError, frames_to_time, make_element};
 
 /// How many frames to render and push at a time.
 const CHUNK_FRAMES: usize = 8192;
@@ -160,9 +160,6 @@ pub enum ExportError {
     /// The export was cancelled; the unfinished file was removed.
     #[error("the export was cancelled")]
     Cancelled,
-    /// GStreamer reported an error while encoding or writing.
-    #[error("the export failed: {0}")]
-    Failed(String),
 }
 
 /// Exports `mix` to `path` in `format`. Calls `progress` with the fraction done
@@ -233,9 +230,7 @@ fn run_pipeline(
         .map_err(EngineError::from)?;
 
     let result = push_mix(mix, &appsrc, rate, progress, cancel).and_then(|()| {
-        appsrc
-            .end_of_stream()
-            .map_err(|error| ExportError::Failed(error.to_string()))?;
+        appsrc.end_of_stream().map_err(EngineError::from)?;
         wait_for_end(&pipeline)
     });
     if let Err(error) = pipeline.set_state(gstreamer::State::Null) {
@@ -267,12 +262,10 @@ fn push_mix(
         let bytes: Vec<u8> = chunk.iter().flat_map(|s| s.to_le_bytes()).collect();
         let mut buffer = gstreamer::Buffer::from_mut_slice(bytes);
         if let Some(buffer) = buffer.get_mut() {
-            buffer.set_pts(time(position, rate));
-            buffer.set_duration(time(frames, rate));
+            buffer.set_pts(frames_to_time(position, rate));
+            buffer.set_duration(frames_to_time(frames, rate));
         }
-        appsrc
-            .push_buffer(buffer)
-            .map_err(|error| ExportError::Failed(format!("could not write audio: {error:?}")))?;
+        appsrc.push_buffer(buffer).map_err(EngineError::from)?;
         position += frames;
         progress(frames_to_f64(position) / frames_to_f64(length));
     }
@@ -281,30 +274,18 @@ fn push_mix(
 
 /// Waits until the file is completely written (or GStreamer reports an error).
 fn wait_for_end(pipeline: &gstreamer::Pipeline) -> Result<(), ExportError> {
-    let bus = pipeline
-        .bus()
-        .ok_or_else(|| ExportError::Failed("no bus".into()))?;
+    let bus = pipeline.bus().ok_or(EngineError::NoBus)?;
     let message = bus.timed_pop_filtered(
         gstreamer::ClockTime::NONE,
         &[gstreamer::MessageType::Eos, gstreamer::MessageType::Error],
     );
     let Some(message) = message else {
-        return Err(ExportError::Failed(
-            "the pipeline stopped unexpectedly".into(),
-        ));
+        return Err(EngineError::Stopped.into());
     };
     match message.view() {
         gstreamer::MessageView::Eos(_) => Ok(()),
-        gstreamer::MessageView::Error(error) => Err(ExportError::Failed(error.error().to_string())),
-        _ => Err(ExportError::Failed(
-            "the pipeline stopped unexpectedly".into(),
-        )),
+        _ => Err(crate::bus_error(&message).into()),
     }
-}
-
-fn time(frames: Frames, rate: SampleRate) -> gstreamer::ClockTime {
-    let nanos = u128::from(frames) * 1_000_000_000 / u128::from(rate.hz());
-    gstreamer::ClockTime::from_nseconds(u64::try_from(nanos).unwrap_or(u64::MAX))
 }
 
 fn absolute(path: &Path) -> PathBuf {
@@ -338,7 +319,7 @@ mod tests {
             })
             .collect();
         let mut project = Project::default();
-        let track = project.import("tone.wav".into(), u64::from(frames), "tone".to_owned());
+        let track = project.import("tone.wav".into(), u64::from(frames), "tone".to_owned(), 0);
         let source = project.track(track).unwrap().clips[0].source;
         let audio = AudioBuffer::new(SampleRate::HZ_48000, samples).unwrap();
         Mix::new(&project, &AudioPool::from([(source, audio)]))

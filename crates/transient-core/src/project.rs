@@ -166,7 +166,7 @@ impl Default for Project {
 #[derive(Debug, Error)]
 pub enum ProjectError {
     /// The file is not valid JSON, or does not have the expected structure.
-    #[error("the project file is damaged: {0}")]
+    #[error("the project file is damaged")]
     Malformed(#[from] serde_json::Error),
     /// The file was saved by a newer version of Transient.
     #[error(
@@ -274,15 +274,9 @@ impl Project {
         Some(id)
     }
 
-    /// Imports a file the usual way: a new track named `name`, with the whole
-    /// file as one clip at the start of the timeline.
-    pub fn import(&mut self, path: PathBuf, frames: Frames, name: String) -> TrackId {
-        self.import_at(path, frames, name, 0)
-    }
-
-    /// Like [`Project::import`], with the clip starting at `start` (the app
-    /// imports at the playhead).
-    pub fn import_at(
+    /// Imports a file: a new track named `name`, with the whole file (`frames`
+    /// long) as one clip starting at `start` (the app imports at the playhead).
+    pub fn import(
         &mut self,
         path: PathBuf,
         frames: Frames,
@@ -334,7 +328,7 @@ mod tests {
     #[test]
     fn project_file_format() {
         let mut project = Project::default();
-        project.import("/music/drums.wav".into(), 96_000, "drums".to_owned());
+        project.import("/music/drums.wav".into(), 96_000, "drums".to_owned(), 0);
         let json = project.to_json().unwrap();
         insta::assert_snapshot!(json, @r#"
         {
@@ -383,7 +377,7 @@ mod tests {
             sample_rate: SampleRate::new(44_100).unwrap(),
             ..Project::default()
         };
-        project.import("intro.flac".into(), 1000, "intro".to_owned());
+        project.import("intro.flac".into(), 1000, "intro".to_owned(), 0);
         let reopened = Project::from_json(&project.to_json().unwrap()).unwrap();
         assert_eq!(reopened, project);
     }
@@ -428,7 +422,7 @@ mod tests {
     fn the_timeline_ends_with_the_last_clip() {
         let mut project = Project::default();
         assert_eq!(project.length(), 0);
-        let track = project.import("a.wav".into(), 1000, "a".to_owned());
+        let track = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
         let source = project.add_source("b.wav".into(), 500);
         project.add_clip(track, source, 2000).unwrap();
         assert_eq!(project.length(), 2500);

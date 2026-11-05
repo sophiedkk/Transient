@@ -16,10 +16,12 @@ pub const AUTOSCROLL_ZONE: f64 = 40.0;
 /// per second.
 pub const AUTOSCROLL_MAX_SPEED: f64 = 1200.0;
 
-/// The zoom level during a pinch: `scale` is how far the fingers have spread
-/// since the pinch began (2 = twice as far apart), `start` the frames per pixel
-/// at that moment. Spreading the fingers zooms in, so fewer frames per pixel.
-/// A scale that makes no sense (zero, negative, not a number) keeps the zoom.
+/// The zoom level during a pinch.
+///
+/// `scale` is how far the fingers have spread since the pinch began (2 = twice as
+/// far apart), `start` the frames per pixel at that moment. Spreading the fingers
+/// zooms in, so fewer frames per pixel. A scale that makes no sense (zero,
+/// negative, not a number) keeps the zoom.
 #[must_use]
 pub fn pinch_frames_per_pixel(start: f64, scale: f64) -> f64 {
     if scale.is_finite() && scale > 0.0 {
@@ -29,9 +31,11 @@ pub fn pinch_frames_per_pixel(start: f64, scale: f64) -> f64 {
     }
 }
 
-/// Where the view has to start (in frames) so that `anchor_frame` is drawn at
-/// pixel column `anchor_x` with `frames_per_pixel`. Used to zoom around the
-/// pointer or the fingers: the audio under them stays under them.
+/// Where the view has to start (in frames) to keep `anchor_frame` in place.
+///
+/// That is, `anchor_frame` is drawn at pixel column `anchor_x` with
+/// `frames_per_pixel`. Used to zoom around the pointer or the fingers: the audio
+/// under them stays under them.
 #[must_use]
 pub fn start_keeping_anchor(anchor_frame: f64, anchor_x: f64, frames_per_pixel: f64) -> f64 {
     anchor_frame - anchor_x * frames_per_pixel
@@ -74,9 +78,10 @@ impl Glide {
     }
 }
 
-/// How fast to auto-scroll (pixels per second; negative is to the left) with the
-/// pointer at `x` in a view `width` pixels wide. Zero away from the edges; it
-/// speeds up the closer the pointer gets to an edge, and is fastest past it.
+/// How fast to auto-scroll, in pixels per second (negative is to the left).
+///
+/// The pointer is at `x` in a view `width` pixels wide. Zero away from the edges;
+/// it speeds up the closer the pointer gets to an edge, and is fastest past it.
 #[must_use]
 pub fn autoscroll_speed(x: f64, width: f64) -> f64 {
     if !x.is_finite() || !width.is_finite() || width <= 0.0 {

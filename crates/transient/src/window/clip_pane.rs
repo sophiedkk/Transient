@@ -9,6 +9,7 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::gio;
 use tracing::warn;
+use transient_core::convert::f32_from_f64;
 use transient_core::normalize::{LOUDNESS_TARGET_LUFS, PEAK_TARGET_DB, loudness_gain, peak_gain};
 use transient_core::project::{Clip, ClipId};
 use transient_core::time::frames_from_f64;
@@ -32,7 +33,7 @@ impl Window {
         let weak = self.downgrade();
         imp.gain_row.connect_value_notify(move |row| {
             if let Some(window) = weak.upgrade() {
-                let gain = to_f32(row.value());
+                let gain = f32_from_f64(row.value());
                 window.change_selected_clip(MixerControl::ClipGain, |clip| Clip {
                     gain_db: gain,
                     ..clip
@@ -120,12 +121,7 @@ impl Window {
             self.show_toast(&gettext("The clip is silent or too short to normalize"));
             return;
         };
-        self.apply_edit(|project| {
-            let Some((track, clip)) = project.clip(id).map(|(track, clip)| (track, *clip)) else {
-                return false;
-            };
-            project.update_clip(Clip { gain_db, ..clip }, track)
-        });
+        self.apply_edit(|project| project.change_clip(id, |clip| Clip { gain_db, ..clip }));
         self.update_clip_pane();
         if limited {
             self.show_toast(&gettext("Kept quieter than the target to avoid clipping"));
@@ -152,13 +148,7 @@ impl Window {
         let (Some(id), Some(at)) = (self.imp().selected.get(), self.playhead_position()) else {
             return;
         };
-        self.apply_edit(|project| {
-            let Some((track, clip)) = project.clip(id).map(|(track, clip)| (track, *clip)) else {
-                return false;
-            };
-            let faded = fade(clip, at);
-            faded != clip && project.update_clip(faded, track)
-        });
+        self.apply_edit(|project| project.change_clip(id, |clip| fade(clip, at)));
         self.update_clip_pane();
     }
 
@@ -175,13 +165,7 @@ impl Window {
         let Some(id) = imp.selected.get() else {
             return;
         };
-        self.apply_mixer_change(Some(control(id)), |project| {
-            let Some((track, clip)) = project.clip(id).map(|(track, clip)| (track, *clip)) else {
-                return false;
-            };
-            let changed = change(clip);
-            changed != clip && project.update_clip(changed, track)
-        });
+        self.apply_mixer_change(Some(control(id)), |project| project.change_clip(id, change));
     }
 
     /// A clip and the name of its track.
@@ -195,15 +179,4 @@ impl Window {
         let rate = f64::from(self.imp().project.borrow().sample_rate.hz());
         frames_from_f64(seconds.max(0.0) * rate).unwrap_or(0)
     }
-}
-
-/// A spin button value as `f32` (the gain range is small).
-fn to_f32(value: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "gain values are within -60..24, far inside f32's range"
-    )]
-    let value = value as f32;
-    value
 }

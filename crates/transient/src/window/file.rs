@@ -21,6 +21,7 @@ use gtk::{gio, glib};
 use tracing::{info, warn};
 use transient_core::archive;
 use transient_core::project::Project;
+use transient_core::report::Report;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::decode_file;
 
@@ -99,7 +100,7 @@ impl Window {
         let not_included = match result {
             Ok(Ok(not_included)) => not_included,
             Ok(Err(error)) => {
-                warn!("could not save to {}: {error}", file.uri());
+                warn!("could not save to {}: {}", file.uri(), Report(&error));
                 self.show_toast(&gettext("Could not save the project"));
                 return false;
             }
@@ -169,16 +170,16 @@ impl Window {
                 gio::spawn_blocking(move || archive::open(&file_path, &cache_path))
                     .await
                     // The thread panicked; its payload says nothing useful to show.
-                    .map_err(|_panic| "opening stopped unexpectedly".to_owned())
-                    .and_then(|result| result.map_err(|error| error.to_string()))
+                    .map_err(|_panic| OpenError::Crashed)
+                    .and_then(|result| result.map_err(OpenError::from))
                     .map(|project| (project, cache))
             }
-            Err(error) => Err(format!("no folder for its audio: {error}")),
+            Err(error) => Err(OpenError::Cache(error)),
         };
         let (project, cache) = match opened {
             Ok(opened) => opened,
             Err(error) => {
-                warn!("could not open {}: {error}", path.display());
+                warn!("could not open {}: {}", path.display(), Report(&error));
                 if let Some(page) = previous_page {
                     imp.stack.set_visible_child_name(&page);
                 }
@@ -364,6 +365,20 @@ fn cache_base() -> PathBuf {
     glib::user_cache_dir().join("transient")
 }
 
+/// Why a project could not be opened.
+#[derive(Debug, thiserror::Error)]
+enum OpenError {
+    /// No folder could be made to unpack its audio into.
+    #[error("no folder for its audio")]
+    Cache(#[source] std::io::Error),
+    /// The file could not be read.
+    #[error(transparent)]
+    Archive(#[from] archive::ArchiveError),
+    /// The thread that opened it panicked (a bug).
+    #[error("opening stopped unexpectedly")]
+    Crashed,
+}
+
 /// A new, empty, locked folder for an opened project's audio.
 fn new_project_cache() -> std::io::Result<ProjectCache> {
     let base = cache_base();
@@ -430,7 +445,7 @@ async fn load_sources(project: &Project) -> (LoadedSources, Vec<PathBuf>) {
                     loaded.insert(id, source);
                 }
                 Err(error) => {
-                    warn!("could not load {}: {error}", path.display());
+                    warn!("could not load {}: {}", path.display(), Report(&error));
                     missing.push(path);
                 }
             }

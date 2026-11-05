@@ -12,6 +12,7 @@
 use ebur128::{EbuR128, Mode};
 
 use crate::audio::{AudioBuffer, CHANNELS, to_dbfs};
+use crate::convert::f32_from_f64;
 use crate::mix::SILENT_DB;
 use crate::project::Clip;
 
@@ -84,13 +85,7 @@ fn clip_samples<'a>(audio: &'a AudioBuffer, clip: &Clip) -> &'a [f32] {
 
 /// A gain in dB as `f32`, kept within what the mixer can express.
 fn to_gain_db(db: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "clamped to a small range first"
-    )]
-    let db = db.clamp(f64::from(SILENT_DB), 60.0) as f32;
-    db
+    f32_from_f64(db.clamp(f64::from(SILENT_DB), 60.0))
 }
 
 #[cfg(test)]

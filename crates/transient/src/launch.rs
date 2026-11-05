@@ -269,8 +269,8 @@ impl LaunchOptions {
         if let Some(seconds) = self.seek {
             window.seek_to_seconds(seconds);
         }
-        for _ in 0..self.zoom.unwrap_or(0) {
-            window.zoom_in();
+        if let Some(steps) = self.zoom {
+            window.zoom(f64::from(steps));
         }
         if let Some((start, end)) = self.select {
             window.select_seconds(start, end);
@@ -300,7 +300,7 @@ impl LaunchOptions {
                 save_screenshot_when_drawn(&window, path).await;
                 screenshot_taken = true;
             }
-            window.stop_recording_now().await;
+            window.stop_recording().await;
         }
         if let Some(path) = &self.save_to {
             let file = gio::File::for_path(std::path::absolute(path).unwrap_or(path.clone()));

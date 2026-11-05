@@ -3,7 +3,7 @@
 //! of a range.
 //!
 //! A range is a [`TimeRange`] plus the tracks it covers (the lanes the user
-//! dragged over). Like everything in `edit`, these are plain changes to a
+//! dragged over). Like everything in [`crate::edit`], these are plain changes to a
 //! [`Project`]; the window records them for undo.
 
 use crate::project::{Clip, ClipId, Project, TrackId};
@@ -157,23 +157,16 @@ mod tests {
 
     use super::*;
     use crate::audio::AudioBuffer;
-    use crate::mix::{AudioPool, Mix};
+    use crate::mix::AudioPool;
+    use crate::test_support::{clips, range, render};
     use crate::time::SampleRate;
-
-    fn range(start: Frames, end: Frames) -> TimeRange {
-        TimeRange { start, end }
-    }
 
     /// Two tracks, each with one 1000-frame clip at 0..1000.
     fn two_tracks() -> (Project, TrackId, TrackId) {
         let mut project = Project::default();
-        let a = project.import("a.wav".into(), 1000, "a".to_owned());
-        let b = project.import("b.wav".into(), 1000, "b".to_owned());
+        let a = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
+        let b = project.import("b.wav".into(), 1000, "b".to_owned(), 0);
         (project, a, b)
-    }
-
-    fn clips(project: &Project, track: TrackId) -> Vec<Clip> {
-        project.track(track).unwrap().clips.clone()
     }
 
     #[test]
@@ -242,19 +235,11 @@ mod tests {
         assert_eq!(clips(&project, b).len(), 1);
     }
 
-    /// Renders the whole project, left channel only.
-    fn render(project: &Project, pool: &AudioPool) -> Vec<f32> {
-        let mix = Mix::new(project, pool);
-        let mut out = vec![0.0; usize::try_from(mix.length()).unwrap() * 2];
-        mix.render(0, &mut out);
-        out.into_iter().step_by(2).collect()
-    }
-
     /// A ramp (frame n plays the value n + 1, so silence is easy to tell apart)
     /// on one track.
     fn ramp_project(frames: u16) -> (Project, TrackId, AudioPool) {
         let mut project = Project::default();
-        let track = project.import("ramp.wav".into(), u64::from(frames), "r".to_owned());
+        let track = project.import("ramp.wav".into(), u64::from(frames), "r".to_owned(), 0);
         let samples: Vec<f32> = (0..frames)
             .flat_map(|n| [f32::from(n) + 1.0, 0.0])
             .collect();

@@ -5,7 +5,7 @@ use std::cell::{Cell, OnceCell, RefCell};
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{CompositeTemplate, gio, glib};
-use transient_core::edit::History;
+use transient_core::history::History;
 use transient_core::project::{ClipId, Project};
 use transient_engine::player::{AudioOutput, Player};
 
@@ -225,10 +225,10 @@ impl ObjectSubclass for Window {
             window.nudge_selected_clip(1);
         });
         klass.install_action("win.zoom-in", None, |window, _, _| {
-            window.zoom_in();
+            window.zoom(1.0);
         });
         klass.install_action("win.zoom-out", None, |window, _, _| {
-            window.imp().timeline.zoom_out();
+            window.zoom(-1.0);
         });
         klass.install_action("win.zoom-fit", None, |window, _, _| {
             window.imp().timeline.zoom_to_fit();

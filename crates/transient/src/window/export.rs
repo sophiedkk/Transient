@@ -9,6 +9,7 @@ use gettextrs::gettext;
 use gtk::gio;
 use tracing::{info, warn};
 use transient_core::mix::{AudioPool, Mix};
+use transient_core::report::Report;
 use transient_engine::export::ExportFormat;
 
 use super::Window;
@@ -92,10 +93,17 @@ impl Window {
                 self.imp().toast_overlay.add_toast(toast);
             }
             ExportOutcome::Cancelled => self.show_toast(&gettext("Export stopped")),
-            ExportOutcome::Failed(message) => {
-                warn!("export failed: {message}");
-                self.show_toast(&gettext("Export failed"));
+            ExportOutcome::NotLocal => {
+                self.export_failed("the chosen file is not on this computer");
             }
+            ExportOutcome::Failed(error) => self.export_failed(Report(&error)),
+            ExportOutcome::Crashed => self.export_failed("the export stopped unexpectedly"),
         }
+    }
+
+    /// Logs why an export failed and tells the user it did.
+    fn export_failed(&self, reason: impl std::fmt::Display) {
+        warn!("export failed: {reason}");
+        self.show_toast(&gettext("Export failed"));
     }
 }

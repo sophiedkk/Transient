@@ -13,6 +13,7 @@ use gettextrs::{gettext, ngettext};
 use tracing::warn;
 use transient_core::mix::{AudioPool, Mix};
 use transient_core::project::{Clip, Project, SourceId};
+use transient_core::report::Report;
 use transient_core::time::format_position;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::SourceFormat;
@@ -129,7 +130,7 @@ impl Window {
         match Player::new(mix, self.imp().audio_output.get()) {
             Ok(new_player) => *player = Some(new_player),
             Err(error) => {
-                warn!("could not create the player: {error}");
+                warn!("could not create the player: {}", Report(&error));
                 self.show_toast(&gettext("Playback is not available"));
             }
         }

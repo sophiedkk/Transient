@@ -72,9 +72,10 @@ impl InputDevice {
     }
 }
 
-/// The sound inputs (microphones, line inputs) GStreamer can see now. "Monitor"
-/// inputs, which only capture what is playing, are left out, and each input is
-/// listed once (PipeWire and PulseAudio can both report the same one).
+/// The sound inputs (microphones, line inputs) GStreamer can see now.
+///
+/// "Monitor" inputs, which only capture what is playing, are left out, and each
+/// input is listed once (PipeWire and PulseAudio can both report the same one).
 #[must_use]
 pub fn inputs() -> Vec<InputDevice> {
     let monitor = gstreamer::DeviceMonitor::new();
@@ -228,7 +229,7 @@ impl Recorder {
                     }
                 }
                 gstreamer::MessageView::Error(error) => {
-                    return Err(EngineError::Pipeline(error.error().to_string()));
+                    return Err(EngineError::Stream(error.error()));
                 }
                 _ => {}
             }
@@ -259,8 +260,7 @@ impl Recorder {
             .lock()
             .map(|mut samples| std::mem::take(&mut *samples))
             .unwrap_or_default();
-        AudioBuffer::new(self.sample_rate, samples)
-            .map_err(|error| EngineError::Pipeline(format!("the recording is unusable: {error}")))
+        Ok(AudioBuffer::new(self.sample_rate, samples)?)
     }
 }
 
@@ -275,7 +275,7 @@ pub fn save_flac(audio: &AudioBuffer, path: &Path) -> Result<(), ExportError> {
         sample_rate: audio.sample_rate(),
         ..Project::default()
     };
-    let track = project.import(path.to_owned(), audio.frames(), String::new());
+    let track = project.import(path.to_owned(), audio.frames(), String::new(), 0);
     let source = project
         .track(track)
         .and_then(|track| track.clips.first())

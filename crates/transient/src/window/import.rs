@@ -8,6 +8,7 @@ use adw::subclass::prelude::*;
 use gettextrs::{gettext, ngettext};
 use gtk::gio;
 use tracing::{info, warn};
+use transient_core::report::Report;
 use transient_core::time::Frames;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::{DecodedAudio, SourceFormat, decode_file};
@@ -98,7 +99,7 @@ impl Window {
             match decoded {
                 Ok((decoded, waveform)) => self.add_to_project(path, &decoded, waveform, start),
                 Err(error) => {
-                    warn!("could not open {}: {error}", path.display());
+                    warn!("could not open {}: {}", path.display(), Report(&error));
                     failed.push(display_name(&path));
                 }
             }
@@ -141,10 +142,7 @@ impl Window {
             |stem| stem.to_string_lossy().into_owned(),
         );
         let frames = decoded.buffer.frames();
-        let track = imp
-            .project
-            .borrow_mut()
-            .import_at(path, frames, name, start);
+        let track = imp.project.borrow_mut().import(path, frames, name, start);
         let Some(source) = imp
             .project
             .borrow()

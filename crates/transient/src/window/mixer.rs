@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use transient_core::convert::f32_from_f64;
 use transient_core::project::{ClipId, Project, TrackId};
 
 use super::Window;
@@ -48,7 +49,7 @@ impl Window {
             if window.imp().updating_controls.get() {
                 return;
             }
-            let volume = to_f32(scale.value());
+            let volume = f32_from_f64(scale.value());
             window.apply_mixer_change(Some(MixerControl::Master), |project| {
                 let changed = (project.master_volume_db - volume).abs() > f32::EPSILON;
                 project.master_volume_db = volume;
@@ -150,15 +151,4 @@ impl Window {
             imp.level_meter.add_css_class("dimmed");
         }
     }
-}
-
-/// A slider value as `f32` (slider ranges are small).
-fn to_f32(value: f64) -> f32 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        reason = "slider values are within -60..12, far inside f32's range"
-    )]
-    let value = value as f32;
-    value
 }

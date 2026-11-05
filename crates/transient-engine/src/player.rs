@@ -26,7 +26,7 @@ use transient_core::audio::CHANNELS;
 use transient_core::mix::Mix;
 use transient_core::time::{Frames, SampleRate};
 
-use crate::{EngineError, make_element};
+use crate::{EngineError, frames_to_time, make_element, time_to_frames};
 
 /// How many frames to hand to GStreamer at a time (about 85 ms at 48 kHz).
 const CHUNK_FRAMES: usize = 4096;
@@ -44,12 +44,12 @@ pub enum AudioOutput {
 }
 
 /// Something the player reports back to the app.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum PlayerEvent {
     /// Playback reached the end.
     Finished,
-    /// Playback failed; the message explains why.
-    Error(String),
+    /// Playback failed.
+    Error(EngineError),
 }
 
 /// What the `need-data` and `seek-data` callbacks share.
@@ -261,7 +261,7 @@ impl Player {
                 }
                 gstreamer::MessageView::Error(error) => {
                     self.playing = false;
-                    events.push(PlayerEvent::Error(error.error().to_string()));
+                    events.push(PlayerEvent::Error(EngineError::Stream(error.error())));
                 }
                 _ => {}
             }
@@ -335,19 +335,6 @@ fn callbacks(source: &Arc<Mutex<Source>>, sample_rate: SampleRate) -> AppSrcCall
         .build()
 }
 
-/// Frames → GStreamer time (nanoseconds), rounding down.
-fn frames_to_time(frames: Frames, rate: SampleRate) -> gstreamer::ClockTime {
-    let nanos = u128::from(frames) * 1_000_000_000 / u128::from(rate.hz());
-    gstreamer::ClockTime::from_nseconds(u64::try_from(nanos).unwrap_or(u64::MAX))
-}
-
-/// GStreamer time → frames, rounding to the nearest frame.
-fn time_to_frames(time: gstreamer::ClockTime, rate: SampleRate) -> Frames {
-    let frames =
-        (u128::from(time.nseconds()) * u128::from(rate.hz()) + 500_000_000) / 1_000_000_000;
-    Frames::try_from(frames).unwrap_or(Frames::MAX)
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
@@ -361,19 +348,10 @@ mod tests {
     /// A mix of one quarter-second clip.
     fn quarter_second() -> Mix {
         let mut project = Project::default();
-        let track = project.import("tone.wav".into(), 12_000, "tone".to_owned());
+        let track = project.import("tone.wav".into(), 12_000, "tone".to_owned(), 0);
         let source = project.track(track).unwrap().clips[0].source;
         let audio = AudioBuffer::new(SampleRate::HZ_48000, vec![0.1; 2 * 12_000]).unwrap();
         Mix::new(&project, &AudioPool::from([(source, audio)]))
-    }
-
-    #[test]
-    fn time_and_frames_convert_both_ways() {
-        let rate = SampleRate::HZ_48000;
-        assert_eq!(frames_to_time(48_000, rate), gstreamer::ClockTime::SECOND);
-        for frames in [0, 1, 441, 48_000, 123_456_789] {
-            assert_eq!(time_to_frames(frames_to_time(frames, rate), rate), frames);
-        }
     }
 
     #[test]
@@ -389,7 +367,10 @@ mod tests {
             events = player.poll_events();
         }
 
-        assert_eq!(events, vec![PlayerEvent::Finished]);
+        assert!(
+            matches!(events.as_slice(), [PlayerEvent::Finished]),
+            "got {events:?}"
+        );
         // A constant 0.1 is −20 dBFS; the meter must have seen it.
         let levels = player.levels.unwrap();
         assert!(

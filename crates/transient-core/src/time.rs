@@ -6,6 +6,7 @@
 
 use std::num::NonZeroU32;
 
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 /// A position or a length on the timeline, in frames.
@@ -64,13 +65,8 @@ impl SampleRate {
 /// Exact for every count below 2^53 frames (see `MAX_EXACT_FRAMES`).
 #[must_use]
 pub fn frames_to_f64(frames: Frames) -> f64 {
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_precision_loss,
-        reason = "exact for every count below 2^53 frames (see MAX_EXACT_FRAMES)"
-    )]
-    let frames = frames as f64;
-    frames
+    // Converting a `u64` to `f64` always succeeds (it rounds above 2^53).
+    frames.to_f64().unwrap_or(f64::MAX)
 }
 
 /// The nearest whole frame to `value`, or `None` for negative, infinite or NaN
@@ -81,13 +77,7 @@ pub fn frames_from_f64(value: f64) -> Option<Frames> {
     if !(0.0..=MAX_EXACT_FRAMES).contains(&frames) {
         return None;
     }
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "range-checked above: a whole number in 0..=2^53"
-    )]
-    Some(frames as Frames)
+    frames.to_u64()
 }
 
 /// Formats a timeline position for display, like `1:02.345` (minutes, seconds,

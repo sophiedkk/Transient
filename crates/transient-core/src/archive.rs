@@ -33,19 +33,21 @@ const AUDIO_FOLDER: &str = "audio/";
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveError {
     /// Reading or writing the file failed.
-    #[error("{0}")]
+    #[error("could not read or write the file")]
     Io(#[from] io::Error),
     /// The archive itself is damaged.
-    #[error("not a valid project file: {0}")]
+    #[error("not a valid project file")]
     Zip(#[from] zip::result::ZipError),
     /// The project inside it is damaged or too new.
     #[error(transparent)]
     Project(#[from] ProjectError),
 }
 
-/// Writes `project` to `path`, with a copy of each source's audio (read from
-/// its `path`). A source whose file cannot be read keeps pointing at that path
-/// instead (it was missing already); the result says which ones.
+/// Writes `project` to `path`, with a copy of each source's audio.
+///
+/// The audio is read from each source's `path`. A source whose file cannot be
+/// read keeps pointing at that path instead (it was missing already); the result
+/// says which ones.
 ///
 /// # Errors
 ///
@@ -89,10 +91,11 @@ pub fn save(project: &Project, path: &Path) -> Result<Vec<SourceId>, ArchiveErro
     Ok(not_embedded)
 }
 
-/// Reads the project at `path`. Its audio is unpacked into `cache` (a folder
-/// for this project, created if needed) and the sources point there. An old
-/// plain-JSON project (format 1) is read as it was, with paths resolved from
-/// its folder.
+/// Reads the project at `path`.
+///
+/// Its audio is unpacked into `cache` (a folder for this project, created if
+/// needed) and the sources point there. An old plain-JSON project (format 1) is
+/// read as it was, with paths resolved from its folder.
 ///
 /// # Errors
 ///
@@ -168,7 +171,7 @@ mod tests {
         ] {
             let path = folder.join(name);
             std::fs::write(&path, bytes).unwrap();
-            project.import(path, 1000, name.to_owned());
+            project.import(path, 1000, name.to_owned(), 0);
         }
         project
     }

@@ -1711,6 +1711,7 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "tempfile",
+ "thiserror",
  "tracing",
  "tracing-subscriber",
  "transient-core",
@@ -1736,6 +1737,7 @@ version = "0.1.0"
 dependencies = [
  "ebur128",
  "insta",
+ "num-traits",
  "proptest",
  "serde",
  "serde_json",

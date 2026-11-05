@@ -155,7 +155,7 @@ impl TimelineView {
             let lanes = imp.lanes.borrow();
             lanes.get(lane).and_then(|lane| {
                 let stack: Vec<_> = lane.clips.iter().map(|clip| clip.clip).collect();
-                transient_core::edit::visible_parts(&stack)
+                transient_core::clip::visible_parts(&stack)
                     .into_iter()
                     .rev()
                     .find(|part| part.start <= playhead && playhead < part.end())

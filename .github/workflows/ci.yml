@@ -48,6 +48,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: File size (at most 800 lines per Rust file)
+        run: dev/check-file-size.sh
+
       - name: Tests
         run: cargo nextest run --workspace --profile ci
 

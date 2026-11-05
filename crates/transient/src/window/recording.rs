@@ -17,9 +17,11 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 use tracing::{info, warn};
+use transient_core::report::Report;
 use transient_core::time::Frames;
 use transient_core::waveform::Waveform;
 use transient_engine::decode::SourceFormat;
+use transient_engine::export::ExportError;
 use transient_engine::recorder::{Input, Recorder, inputs, save_flac};
 
 use super::Window;
@@ -63,7 +65,7 @@ impl Window {
         let recorder = match Recorder::start(&input, rate) {
             Ok(recorder) => recorder,
             Err(error) => {
-                warn!("could not start recording: {error}");
+                warn!("could not start recording: {}", Report(&error));
                 self.show_toast(&gettext("Could not record from the input"));
                 return;
             }
@@ -87,8 +89,9 @@ impl Window {
         self.update_record_button();
     }
 
-    /// Stops recording, saves the take and adds it as a new track.
-    pub(super) async fn stop_recording(&self) {
+    /// Stops recording, saves the take and adds it as a new track. Finishes once
+    /// the take is added (`--record-for` waits for that before saving).
+    pub(crate) async fn stop_recording(&self) {
         let imp = self.imp();
         let Some(Recording {
             recorder, start, ..
@@ -111,9 +114,11 @@ impl Window {
         let file = path.clone();
         // Stopping waits for the last audio, and encoding takes a moment.
         let saved = gio::spawn_blocking(move || {
-            let audio = recorder.stop().map_err(|error| error.to_string())?;
-            save_flac(&audio, &file).map_err(|error| error.to_string())?;
-            Ok::<_, String>(audio)
+            // `?` turns the recorder's `EngineError` into an `ExportError` (which
+            // has a `From` for it), so both steps share one error type.
+            let audio = recorder.stop()?;
+            save_flac(&audio, &file)?;
+            Ok::<_, ExportError>(audio)
         })
         .await;
         let audio = match saved {
@@ -124,7 +129,7 @@ impl Window {
                 return;
             }
             Ok(Err(error)) => {
-                warn!("could not save the recording: {error}");
+                warn!("could not save the recording: {}", Report(&error));
                 self.show_toast(&gettext("Could not save the recording"));
                 self.project_changed();
                 return;
@@ -141,10 +146,7 @@ impl Window {
         let frames = audio.frames();
         let rate = audio.sample_rate();
         let before = imp.project.borrow().clone();
-        let track = imp
-            .project
-            .borrow_mut()
-            .import_at(path, frames, name, start);
+        let track = imp.project.borrow_mut().import(path, frames, name, start);
         let source = imp
             .project
             .borrow()
@@ -195,7 +197,7 @@ impl Window {
         match polled {
             Ok(levels) => levels,
             Err(error) => {
-                warn!("recording failed: {error}");
+                warn!("recording failed: {}", Report(&error));
                 self.show_toast(&gettext("Recording stopped: the input failed"));
                 self.toggle_recording();
                 None
@@ -231,12 +233,6 @@ impl Window {
             .max()
             .unwrap_or(0)
             + 1
-    }
-
-    /// Stops the recording in progress and waits until its take is added (for
-    /// `--record-for`, which saves the project afterwards).
-    pub(crate) async fn stop_recording_now(&self) {
-        self.stop_recording().await;
     }
 
     /// Uses a test tone instead of a microphone (for `--record-for` tests).

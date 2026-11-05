@@ -45,10 +45,11 @@ fmt:
 # Everything CI checks: formatting, lints, tests, licences, and the app metadata
 check: lint test deny meson-test
 
-# Check formatting and run clippy with warnings as errors
+# Check formatting, run clippy with warnings as errors, and check file sizes
 lint:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
+    dev/check-file-size.sh
 
 # Check dependencies for security advisories and licences
 deny:
