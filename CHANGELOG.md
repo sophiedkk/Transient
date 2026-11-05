@@ -23,8 +23,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- The app's description in GNOME Software now has a screenshot, an up-to-date
-  feature list and a blue banner in dark mode.
+- The app's description in GNOME Software now has screenshots (the editor,
+  the clip pane, export and the start screen, in light and dark), an
+  up-to-date feature list and a blue banner in dark mode.
+- Recent projects show folders in your home folder as "~/Music" instead of
+  the full path.
 
 ## [0.2.0] - 2026-11-05
 

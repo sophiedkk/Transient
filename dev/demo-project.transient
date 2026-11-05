@@ -1,0 +1,54 @@
+{
+  "format_version": 1,
+  "name": "Podcast Intro",
+  "sample_rate": 48000,
+  "sources": [
+    { "id": 1, "path": "../test-audio/speech-mono.wav", "frames": 1157403 },
+    { "id": 2, "path": "../test-audio/piano.flac", "frames": 8022292 },
+    { "id": 3, "path": "../test-audio/drum-pattern.mp3", "frames": 930377 },
+    { "id": 4, "path": "../test-audio/clapping.opus", "frames": 1344208 }
+  ],
+  "tracks": [
+    {
+      "id": 5,
+      "name": "Voice",
+      "color": "blue",
+      "clips": [
+        { "id": 9, "source": 1, "start": 288000, "offset": 0, "length": 1152000 }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Piano",
+      "color": "pink",
+      "volume_db": -4.0,
+      "clips": [
+        { "id": 10, "source": 2, "start": 0, "offset": 480000, "length": 1920000,
+          "fade_in": 192000, "fade_out": 288000 }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Drums",
+      "color": "orange",
+      "volume_db": -2.0,
+      "pan": -0.3,
+      "clips": [
+        { "id": 11, "source": 3, "start": 96000, "offset": 0, "length": 930377,
+          "fade_out": 192000 }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Applause",
+      "color": "green",
+      "pan": 0.3,
+      "clips": [
+        { "id": 12, "source": 4, "start": 1440000, "offset": 96000, "length": 480000,
+          "fade_in": 14400, "fade_out": 192000 }
+      ]
+    }
+  ],
+  "master_volume_db": 0.0,
+  "next_id": 13
+}

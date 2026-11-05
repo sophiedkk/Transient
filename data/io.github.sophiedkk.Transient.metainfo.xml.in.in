@@ -25,10 +25,40 @@
     </p>
   </description>
 
+  <!-- Taken by dev/screenshots.sh. Each in the light style, plus a dark copy
+       that stores which support it show in dark mode. -->
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/main-window.png</image>
       <caption>Four coloured tracks with fades, and a selected clip</caption>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/main-window-dark.png</image>
+      <caption>Four coloured tracks with fades, and a selected clip</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/clip-pane.png</image>
+      <caption>The clip pane: gain, fades and normalizing for the selected clip</caption>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/clip-pane-dark.png</image>
+      <caption>The clip pane: gain, fades and normalizing for the selected clip</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/export.png</image>
+      <caption>Export the mix to WAV, FLAC, MP3, Opus or Ogg Vorbis</caption>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/export-dark.png</image>
+      <caption>Export the mix to WAV, FLAC, MP3, Opus or Ogg Vorbis</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/start-screen.png</image>
+      <caption>Start a project by importing or recording audio, or open a recent one</caption>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/start-screen-dark.png</image>
+      <caption>Start a project by importing or recording audio, or open a recent one</caption>
     </screenshot>
   </screenshots>
 

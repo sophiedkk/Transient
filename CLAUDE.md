@@ -137,6 +137,7 @@ Always check UI and audio changes with these before reporting them done:
 ```sh
 just probe test-audio/*                         # decode files → one JSON line each
 just screenshot test-audio/piano.flac           # → target/screenshot.png; then Read the PNG
+dev/screenshots.sh                              # retake data/screenshots/ (MetaInfo, README)
 just headless --silent --play --quit-after=3 test-audio/drum-loop.wav   # run, read the log
 just test-audio                                 # decode the whole test collection
 ```

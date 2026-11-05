@@ -268,7 +268,7 @@ impl Window {
             let folder = file
                 .parent()
                 .and_then(|parent| parent.path())
-                .map(|path| path.display().to_string())
+                .map(|path| folder_label(&path, &glib::home_dir()))
                 .unwrap_or_default();
             let name = file.path().map_or_else(
                 || item.display_name().to_string(),
@@ -476,6 +476,34 @@ fn with_project_extension(file: &gio::File) -> gio::File {
 }
 
 /// Remembers a project in GNOME's recent files (also shown on the start screen).
+/// How a recent project's folder is shown: inside the home folder as
+/// "~/Music", like other GNOME apps, anywhere else as the full path.
+fn folder_label(folder: &Path, home: &Path) -> String {
+    match folder.strip_prefix(home) {
+        Ok(inside) if inside.as_os_str().is_empty() => "~".to_owned(),
+        Ok(inside) => format!("~/{}", inside.display()),
+        Err(_) => folder.display().to_string(),
+    }
+}
+
 fn add_to_recent(file: &gio::File) {
     gtk::RecentManager::default().add_item(&file.uri());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folders_in_the_home_folder_are_shown_with_a_tilde() {
+        let home = Path::new("/home/ada");
+        assert_eq!(
+            folder_label(Path::new("/home/ada/Music/Podcasts"), home),
+            "~/Music/Podcasts"
+        );
+        assert_eq!(folder_label(home, home), "~");
+        assert_eq!(folder_label(Path::new("/media/usb"), home), "/media/usb");
+        // Only whole folder names count: /home/adam is not inside /home/ada.
+        assert_eq!(folder_label(Path::new("/home/adam"), home), "/home/adam");
+    }
 }

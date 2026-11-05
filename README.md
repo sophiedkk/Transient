@@ -17,7 +17,7 @@ Put audio files on tracks, trim and arrange them, record over them, balance
 their volume, and export the mix. Built with Rust, GTK 4, Libadwaita and
 GStreamer.
 
-![Transient with four coloured tracks: a voice clip selected, a purple piano bed
+![Transient with four coloured tracks: a voice clip selected, a pink piano bed
 and orange drums with fades, and green applause at the end](data/screenshots/main-window.png)
 
 > **Status:** early development (0.2). You can import or record audio,
