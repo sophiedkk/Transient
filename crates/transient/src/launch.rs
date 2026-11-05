@@ -58,6 +58,9 @@ pub(crate) struct LaunchOptions {
     pub(crate) select_clips_at: Vec<f64>,
     /// Record a test tone for this many seconds after the actions (for tests).
     pub(crate) record_for: Option<u32>,
+    /// Use this file for the first missing audio file after opening, as
+    /// Locate… in the banner does (before the actions).
+    pub(crate) locate: Option<PathBuf>,
     /// Window actions to run after opening, in order (for example "split").
     pub(crate) actions: Vec<String>,
     /// Save the project to this file after the actions.
@@ -134,6 +137,13 @@ const OPTIONS: &[Opt] = &[
         arg: glib::OptionArg::StringArray,
         help: "Add every clip playing at SECONDS to the selection (repeatable)",
         arg_name: Some("SECONDS"),
+    },
+    Opt {
+        name: "locate",
+        short: None,
+        arg: glib::OptionArg::Filename,
+        help: "Use FILE for the first missing audio file, as Locate… does (before the actions)",
+        arg_name: Some("FILE"),
     },
     Opt {
         name: "record-for",
@@ -235,6 +245,7 @@ impl LaunchOptions {
                 .iter()
                 .filter_map(|text| text.trim().parse().ok())
                 .collect(),
+            locate: dict.lookup::<PathBuf>("locate").ok().flatten(),
             actions: dict
                 .lookup::<Vec<String>>("action")
                 .ok()
@@ -258,6 +269,7 @@ impl LaunchOptions {
             || self.select.is_some()
             || !self.select_clips_at.is_empty()
             || self.record_for.is_some()
+            || self.locate.is_some()
             || !self.actions.is_empty()
             || self.save_to.is_some()
             || self.export_to.is_some()
@@ -291,6 +303,11 @@ impl LaunchOptions {
         }
         for seconds in &self.select_clips_at {
             window.add_clips_at_seconds(*seconds);
+        }
+        if let Some(path) = &self.locate {
+            window
+                .locate(&std::path::absolute(path).unwrap_or(path.clone()))
+                .await;
         }
         for action in &self.actions {
             let name = if action.contains('.') {

@@ -56,24 +56,14 @@ template $TransientExportDialog: Adw.Dialog {
               };
             }
 
+            // Both are filled in Rust (setup_format_rows in export_dialog.rs),
+            // as Preferences shows the same two rows.
             Adw.ComboRow format_row {
               title: _("Format");
-
-              model: StringList {
-                strings [
-                  _("WAV (uncompressed)"),
-                  _("FLAC (lossless)"),
-                  "MP3",
-                  "Opus",
-                  "Ogg Vorbis",
-                ]
-              };
             }
 
             Adw.ComboRow quality_row {
               title: _("Quality");
-
-              model: StringList quality_list {};
             }
           }
         };

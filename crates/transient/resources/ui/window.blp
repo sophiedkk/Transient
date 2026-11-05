@@ -110,8 +110,13 @@ template $TransientWindow: Adw.ApplicationWindow {
 
       // Shown when a project's audio files cannot be found.
       [top]
+      // Locate… asks where the (first) missing file is now (window/missing.rs).
       Adw.Banner missing_banner {
         revealed: false;
+        // The title can hold a file name; "&" or "<" in it is not markup.
+        use-markup: false;
+        button-label: _("_Locate…");
+        action-name: "win.locate-missing";
       }
 
       // One page is visible at a time; the code switches by name.

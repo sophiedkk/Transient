@@ -26,6 +26,7 @@ use transient_core::waveform::Waveform;
 use transient_engine::decode::decode_file;
 
 use super::Window;
+use super::import::display_name;
 use super::project::{LoadedSource, LoadedSources};
 
 /// The project file extension.
@@ -189,7 +190,7 @@ impl Window {
                 return;
             }
         };
-        let (sources, missing) = load_sources(&project).await;
+        let sources = load_sources(&project).await;
         // The old project's unpacked audio is deleted with its folder.
         imp.project_cache.replace(Some(cache));
 
@@ -201,7 +202,6 @@ impl Window {
         self.clear_clipboard();
         self.select(None);
         add_to_recent(file);
-        self.show_missing_sources(&missing);
         self.project_changed();
     }
 
@@ -219,7 +219,6 @@ impl Window {
         imp.project_cache.replace(None);
         self.clear_clipboard();
         self.select(None);
-        self.show_missing_sources(&[]);
         self.project_changed();
     }
 
@@ -318,31 +317,8 @@ impl Window {
         });
         button
     }
-
-    /// Shows or hides the "missing audio" banner.
-    fn show_missing_sources(&self, missing: &[PathBuf]) {
-        let banner = &self.imp().missing_banner;
-        if missing.is_empty() {
-            banner.set_revealed(false);
-            return;
-        }
-        let count = u32::try_from(missing.len()).unwrap_or(u32::MAX);
-        banner.set_title(
-            &ngettext(
-                "{} audio file could not be found",
-                "{} audio files could not be found",
-                count,
-            )
-            .replace("{}", &missing.len().to_string()),
-        );
-        banner.set_revealed(true);
-        for path in missing {
-            warn!("missing audio file: {}", path.display());
-        }
-    }
 }
 
-/// Decodes a project's sources in the background. Returns the decoded ones and
 /// The folder holding an open project's unpacked audio. It is deleted when this
 /// is dropped (another project opened, the window closed). While it exists, the
 /// `in-use` file in it is locked, so another Transient never removes it (see
@@ -447,8 +423,9 @@ pub(crate) fn remove_unused_project_caches() {
     }
 }
 
-/// the paths that could not be read.
-async fn load_sources(project: &Project) -> (LoadedSources, Vec<PathBuf>) {
+/// Decodes a project's sources in the background. Sources that cannot be read
+/// are left out: they are missing (see `missing.rs`).
+async fn load_sources(project: &Project) -> LoadedSources {
     let wanted: Vec<_> = project
         .sources
         .iter()
@@ -457,7 +434,6 @@ async fn load_sources(project: &Project) -> (LoadedSources, Vec<PathBuf>) {
     let rate = project.sample_rate;
     gio::spawn_blocking(move || {
         let mut loaded = LoadedSources::new();
-        let mut missing = Vec::new();
         for (id, path) in wanted {
             match decode_file(&path, rate) {
                 Ok(decoded) => {
@@ -469,11 +445,10 @@ async fn load_sources(project: &Project) -> (LoadedSources, Vec<PathBuf>) {
                 }
                 Err(error) => {
                     warn!("could not load {}: {}", path.display(), Report(&error));
-                    missing.push(path);
                 }
             }
         }
-        (loaded, missing)
+        loaded
     })
     .await
     .unwrap_or_default()
@@ -503,11 +478,4 @@ fn with_project_extension(file: &gio::File) -> gio::File {
 /// Remembers a project in GNOME's recent files (also shown on the start screen).
 fn add_to_recent(file: &gio::File) {
     gtk::RecentManager::default().add_item(&file.uri());
-}
-
-fn display_name(path: &Path) -> String {
-    path.file_name().map_or_else(
-        || path.display().to_string(),
-        |name| name.to_string_lossy().into_owned(),
-    )
 }

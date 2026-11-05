@@ -301,6 +301,10 @@ fn install_project_actions(klass: &mut <Window as ObjectSubclass>::Class) {
     klass.install_action_async("win.save-as", None, |window, _, _| async move {
         window.save_as().await;
     });
+    // The missing-audio banner's Locate… button.
+    klass.install_action_async("win.locate-missing", None, |window, _, _| async move {
+        window.locate_missing().await;
+    });
     klass.install_action("win.export", None, |window, _, _| {
         window.show_export_dialog();
     });

@@ -13,6 +13,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Recordings made while other tracks play are lined up with what you heard,
   correcting for the delay of the sound input. Preferences (Ctrl+,) has a
   Recording Offset to fine-tune it.
+- The Export dialog starts with the format and quality you exported to last;
+  Preferences shows them and can change them.
+- Locate… in the "could not be found" banner: point a project at an audio file
+  that was moved. Other missing files in the same folder are found with it.
+  Undoable.
+
+### Changed
+
+- The app's description in GNOME Software now has a screenshot, an up-to-date
+  feature list and a blue banner in dark mode.
 
 ## [0.2.0] - 2026-11-05
 

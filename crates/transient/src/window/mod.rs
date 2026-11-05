@@ -20,6 +20,7 @@ mod export;
 mod file;
 mod imp;
 mod import;
+mod missing;
 mod mixer;
 mod preferences;
 mod project;

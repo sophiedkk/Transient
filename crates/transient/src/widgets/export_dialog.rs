@@ -33,6 +33,21 @@ pub(crate) enum ExportOutcome {
 
 type FinishedCallback = Box<dyn Fn(ExportOutcome)>;
 
+/// The Format rows' entries, top to bottom, by file extension. The extension is
+/// also how the chosen format is remembered (the `export-format` setting).
+const FORMAT_EXTENSIONS: [&str; 5] = ["wav", "flac", "mp3", "opus", "ogg"];
+
+/// The Format rows' labels, in the order of [`FORMAT_EXTENSIONS`].
+fn format_labels() -> [String; 5] {
+    [
+        gettext("WAV (uncompressed)"),
+        gettext("FLAC (lossless)"),
+        "MP3".to_owned(),
+        "Opus".to_owned(),
+        "Ogg Vorbis".to_owned(),
+    ]
+}
+
 /// The quality choices for each format: label and value (bits or kbit/s).
 fn qualities(format_index: u32) -> &'static [(&'static str, u32)] {
     match format_index {
@@ -62,6 +77,26 @@ fn default_quality(format_index: u32) -> u32 {
     }
 }
 
+/// Where `value` (bits or kbit/s) is in the format's quality list, or the
+/// format's default quality if it is not one of its choices (0 included).
+fn quality_index(format_index: u32, value: u32) -> u32 {
+    qualities(format_index)
+        .iter()
+        .position(|(_, choice)| *choice == value)
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or_else(|| default_quality(format_index))
+}
+
+/// Where the format with this file extension is in the Format rows (the first,
+/// WAV, for an unknown one).
+fn format_index(extension: &str) -> u32 {
+    FORMAT_EXTENSIONS
+        .iter()
+        .position(|known| *known == extension)
+        .and_then(|index| u32::try_from(index).ok())
+        .unwrap_or(0)
+}
+
 fn format_for(format_index: u32, value: u32) -> ExportFormat {
     let bits = u8::try_from(value).unwrap_or(16);
     match format_index {
@@ -70,6 +105,75 @@ fn format_for(format_index: u32, value: u32) -> ExportFormat {
         2 => ExportFormat::Mp3 { kbps: value },
         3 => ExportFormat::Opus { kbps: value },
         _ => ExportFormat::Vorbis { kbps: value },
+    }
+}
+
+/// The quality value (bits or kbit/s) chosen in `quality_row`, for the format
+/// chosen in `format_row`.
+fn chosen_quality(format_row: &adw::ComboRow, quality_row: &adw::ComboRow) -> u32 {
+    qualities(format_row.selected())
+        .get(usize::try_from(quality_row.selected()).unwrap_or(0))
+        .map_or(16, |(_, value)| *value)
+}
+
+/// Fills `quality_row` with the qualities of the format at `format_index`, and
+/// selects the one with `value` (or the format's default).
+fn fill_qualities(quality_row: &adw::ComboRow, format_index: u32, value: u32) {
+    let labels: Vec<&str> = qualities(format_index)
+        .iter()
+        .map(|(label, _)| *label)
+        .collect();
+    quality_row.set_model(Some(&gtk::StringList::new(&labels)));
+    quality_row.set_selected(quality_index(format_index, value));
+}
+
+/// Sets up a pair of Format and Quality rows (the Export dialog's, and the ones
+/// in Preferences): fills them, starts at the format and quality remembered in
+/// `settings`, and offers the right qualities whenever the format changes.
+pub(crate) fn setup_format_rows(
+    format_row: &adw::ComboRow,
+    quality_row: &adw::ComboRow,
+    settings: Option<&gio::Settings>,
+) {
+    let labels = format_labels();
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    format_row.set_model(Some(&gtk::StringList::new(&labels)));
+    let (extension, quality) = settings.map_or_else(
+        || (String::new(), 0),
+        |settings| {
+            (
+                settings.string("export-format").to_string(),
+                settings.uint("export-quality"),
+            )
+        },
+    );
+    let index = format_index(&extension);
+    format_row.set_selected(index);
+    fill_qualities(quality_row, index, quality);
+    // Another format has other qualities; it starts at its usual one. The
+    // closure keeps its own reference to the quality row (`clone` on a widget
+    // only copies the reference, not the widget).
+    let quality_row = quality_row.clone();
+    format_row.connect_selected_notify(move |row| fill_qualities(&quality_row, row.selected(), 0));
+}
+
+/// Remembers the format and quality chosen in these rows for the next export.
+pub(crate) fn save_format_choice(
+    settings: &gio::Settings,
+    format_row: &adw::ComboRow,
+    quality_row: &adw::ComboRow,
+) {
+    let extension = FORMAT_EXTENSIONS
+        .get(usize::try_from(format_row.selected()).unwrap_or(0))
+        .copied()
+        .unwrap_or("wav");
+    let saved = settings
+        .set_string("export-format", extension)
+        .and_then(|()| {
+            settings.set_uint("export-quality", chosen_quality(format_row, quality_row))
+        });
+    if let Err(error) = saved {
+        warn!("could not save the export format: {error}");
     }
 }
 
@@ -100,8 +204,6 @@ mod imp {
         #[template_child]
         pub(super) range_row: TemplateChild<adw::ComboRow>,
         #[template_child]
-        pub(super) quality_list: TemplateChild<gtk::StringList>,
-        #[template_child]
         pub(super) progress_page: TemplateChild<adw::StatusPage>,
         #[template_child]
         pub(super) progress_bar: TemplateChild<gtk::ProgressBar>,
@@ -112,6 +214,8 @@ mod imp {
         /// The time selection's mix (its stretch, its tracks), if there is one.
         pub(super) selection_mix: RefCell<Option<Mix>>,
         pub(super) suggested_name: RefCell<String>,
+        /// Where the chosen format is remembered (`None` without the schema).
+        pub(super) settings: RefCell<Option<gtk::gio::Settings>>,
         pub(super) cancel: Arc<AtomicBool>,
         pub(super) on_finished: RefCell<Option<FinishedCallback>>,
         pub(super) exporting: Cell<bool>,
@@ -162,15 +266,19 @@ impl ExportDialog {
     /// A dialog that exports `mix` (the whole project), or `selection` (the time
     /// selection's mix) if there is one and it is chosen, which it is at first.
     /// It suggests `name` (without extension) as the file name; `on_finished`
-    /// hears how it ended.
+    /// hears how it ended. It starts at the format remembered in `settings`,
+    /// and remembers the one exported to there.
     pub(crate) fn new(
         mix: Mix,
         selection: Option<Mix>,
         name: &str,
+        settings: Option<gio::Settings>,
         on_finished: impl Fn(ExportOutcome) + 'static,
     ) -> Self {
         let dialog: Self = glib::Object::new();
         let imp = dialog.imp();
+        setup_format_rows(&imp.format_row, &imp.quality_row, settings.as_ref());
+        imp.settings.replace(settings);
         imp.mix.replace(Some(mix));
         if selection.is_some() {
             imp.range_row.set_visible(true);
@@ -184,14 +292,6 @@ impl ExportDialog {
 
     fn setup(&self) {
         let imp = self.imp();
-        let weak = self.downgrade();
-        imp.format_row.connect_selected_notify(move |row| {
-            if let Some(dialog) = weak.upgrade() {
-                dialog.fill_qualities(row.selected());
-            }
-        });
-        self.fill_qualities(imp.format_row.selected());
-
         let weak = self.downgrade();
         imp.cancel_button.connect_clicked(move |_| {
             if let Some(dialog) = weak.upgrade() {
@@ -209,34 +309,18 @@ impl ExportDialog {
             .connect_clicked(move |_| cancel.store(true, Ordering::Relaxed));
     }
 
-    fn fill_qualities(&self, format_index: u32) {
-        let imp = self.imp();
-        let labels: Vec<&str> = qualities(format_index)
-            .iter()
-            .map(|(label, _)| *label)
-            .collect();
-        imp.quality_list
-            .splice(0, imp.quality_list.n_items(), &labels);
-        imp.quality_row.set_selected(default_quality(format_index));
-    }
-
-    /// The format and quality as chosen.
-    pub(crate) fn chosen_format(&self) -> ExportFormat {
-        let imp = self.imp();
-        let format_index = imp.format_row.selected();
-        let value = qualities(format_index)
-            .get(usize::try_from(imp.quality_row.selected()).unwrap_or(0))
-            .map_or(16, |(_, value)| *value);
-        format_for(format_index, value)
-    }
-
     async fn choose_file_and_export(&self) {
-        let format = self.chosen_format();
-        let name = format!(
-            "{}.{}",
-            self.imp().suggested_name.borrow(),
-            format.extension()
+        let imp = self.imp();
+        let format = format_for(
+            imp.format_row.selected(),
+            chosen_quality(&imp.format_row, &imp.quality_row),
         );
+        // The next export starts with this format and quality: GNOME apps
+        // remember such choices rather than asking for a default up front.
+        if let Some(settings) = imp.settings.borrow().as_ref() {
+            save_format_choice(settings, &imp.format_row, &imp.quality_row);
+        }
+        let name = format!("{}.{}", imp.suggested_name.borrow(), format.extension());
         let file_dialog = gtk::FileDialog::builder()
             .title(gettext("Export"))
             .modal(true)
@@ -336,4 +420,30 @@ fn display_name(path: &std::path::Path) -> String {
         || path.display().to_string(),
         |n| n.to_string_lossy().into_owned(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_format_row_has_its_extension() {
+        assert_eq!(format_labels().len(), FORMAT_EXTENSIONS.len());
+        for (index, extension) in (0..).zip(FORMAT_EXTENSIONS) {
+            assert_eq!(format_index(extension), index);
+            let format = format_for(index, qualities(index)[0].1);
+            assert_eq!(format.extension(), extension);
+        }
+        assert_eq!(format_index("txt"), 0);
+    }
+
+    #[test]
+    fn a_remembered_quality_is_found_or_falls_back_to_the_usual_one() {
+        // MP3 at 320 kbit/s is the fourth choice.
+        assert_eq!(quality_index(2, 320), 3);
+        // 0 (nothing remembered) and qualities another format has get the default.
+        assert_eq!(quality_index(2, 0), default_quality(2));
+        assert_eq!(quality_index(0, 320), default_quality(0));
+        assert_eq!(quality_index(1, 24), 1);
+    }
 }

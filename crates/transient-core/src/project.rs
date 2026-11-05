@@ -316,6 +316,29 @@ impl Project {
         id
     }
 
+    /// Points the clips of source `old` at another file, `frames` long (for a
+    /// file that was missing and has been found elsewhere). The file gets a new
+    /// source in `old`'s place, with a new ID, so decoded audio kept by ID
+    /// always belongs to the path it came from: undoing brings `old` back,
+    /// still missing. Returns the new ID, or `None` if `old` does not exist.
+    pub fn replace_source(
+        &mut self,
+        old: SourceId,
+        path: PathBuf,
+        frames: Frames,
+    ) -> Option<SourceId> {
+        let index = self.sources.iter().position(|source| source.id == old)?;
+        let id = SourceId(self.new_id());
+        let source = self.sources.get_mut(index)?;
+        *source = Source { id, path, frames };
+        for clip in self.tracks.iter_mut().flat_map(|track| &mut track.clips) {
+            if clip.source == old {
+                clip.source = id;
+            }
+        }
+        Some(id)
+    }
+
     /// Adds an empty track at the bottom.
     pub fn add_track(&mut self, name: String) -> TrackId {
         let id = TrackId(self.new_id());
@@ -527,5 +550,40 @@ mod tests {
         let source = project.add_source("a.wav".into(), 10);
         assert_eq!(project.add_clip(TrackId(999), source, 0), None);
         assert_eq!(project.add_clip(track, SourceId(999), 0), None);
+    }
+
+    #[test]
+    fn a_found_file_replaces_the_missing_source_for_its_clips() {
+        let mut project = Project::default();
+        let track = project.import("/old/a.wav".into(), 1000, "a".to_owned(), 0);
+        let old = project.sources[0].id;
+        let other = project.add_source("/old/b.wav".into(), 10);
+        project.add_clip(track, old, 5000).unwrap();
+        project.add_clip(track, other, 9000).unwrap();
+
+        let new = project
+            .replace_source(old, "/new/a.wav".into(), 1200)
+            .unwrap();
+        assert_ne!(new, old);
+        // Same place in the list, new path and length; the other source stays.
+        assert_eq!(
+            project.sources[0],
+            Source {
+                id: new,
+                path: "/new/a.wav".into(),
+                frames: 1200
+            }
+        );
+        assert_eq!(project.sources[1].id, other);
+        let clips: Vec<SourceId> = project.tracks[0]
+            .clips
+            .iter()
+            .map(|clip| clip.source)
+            .collect();
+        assert_eq!(clips, [new, new, other]);
+        assert_eq!(
+            project.replace_source(SourceId(999), "x.wav".into(), 1),
+            None
+        );
     }
 }

@@ -10,12 +10,27 @@
   <description>
     <p>
       Transient is a simple multitrack audio editor. Put audio files on tracks,
-      trim and arrange them, balance their volume, and export the result.
+      trim and arrange them, record over them, balance their volume, and export
+      the mix.
     </p>
+    <ul>
+      <li>Arrange, trim, split and cut clips on tracks, with undo for every change</li>
+      <li>Fades, clip gain and normalizing</li>
+      <li>Volume, pan, mute and solo for every track</li>
+      <li>Record from a microphone while the other tracks play</li>
+      <li>Export to WAV, FLAC, MP3, Opus or Ogg Vorbis</li>
+    </ul>
     <p>
-      Transient is in early development and cannot edit audio yet.
+      Transient is in early development: expect rough edges.
     </p>
   </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/main-window.png</image>
+      <caption>Four coloured tracks with fades, and a selected clip</caption>
+    </screenshot>
+  </screenshots>
 
   <developer id="io.github.sophiedkk">
     <name>Sophie de Klerk</name>
@@ -28,6 +43,9 @@
   <url type="bugtracker">https://github.com/sophiedkk/Transient/issues</url>
   <url type="vcs-browser">https://github.com/sophiedkk/Transient</url>
 
+  <!-- OARS: an empty rating means "none" for every kind of content (no
+       violence, no in-app purchases, no chat, no data sharing, …), which is
+       true for Transient. https://hughsie.github.io/oars/ -->
   <content_rating type="oars-1.1" />
 
   <requires>
@@ -38,9 +56,13 @@
     <control>pointing</control>
   </supports>
 
+  <!-- Brand colours (the banner behind the icon in GNOME Software and on
+       Flathub), from the trans flag like the icon: its pink in light mode, a
+       deep version of its light blue in dark mode. Both stand out from the
+       icon's dark plate, and white text stays readable on the dark one. -->
   <branding>
     <color type="primary" scheme_preference="light">#f5a9b8</color>
-    <color type="primary" scheme_preference="dark">#241f31</color>
+    <color type="primary" scheme_preference="dark">#1f6f94</color>
   </branding>
 
   <releases>

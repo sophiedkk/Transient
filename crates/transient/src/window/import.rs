@@ -19,17 +19,10 @@ use super::project::LoadedSource;
 impl Window {
     /// Asks the user for audio files (the `win.import-audio` action), then imports them.
     pub(super) async fn choose_and_import(&self) {
-        let audio = gtk::FileFilter::new();
-        audio.set_name(Some(&gettext("Audio Files")));
-        audio.add_mime_type("audio/*");
-        let filters = gio::ListStore::new::<gtk::FileFilter>();
-        filters.append(&audio);
-
         let dialog = gtk::FileDialog::builder()
             .title(gettext("Import Audio"))
             .modal(true)
-            .filters(&filters)
-            .default_filter(&audio)
+            .filters(&audio_filters())
             .build();
 
         match dialog.open_multiple_future(Some(self)).await {
@@ -162,8 +155,18 @@ impl Window {
     }
 }
 
+/// File chooser filters: audio files only (the first filter is the one used).
+pub(super) fn audio_filters() -> gio::ListStore {
+    let audio = gtk::FileFilter::new();
+    audio.set_name(Some(&gettext("Audio Files")));
+    audio.add_mime_type("audio/*");
+    let filters = gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&audio);
+    filters
+}
+
 /// The file name to show, for example "drum-loop.wav".
-fn display_name(path: &Path) -> String {
+pub(super) fn display_name(path: &Path) -> String {
     path.file_name().map_or_else(
         || path.display().to_string(),
         |name| name.to_string_lossy().into_owned(),

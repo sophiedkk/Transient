@@ -35,5 +35,22 @@
       <summary>Recording input</summary>
       <description>The input to record from; empty means the system default.</description>
     </key>
+    <key name="export-format" type="s">
+      <choices>
+        <choice value="wav"/>
+        <choice value="flac"/>
+        <choice value="mp3"/>
+        <choice value="opus"/>
+        <choice value="ogg"/>
+      </choices>
+      <default>'wav'</default>
+      <summary>Export format</summary>
+      <description>The format the Export dialog starts with, by file extension; the last format exported to.</description>
+    </key>
+    <key name="export-quality" type="u">
+      <default>0</default>
+      <summary>Export quality</summary>
+      <description>The quality the Export dialog starts with: bits per sample for WAV and FLAC, kbit/s for the others; 0 means the format's usual quality.</description>
+    </key>
   </schema>
 </schemalist>

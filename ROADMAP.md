@@ -38,12 +38,18 @@ dialog, dark mode (Libadwaita), error toasts.
       GNOME palette colours. Keep the waveform-with-a-transient idea. Update the
       symbolic icon (`hicolor/symbolic/apps/`) to match and check both in App
       Icon Preview.
-- [ ] **Preferences dialog** (e.g. default export format).
+- [x] **Preferences dialog** (Ctrl+,): the recording offset, and the format and
+      quality the Export dialog starts with. The Export dialog remembers the
+      last format exported to (`export-format`/`export-quality` settings), so
+      Preferences only shows and changes that choice.
 - [x] **Export a selection**: the export dialog offers Whole Project or
       Selection (the selected stretch on the selected tracks).
-- [ ] **"Locate…" for missing audio files** in the missing-files banner. Only
+- [x] **"Locate…" for missing audio files** in the missing-files banner. Only
       projects saved before format 2 (and audio that was missing when saving)
-      can still lack audio, so this matters much less now.
+      can still lack audio, so this matters much less now. The chosen file
+      replaces the source (`Project::replace_source`, a new source ID, so undo
+      makes it missing again); other missing files with the same name in that
+      folder are used too. Scripted with `--locate=FILE`.
 - [x] **Keyboard focus and accessibility pass**: the timeline is usable from
       the keyboard (arrows like a text cursor, Up/Down for tracks), every icon
       button has an accessible name, and the timeline describes and announces
@@ -53,9 +59,14 @@ dialog, dark mode (Libadwaita), error toasts.
       chosen in the track's menu; its clips are drawn in that colour.
 - [x] **Light, dark or system style** (requested 2026-11-05): three circles at
       the top of the main menu, as in GNOME Text Editor; remembered.
-- [ ] **Release-ready MetaInfo**: screenshots, a releases list and a content
-      rating (see "Publishing" below).
-- [ ] **CI**: check for flaky jobs.
+- [x] **Release-ready MetaInfo**: a screenshot with a caption, a releases
+      list, an OARS content rating, brand colours (trans flag pink, deep trans
+      blue in dark mode) and a current description (see "Publishing" below).
+- [x] **CI**: checked for flaky jobs (2026-11-05, the last 40 runs). One flaky
+      failure: the Flatpak job's runtime update failed with "Invalid
+      cross-device link" (run 41912431255), so both workflows now update the
+      runtime first, with retries. Cancelled runs are superseded pushes
+      (`cancel-in-progress`); the other failure was a real AppImage bug, fixed.
 
 ## 10 · Cutting
 
@@ -241,9 +252,10 @@ written with an AI agent):
 - [ ] **Explain `--socket=pulseaudio`** in the Flathub submission: recording
       needs it, as there is no portal for the microphone yet; Flathub accepts
       it for audio apps.
-- [ ] **MetaInfo**: screenshots, a `<releases>` list, a content rating
+- [x] **MetaInfo**: screenshots, a `<releases>` list, a content rating
       (OARS), brand colours; must pass validation (already checked by
-      `meson test`).
+      `meson test`). Before submitting: add a `<release>` for each new version,
+      and check that the screenshot URL (on `main`) still shows the current app.
 - [ ] **Translations** only from people: Flathub refuses machine-generated
       translations.
 - [ ] **Runtime**: the latest GNOME runtime at the time of submitting.

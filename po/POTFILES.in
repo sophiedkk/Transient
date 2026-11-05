@@ -13,6 +13,7 @@ crates/transient/src/window/edit.rs
 crates/transient/src/window/export.rs
 crates/transient/src/window/file.rs
 crates/transient/src/window/import.rs
+crates/transient/src/window/missing.rs
 crates/transient/src/window/preferences.rs
 crates/transient/src/window/project.rs
 crates/transient/src/window/recording.rs

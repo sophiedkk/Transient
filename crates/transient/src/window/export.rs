@@ -57,11 +57,18 @@ impl Window {
             Mix::new(&selected, &pool).excerpt(selection.range)
         });
         let weak = self.downgrade();
-        ExportDialog::new(mix, selection, &self.project_title(), move |outcome| {
-            if let Some(window) = weak.upgrade() {
-                window.export_finished(outcome);
-            }
-        })
+        let settings = imp.settings.get().cloned();
+        ExportDialog::new(
+            mix,
+            selection,
+            &self.project_title(),
+            settings,
+            move |outcome| {
+                if let Some(window) = weak.upgrade() {
+                    window.export_finished(outcome);
+                }
+            },
+        )
     }
 
     fn export_finished(&self, outcome: ExportOutcome) {

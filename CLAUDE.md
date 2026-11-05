@@ -162,6 +162,8 @@ just test-audio                                 # decode the whole test collecti
   `toggle-clip-pane`, `new-project`, `app.quit`) to script edits. `--save-to=FILE` saves afterwards; passing a
   `.transient` file opens it — together they test a full save/open round trip.
   `--export-to=FILE.ext` exports through the app's export path.
+  `--locate=FILE` uses FILE for the first missing audio file, as the banner's
+  Locate… does (other missing files in its folder are found with it).
   `--record-for=SECONDS` records a test tone (no microphone needed) onto a new
   track at the playhead, then continues with `--save-to` etc.
   `--test-input` uses that test tone for the Record button too, and for the input

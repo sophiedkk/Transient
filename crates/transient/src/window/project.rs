@@ -51,6 +51,7 @@ impl Window {
             project.length(),
         );
         self.show_time_selection();
+        self.update_missing_banner();
 
         let length = format_position(project.length(), project.sample_rate);
         let tracks = project.tracks.len();
