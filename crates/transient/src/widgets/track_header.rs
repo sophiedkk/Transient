@@ -10,10 +10,10 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
-use gtk::glib;
+use gtk::{gio, glib};
 use transient_core::convert::f32_from_f64;
 use transient_core::mix::SILENT_DB;
-use transient_core::project::{Track, TrackId};
+use transient_core::project::{Track, TrackColor, TrackId};
 
 /// The mixer settings a header shows and edits.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -36,15 +36,17 @@ type RemoveCallback = Box<dyn Fn(TrackId)>;
 type RenameCallback = Box<dyn Fn(TrackId, String)>;
 /// What a header reports for Move Up (`true`) or Move Down (`false`).
 type MoveCallback = Box<dyn Fn(TrackId, bool)>;
+/// What a header reports when the user picks a colour (`None`: the default).
+type ColorCallback = Box<dyn Fn(TrackId, Option<TrackColor>)>;
 
 mod imp {
     use std::cell::{Cell, RefCell};
 
     use adw::subclass::prelude::*;
-    use gtk::glib;
+    use gtk::{gio, glib};
     use transient_core::project::TrackId;
 
-    use super::{ChangedCallback, MoveCallback, RemoveCallback, RenameCallback};
+    use super::{ChangedCallback, ColorCallback, MoveCallback, RemoveCallback, RenameCallback};
 
     #[derive(Default, gtk::CompositeTemplate)]
     #[template(resource = "/io/github/sophiedkk/Transient/ui/track-header.ui")]
@@ -71,6 +73,9 @@ mod imp {
         pub(super) on_remove: RefCell<Option<RemoveCallback>>,
         pub(super) on_rename: RefCell<Option<RenameCallback>>,
         pub(super) on_move: RefCell<Option<MoveCallback>>,
+        pub(super) on_color: RefCell<Option<ColorCallback>>,
+        /// `trackcolor.set`: its state is the track's colour (see `setup_color_picker`).
+        pub(super) color_action: RefCell<Option<gio::SimpleAction>>,
         /// True while the code sets the controls, so that does not count as a change.
         pub(super) updating: Cell<bool>,
     }
@@ -152,6 +157,9 @@ impl TrackHeader {
         imp.solo_button.set_active(track.solo);
         imp.volume_scale.set_value(f64::from(track.volume_db));
         imp.pan_scale.set_value(f64::from(track.pan));
+        if let Some(action) = imp.color_action.borrow().as_ref() {
+            action.set_state(&track.color.map_or("", TrackColor::id).to_variant());
+        }
         imp.updating.set(false);
         self.update_tooltips();
     }
@@ -170,6 +178,12 @@ impl TrackHeader {
     /// Calls `callback` with the track and its new name after the user renamed it.
     pub(crate) fn connect_rename(&self, callback: impl Fn(TrackId, String) + 'static) {
         self.imp().on_rename.replace(Some(Box::new(callback)));
+    }
+
+    /// Calls `callback` with the track and the colour the user picked (`None`:
+    /// the default accent colour).
+    pub(crate) fn connect_color(&self, callback: impl Fn(TrackId, Option<TrackColor>) + 'static) {
+        self.imp().on_color.replace(Some(Box::new(callback)));
     }
 
     /// Calls `callback` with the track and `true` (up) or `false` (down) for
@@ -232,6 +246,60 @@ impl TrackHeader {
         }
     }
 
+    /// The colour circles in the track menu, like the accent colour picker in
+    /// Settings. They share one stateful action, `trackcolor.set`, whose state
+    /// is the track's colour id ("" for the default accent colour); each circle
+    /// is a toggle button for one value, so GTK shows the current colour as
+    /// pressed. Called once, from `setup_controls`.
+    fn setup_color_picker(&self) {
+        let imp = self.imp();
+        let action =
+            gio::SimpleAction::new_stateful("set", Some(glib::VariantTy::STRING), &"".to_variant());
+        let weak = self.downgrade();
+        action.connect_activate(move |action, value| {
+            let Some(id) = value.and_then(glib::Variant::get::<String>) else {
+                return;
+            };
+            action.set_state(&id.to_variant());
+            if let Some(header) = weak.upgrade() {
+                let imp = header.imp();
+                if let Some(callback) = imp.on_color.borrow().as_ref() {
+                    callback(imp.track.get(), TrackColor::from_id(&id));
+                }
+            }
+        });
+        let group = gio::SimpleActionGroup::new();
+        group.add_action(&action);
+        self.insert_action_group("trackcolor", Some(&group));
+        imp.color_action.replace(Some(action));
+
+        // Two rows of five: "Default" first, then the named colours.
+        let grid = gtk::Grid::builder()
+            .column_spacing(8)
+            .row_spacing(8)
+            .halign(gtk::Align::Center)
+            .css_classes(["track-colors"])
+            .build();
+        let choices = std::iter::once(("default", "", gettext("Default Color"))).chain(
+            TrackColor::ALL
+                .into_iter()
+                .map(|color| (color.id(), color.id(), color_name(color))),
+        );
+        for (index, (class, target, name)) in (0..).zip(choices) {
+            let button = gtk::ToggleButton::builder()
+                .action_name("trackcolor.set")
+                .action_target(&target.to_variant())
+                .css_classes(["track-color", class])
+                .child(&gtk::Image::from_icon_name("object-select-symbolic"))
+                .build();
+            crate::widgets::set_button_text(&button, &name);
+            grid.attach(&button, index % 5, index / 5, 1, 1);
+        }
+        if let Some(popover) = imp.menu_button.popover().and_downcast::<gtk::PopoverMenu>() {
+            popover.add_child(&grid, "colors");
+        }
+    }
+
     /// Double-click to rename; in the text field, Enter (or clicking elsewhere)
     /// saves and Escape cancels. Called once, from `setup_controls`.
     fn setup_rename(&self) {
@@ -288,6 +356,7 @@ impl TrackHeader {
 
     fn setup_controls(&self) {
         self.setup_rename();
+        self.setup_color_picker();
         let imp = self.imp();
         let weak = self.downgrade();
         let changed = move || {
@@ -359,5 +428,20 @@ impl TrackHeader {
             gettext("Pan: {}% right").replace("{}", &format!("{percent}"))
         };
         imp.pan_scale.set_tooltip_text(Some(&pan));
+    }
+}
+
+/// A colour's name, for its circle's tooltip and screen readers.
+fn color_name(color: TrackColor) -> String {
+    match color {
+        TrackColor::Blue => gettext("Blue"),
+        TrackColor::Teal => gettext("Teal"),
+        TrackColor::Green => gettext("Green"),
+        TrackColor::Yellow => gettext("Yellow"),
+        TrackColor::Orange => gettext("Orange"),
+        TrackColor::Red => gettext("Red"),
+        TrackColor::Pink => gettext("Pink"),
+        TrackColor::Purple => gettext("Purple"),
+        TrackColor::Slate => gettext("Slate"),
     }
 }

@@ -4,7 +4,7 @@
 //! What happens to a single clip (trimming, splitting, stacking) is in
 //! [`crate::clip`]; undo and redo in [`crate::history`].
 
-use crate::project::{Clip, ClipId, Project, Track, TrackId};
+use crate::project::{Clip, ClipId, Project, Track, TrackColor, TrackId};
 use crate::time::Frames;
 
 impl Project {
@@ -112,6 +112,18 @@ impl Project {
         match self.track_mut(id) {
             Some(track) if !name.is_empty() && track.name != name => {
                 name.clone_into(&mut track.name);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Gives a track a colour (`None`: the system's accent colour). Returns
+    /// whether it changed.
+    pub fn set_track_color(&mut self, id: TrackId, color: Option<TrackColor>) -> bool {
+        match self.track_mut(id) {
+            Some(track) if track.color != color => {
+                track.color = color;
                 true
             }
             _ => false,
@@ -456,6 +468,23 @@ mod tests {
             "a keeps its first clip; b is gone"
         );
         assert!(!project.delete_clips(&[second]), "already deleted");
+    }
+
+    #[test]
+    fn a_track_can_get_a_colour_and_lose_it_again() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
+        assert!(project.set_track_color(track, Some(TrackColor::Green)));
+        assert_eq!(project.track(track).unwrap().color, Some(TrackColor::Green));
+        assert!(
+            !project.set_track_color(track, Some(TrackColor::Green)),
+            "same colour"
+        );
+        assert!(project.set_track_color(track, None));
+        assert!(
+            !project.set_track_color(TrackId(999), None),
+            "unknown track"
+        );
     }
 
     #[test]

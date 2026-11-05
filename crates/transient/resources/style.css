@@ -33,3 +33,89 @@
 splitbutton.record-button:not(.destructive-action) > button:first-child {
   color: var(--destructive-color);
 }
+
+/* The colour circles in a track's menu, like the accent colour picker in
+   Settings: Libadwaita's named colours, plus "Default". The chosen one shows a
+   check mark. */
+.track-colors {
+  padding: 6px 10px;
+}
+
+.track-color {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1px alpha(black, 0.1);
+}
+
+.track-color image {
+  color: white;
+  opacity: 0;
+}
+
+.track-color:checked image {
+  opacity: 1;
+}
+
+/* "Default" follows the system's accent colour: a ring, so it differs from the
+   named colour it may equal. */
+.track-color.default {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 3px var(--accent-bg-color);
+}
+
+.track-color.default image {
+  color: var(--accent-color);
+}
+
+.track-color.blue { background-color: var(--accent-blue); }
+.track-color.teal { background-color: var(--accent-teal); }
+.track-color.green { background-color: var(--accent-green); }
+.track-color.yellow { background-color: var(--accent-yellow); }
+.track-color.orange { background-color: var(--accent-orange); }
+.track-color.red { background-color: var(--accent-red); }
+.track-color.pink { background-color: var(--accent-pink); }
+.track-color.purple { background-color: var(--accent-purple); }
+.track-color.slate { background-color: var(--accent-slate); }
+
+/* The style choice at the top of the main menu (follow system, light, dark),
+   as in GNOME Text Editor. These circles show the light and dark styles
+   themselves, so they use the GNOME palette's light and dark colours instead of
+   the current style's colours. The chosen one gets an accent ring and a check. */
+.style-choices {
+  padding: 6px 12px 12px;
+}
+
+.style-choice {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 9999px;
+  /* The text colour, faint: an outline that shows on light and dark menus. */
+  box-shadow: inset 0 0 0 1px alpha(currentColor, 0.2);
+}
+
+.style-choice.default {
+  background-image: linear-gradient(to bottom right, var(--light-1) 49.99%, var(--dark-4) 50%);
+}
+
+.style-choice.light { background-color: var(--light-1); }
+.style-choice.dark { background-color: var(--dark-4); }
+
+/* The check mark: a small accent badge at the bottom right (see style.rs). */
+.style-choice image {
+  padding: 2px;
+  border-radius: 9999px;
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+  opacity: 0;
+}
+
+.style-choice:checked {
+  box-shadow: inset 0 0 0 2px var(--accent-bg-color);
+}
+
+.style-choice:checked image {
+  opacity: 1;
+}

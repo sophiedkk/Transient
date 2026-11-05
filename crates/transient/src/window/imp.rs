@@ -65,6 +65,8 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) recent_list: TemplateChild<gtk::ListBox>,
     #[template_child]
+    pub(super) primary_menu_button: TemplateChild<gtk::MenuButton>,
+    #[template_child]
     pub(super) missing_banner: TemplateChild<adw::Banner>,
     #[template_child]
     pub(super) split_view: TemplateChild<adw::OverlaySplitView>,
@@ -263,6 +265,7 @@ impl ObjectImpl for Window {
         window.setup_time_selection();
         window.setup_shortcuts();
         window.setup_record_input();
+        window.setup_style_menu();
         window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();

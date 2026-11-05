@@ -13,6 +13,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deselects too.
 - Recent projects on the start screen can be removed from the list with their ×
   button, for example one that was moved or can no longer be opened.
+- Track colours: choose one of nine colours (or the default accent colour) in a
+  track's menu; its clips are drawn in that colour. Saved in the project.
+- Light, dark or system style, chosen at the top of the main menu.
 
 ### Changed
 

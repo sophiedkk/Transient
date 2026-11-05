@@ -123,6 +123,74 @@ pub struct Track {
     pub mute: bool,
     /// When any track is soloed, only soloed tracks are heard.
     pub solo: bool,
+    /// The colour its clips are drawn in; `None` is the system's accent colour.
+    pub color: Option<TrackColor>,
+}
+
+/// A track's colour: one of the named colours of the GNOME desktop.
+///
+/// They are the colours of the accent colour picker in Settings. The app draws
+/// each in the theme's shade of it (lighter in dark mode), so no colour value is
+/// stored here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TrackColor {
+    /// Blue.
+    Blue,
+    /// Teal.
+    Teal,
+    /// Green.
+    Green,
+    /// Yellow.
+    Yellow,
+    /// Orange.
+    Orange,
+    /// Red.
+    Red,
+    /// Pink.
+    Pink,
+    /// Purple.
+    Purple,
+    /// Slate (a blue-grey).
+    Slate,
+}
+
+impl TrackColor {
+    /// Every colour, in the order the picker shows them.
+    pub const ALL: [Self; 9] = [
+        Self::Blue,
+        Self::Teal,
+        Self::Green,
+        Self::Yellow,
+        Self::Orange,
+        Self::Red,
+        Self::Pink,
+        Self::Purple,
+        Self::Slate,
+    ];
+
+    /// The colour's name as stored in project files ("blue", "teal", …), also
+    /// used as the colour menu's action target.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Blue => "blue",
+            Self::Teal => "teal",
+            Self::Green => "green",
+            Self::Yellow => "yellow",
+            Self::Orange => "orange",
+            Self::Red => "red",
+            Self::Pink => "pink",
+            Self::Purple => "purple",
+            Self::Slate => "slate",
+        }
+    }
+
+    /// The colour with this [`TrackColor::id`], if there is one.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|color| color.id() == id)
+    }
 }
 
 /// A Transient project.
@@ -361,7 +429,8 @@ mod tests {
               "volume_db": 0.0,
               "pan": 0.0,
               "mute": false,
-              "solo": false
+              "solo": false,
+              "color": null
             }
           ],
           "master_volume_db": 0.0,
@@ -380,6 +449,29 @@ mod tests {
         project.import("intro.flac".into(), 1000, "intro".to_owned(), 0);
         let reopened = Project::from_json(&project.to_json().unwrap()).unwrap();
         assert_eq!(reopened, project);
+    }
+
+    #[test]
+    fn a_track_colour_is_saved_by_name_and_is_optional() {
+        let mut project = Project::default();
+        let track = project.import("a.wav".into(), 1000, "a".to_owned(), 0);
+        if let Some(track) = project.track_mut(track) {
+            track.color = Some(TrackColor::Teal);
+        }
+        let json = project.to_json().unwrap();
+        assert!(json.contains(r#""color": "teal""#), "{json}");
+        assert_eq!(Project::from_json(&json).unwrap(), project);
+        // A track from an older file has no colour: the accent colour.
+        let old = Project::from_json(r#"{ "tracks": [{ "id": 1, "name": "a" }] }"#).unwrap();
+        assert_eq!(old.tracks[0].color, None);
+    }
+
+    #[test]
+    fn every_colour_has_its_own_id() {
+        for color in TrackColor::ALL {
+            assert_eq!(TrackColor::from_id(color.id()), Some(color));
+        }
+        assert_eq!(TrackColor::from_id("magenta"), None);
     }
 
     #[test]

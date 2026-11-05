@@ -74,7 +74,7 @@ template $TransientWindow: Adw.ApplicationWindow {
         }
 
         [end]
-        MenuButton {
+        MenuButton primary_menu_button {
           primary: true;
           icon-name: "open-menu-symbolic";
           tooltip-text: _("Main Menu");
@@ -586,6 +586,13 @@ template $TransientWindow: Adw.ApplicationWindow {
 }
 
 menu primary_menu {
+  // Follow system, light or dark style (see window/style.rs).
+  section {
+    item {
+      custom: "style";
+    }
+  }
+
   section {
     item {
       label: _("_New Project");

@@ -25,6 +25,7 @@ mod project;
 mod recording;
 mod selection;
 mod shortcuts;
+mod style;
 mod transport;
 
 use std::path::Path;
@@ -115,7 +116,7 @@ impl Window {
     /// With a plain `cargo run` the schema is not installed; `just run` compiles
     /// it and points `GSETTINGS_SCHEMA_DIR` at it. Without it, the window simply
     /// does not remember its size.
-    fn open_settings() -> Option<gio::Settings> {
+    pub(crate) fn open_settings() -> Option<gio::Settings> {
         let schema = gio::SettingsSchemaSource::default()
             .and_then(|source| source.lookup(config::SETTINGS_SCHEMA_ID, true));
         if schema.is_none() {

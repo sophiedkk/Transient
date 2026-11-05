@@ -12,7 +12,7 @@ use gtk::{gdk, graphene, gsk, pango};
 use transient_core::clip::visible_parts;
 use transient_core::convert::{f32_from_f64, f64_from_usize, i32_from_f64, u32_from_f64};
 use transient_core::mix::{db_to_gain, fade_shape};
-use transient_core::project::{Clip, ClipId};
+use transient_core::project::{Clip, ClipId, TrackColor};
 use transient_core::ruler;
 use transient_core::time::{Frames, frames_to_f64};
 use transient_core::waveform::Peak;
@@ -32,9 +32,42 @@ const SILENT_LANE_OPACITY: f64 = 0.4;
 const HEADROOM: f32 = 0.92;
 
 /// The colours used, taken from the current theme.
+#[derive(Clone, Copy)]
 struct Palette {
     foreground: gdk::RGBA,
     accent: gdk::RGBA,
+    /// Dark mode: named colours are drawn in their lighter shade.
+    dark: bool,
+}
+
+impl Palette {
+    /// The palette for a track's clips: its colour as the accent (see
+    /// `Track::color`), or the system's accent colour.
+    fn for_track(self, color: Option<TrackColor>) -> Self {
+        let Some(color) = color else {
+            return self;
+        };
+        Self {
+            accent: accent_color(color).to_standalone_rgba(self.dark),
+            ..self
+        }
+    }
+}
+
+/// Libadwaita's colour for a track colour: the same named colours as the
+/// accent colour picker in Settings, in the theme's shades.
+fn accent_color(color: TrackColor) -> adw::AccentColor {
+    match color {
+        TrackColor::Blue => adw::AccentColor::Blue,
+        TrackColor::Teal => adw::AccentColor::Teal,
+        TrackColor::Green => adw::AccentColor::Green,
+        TrackColor::Yellow => adw::AccentColor::Yellow,
+        TrackColor::Orange => adw::AccentColor::Orange,
+        TrackColor::Red => adw::AccentColor::Red,
+        TrackColor::Pink => adw::AccentColor::Pink,
+        TrackColor::Purple => adw::AccentColor::Purple,
+        TrackColor::Slate => adw::AccentColor::Slate,
+    }
 }
 
 /// One clip to draw (see `draw_clip`).
@@ -76,6 +109,7 @@ impl TimelineView {
         let palette = Palette {
             foreground: self.color(),
             accent: style.accent_color().to_standalone_rgba(style.is_dark()),
+            dark: style.is_dark(),
         };
         let imp = self.imp();
         let view = View {
@@ -122,6 +156,8 @@ impl TimelineView {
             if !lane.audible {
                 snapshot.push_opacity(SILENT_LANE_OPACITY);
             }
+            // This track's clips are drawn in its colour.
+            let lane_palette = palette.for_track(lane.color);
             let stack = lane_stack(&lane.clips, index, &moved);
             let parts = visible_parts(&stack);
             for &part in &parts {
@@ -133,7 +169,7 @@ impl TimelineView {
                     selected_clip = stack
                         .iter()
                         .find(|clip| clip.id == part.id)
-                        .map(|whole| (*whole, top, parts.clone()));
+                        .map(|whole| (*whole, top, parts.clone(), lane_palette));
                 }
                 let item = ClipToDraw {
                     drawn,
@@ -141,7 +177,7 @@ impl TimelineView {
                     lane_top: top,
                     selected: is_selected,
                 };
-                self.draw_clip(snapshot, &view, &palette, item);
+                self.draw_clip(snapshot, &view, &lane_palette, item);
             }
             if !lane.audible {
                 snapshot.pop();
@@ -164,8 +200,8 @@ impl TimelineView {
             self.draw_new_track_preview(snapshot, &view, &palette, drawn, &moved, lane);
         }
 
-        if let Some((clip, lane_top, parts)) = selected_clip {
-            self.draw_fade_handles(snapshot, &palette, &clip, lane_top, &parts);
+        if let Some((clip, lane_top, parts, clip_palette)) = selected_clip {
+            self.draw_fade_handles(snapshot, &clip_palette, &clip, lane_top, &parts);
         }
 
         if let Some(take) = imp.live_take.borrow().as_ref() {

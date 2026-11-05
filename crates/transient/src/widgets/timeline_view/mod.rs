@@ -27,7 +27,7 @@ mod keyboard;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
-use transient_core::project::{Clip, ClipId};
+use transient_core::project::{Clip, ClipId, TrackColor};
 use transient_core::range::TimeRange;
 use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
 use transient_core::view::start_keeping_anchor;
@@ -110,6 +110,8 @@ pub(crate) struct Lane {
     pub(crate) audible: bool,
     /// The track's name, for screen readers.
     pub(crate) name: String,
+    /// The track's colour (`None`: the accent colour).
+    pub(crate) color: Option<TrackColor>,
 }
 
 glib::wrapper! {

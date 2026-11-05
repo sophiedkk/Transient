@@ -16,6 +16,7 @@ crates/transient/src/window/import.rs
 crates/transient/src/window/project.rs
 crates/transient/src/window/recording.rs
 crates/transient/src/window/selection.rs
+crates/transient/src/window/style.rs
 crates/transient/src/window/transport.rs
 crates/transient/src/widgets/track_header.rs
 crates/transient/src/widgets/export_dialog.rs

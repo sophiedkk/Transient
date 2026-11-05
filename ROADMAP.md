@@ -48,6 +48,11 @@ dialog, dark mode (Libadwaita), error toasts.
       the keyboard (arrows like a text cursor, Up/Down for tracks), every icon
       button has an accessible name, and the timeline describes and announces
       its state. Not yet checked with a real screen reader (Orca).
+- [x] **Track colours** (requested 2026-11-05): the nine named Libadwaita colours
+      (as in the accent picker in Settings) or "Default" (the accent colour),
+      chosen in the track's menu; its clips are drawn in that colour.
+- [x] **Light, dark or system style** (requested 2026-11-05): three circles at
+      the top of the main menu, as in GNOME Text Editor; remembered.
 - [ ] **Release-ready MetaInfo**: screenshots, a releases list and a content
       rating (see "Publishing" below).
 - [ ] **CI**: check for flaky jobs.

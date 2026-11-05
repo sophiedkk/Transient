@@ -174,6 +174,12 @@ impl Window {
                     }
                 });
                 let weak = self.downgrade();
+                header.connect_color(move |track, color| {
+                    if let Some(window) = weak.upgrade() {
+                        window.apply_edit(|project| project.set_track_color(track, color));
+                    }
+                });
+                let weak = self.downgrade();
                 header.connect_move(move |track, up| {
                     if let Some(window) = weak.upgrade() {
                         window.apply_edit(|project| project.move_track(track, up));
@@ -214,6 +220,7 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
         .map(|track| Lane {
             audible: !track.mute && (track.solo || !any_solo),
             name: track.name.clone(),
+            color: track.color,
             clips: track
                 .clips
                 .iter()

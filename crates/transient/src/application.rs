@@ -87,6 +87,7 @@ fn setup_actions(app: &adw::Application) {
         .activate(|app: &adw::Application, _, _| show_about(app))
         .build();
     app.add_action_entries([quit, about]);
+    setup_color_scheme(app);
 
     // Only shortcuts that never clash with typing are application-wide. The
     // editing ones (S, Space, Delete, Ctrl+C, …) are in window/shortcuts.rs, so
@@ -133,4 +134,31 @@ fn show_about(app: &adw::Application) {
         .build();
 
     about.present(app.active_window().as_ref());
+}
+
+/// The light/dark style (`app.color-scheme`, chosen at the top of the main
+/// menu): follow the system, or always light or dark. The choice is the
+/// `color-scheme` setting; GSettings turns that key into a stateful action whose
+/// state is the setting, so the menu shows the current choice and changing it
+/// saves it.
+fn setup_color_scheme(app: &adw::Application) {
+    let Some(settings) = Window::open_settings() else {
+        return;
+    };
+    // The action keeps `settings` alive, and with it the handler below.
+    app.add_action(&settings.create_action("color-scheme"));
+    settings.connect_changed(Some("color-scheme"), |settings, _| {
+        apply_color_scheme(settings);
+    });
+    apply_color_scheme(&settings);
+}
+
+/// Applies the `color-scheme` setting to every window.
+fn apply_color_scheme(settings: &gio::Settings) {
+    let scheme = match settings.string("color-scheme").as_str() {
+        "light" => adw::ColorScheme::ForceLight,
+        "dark" => adw::ColorScheme::ForceDark,
+        _ => adw::ColorScheme::Default,
+    };
+    adw::StyleManager::default().set_color_scheme(scheme);
 }
