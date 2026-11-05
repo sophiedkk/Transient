@@ -256,13 +256,16 @@ impl Project {
     /// Returns [`ProjectError::Malformed`] if `json` is not a valid project, and
     /// [`ProjectError::TooNew`] if it was saved by a newer version of Transient.
     pub fn from_json(json: &str) -> Result<Self, ProjectError> {
-        let project: Self = serde_json::from_str(json)?;
+        let mut project: Self = serde_json::from_str(json)?;
         if project.format_version > FORMAT_VERSION {
             return Err(ProjectError::TooNew {
                 found: project.format_version,
                 supported: FORMAT_VERSION,
             });
         }
+        // An older file has been read into the current model, so saving it
+        // again writes the current format.
+        project.format_version = FORMAT_VERSION;
         Ok(project)
     }
 

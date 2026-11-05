@@ -235,6 +235,34 @@ mod tests {
     }
 
     #[test]
+    fn an_old_project_saved_again_is_in_the_current_format() {
+        let work = tempfile::tempdir().unwrap();
+        let project = project_with_audio(work.path());
+        let old = project.with_paths_relative_to(work.path());
+        let json = old.to_json().unwrap().replace(
+            &format!("\"format_version\": {}", crate::project::FORMAT_VERSION),
+            "\"format_version\": 1",
+        );
+        let file = work.path().join("old.transient");
+        std::fs::write(&file, json).unwrap();
+        let opened = open(&file, &work.path().join("cache")).unwrap();
+        assert_eq!(opened.format_version, crate::project::FORMAT_VERSION);
+
+        let resaved = work.path().join("resaved.transient");
+        save(&opened, &resaved).unwrap();
+        let mut zip = ZipArchive::new(File::open(&resaved).unwrap()).unwrap();
+        let mut json = String::new();
+        zip.by_name(PROJECT_ENTRY)
+            .unwrap()
+            .read_to_string(&mut json)
+            .unwrap();
+        assert!(json.contains(&format!(
+            "\"format_version\": {}",
+            crate::project::FORMAT_VERSION
+        )));
+    }
+
+    #[test]
     fn something_else_is_refused() {
         let work = tempfile::tempdir().unwrap();
         let file = work.path().join("notes.transient");
