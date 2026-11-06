@@ -39,21 +39,35 @@ were final; recheck steps 4–6.*
 
 ### B. Noise Gate
 
-*Not yet tested by hand.*
+*Tried 2026-11-06 without a clear result: the test files are not suited (see
+below). Retest with the recipe.*
 
-1. Record or import a voice recording with pauses. On its Track tab, switch
-   **Noise Gate** on (Quiet Below −45 dB, Reduction Strong).
-   - In the pauses the hiss and room noise drop clearly; words still start
-     crisply and their ends fade instead of being cut off.
-2. Drag **Quiet Below** while it plays (whole dB).
-   - Far left (−80): nothing changes. Far right (−20): quiet words are turned
-     down too. Somewhere between, only the noise goes.
-3. Try **Reduction**: Silence (dead quiet pauses), Light (some room sound
-   left, most natural). No clicks when switching or dragging.
+A gate only acts in the pauses, and only when the noise there is clearly
+quieter than the voice. Music has no pauses, and the test collection's speech
+has noise just 13 dB under the voice, which no gate can separate. Make a
+recording that shows it:
+
+1. Somewhere with a steady, quiet noise (a fan, a laptop, a fridge), record
+   yourself with Transient for about 20 seconds: a sentence, a pause of two
+   or three seconds, another sentence, another pause. Speak at a normal
+   distance from the microphone.
+2. Play it with the gate off and listen to the pauses: you hear the fan or
+   hiss there. Watch the level meter in a pause and while you speak.
+3. Turn **Noise Gate** on and set **Reduction** to **Silence** (the clearest
+   to hear). Drag **Quiet Below** to the right while it plays, until the
+   pauses go completely silent but no word is cut.
+   - Too far left: the pauses keep their noise (the gate never closes).
+   - Too far right: quiet words or word endings drop out too.
+   - Right: dead silence between sentences, words start crisply and their
+     ends fade out over a moment instead of being chopped.
+4. Switch **Reduction** to **Strong** and then **Light**: the noise comes back
+   in the pauses, quieter (−20 dB, −10 dB). Light usually sounds most
+   natural; Silence can sound like the line went dead.
+5. No clicks when the gate opens or closes, or when dragging.
 
 ### C. Equalizer
 
-*Not yet tested by hand.*
+*Confirmed 2026-11-06 with music ("the effects I would expect").*
 
 1. On a music or voice track, switch **Equalizer** on (between Noise Gate and
    Compressor). Drag **Bass** to the right: more boom and body; to the left:
@@ -81,7 +95,7 @@ were final; recheck steps 4–6.*
 
 ### E. Prevent Clipping (master limiter)
 
-*Not yet tested by hand.*
+*Confirmed 2026-11-06.*
 
 1. Right of the master volume (bottom bar) is a toggle with a "flat top" icon,
    blue while on (tooltip "Prevent Clipping"). It is on for new projects and
@@ -93,7 +107,7 @@ were final; recheck steps 4–6.*
 
 ### F. Track headers and the effects button
 
-*Confirmed 2026-11-06 ("Perfect").*
+*Confirmed 2026-11-06.*
 
 1. Each header shows the name on its own line, with mute, solo, the effects
    button (faders icon) and ⋮ below it. Headers line up exactly with their
@@ -108,6 +122,7 @@ were final; recheck steps 4–6.*
 
 ### G. The pane: Clip and Track tabs
 
+*Confirmed 2026-11-06.*
 1. Open the pane (top right button, or F9) and click a clip: the Clip tab
    shows its Gain and Fades; the Track tab shows the effects of its track.
    Clicking a clip on another track makes the Track tab follow.
@@ -122,6 +137,7 @@ were final; recheck steps 4–6.*
 
 ### H. Undo, saving, opening, exporting
 
+*Not yet tested by hand.*
 1. Drag Cut Below once, then Ctrl+Z: it goes back in one step (not one per
    tiny move). Ctrl+Z again undoes switching it on; Shift+Ctrl+Z redoes.
 2. Move any slider or toggle mute in a saved project: the title gets its "•"
@@ -135,6 +151,7 @@ were final; recheck steps 4–6.*
 
 ### I. No clicks when changing things during playback
 
+*Confirmed 2026-11-06.*
 Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 
 1. While playing, type `-12` in the clip's **Gain** and press Enter, then `0`:
@@ -147,6 +164,7 @@ Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 
 ### J. Seeking with effects on
 
+*Confirmed 2026-11-06.*
 1. With Cut Below near Thin (and the compressor on), click around the
    timeline while playing, and move the playhead with the arrow keys: each
    jump starts cleanly, without a thump.
@@ -155,6 +173,7 @@ Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 
 ### K. Keyboard and looks
 
+*Confirmed 2026-11-06.*
 1. Tab into the pane: Space toggles a switch, the arrow keys move a slider,
    Enter opens a choice row.
 2. Make the window narrow: the pane slides over the timeline and still fits.
