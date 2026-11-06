@@ -13,8 +13,9 @@ use std::process::Command;
 
 /// Blueprint files, relative to this crate. Add new `.blp` files here
 /// and in `resources/resources.gresource.xml`.
-const BLUEPRINTS: [&str; 4] = [
+const BLUEPRINTS: [&str; 5] = [
     "resources/ui/window.blp",
+    "resources/ui/effect-slider.blp",
     "resources/ui/shortcuts-dialog.blp",
     "resources/ui/track-header.blp",
     "resources/ui/export-dialog.blp",

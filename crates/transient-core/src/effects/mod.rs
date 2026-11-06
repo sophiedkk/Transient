@@ -8,12 +8,18 @@
 //! order and resets it when playback jumps.
 
 mod biquad;
+pub mod compressor;
+pub mod limiter;
 pub mod low_cut;
+pub mod noise_gate;
 
 use serde::{Deserialize, Serialize};
 
+use crate::convert::f32_from_f64;
 use crate::time::SampleRate;
+use compressor::{Compressor, CompressorFilter};
 use low_cut::{LowCut, LowCutFilter};
+use noise_gate::{NoiseGate, NoiseGateFilter};
 
 /// The effect settings of one track, as saved in the project file.
 ///
@@ -24,14 +30,26 @@ use low_cut::{LowCut, LowCutFilter};
 pub struct TrackEffects {
     /// Removes rumble and handling noise below a frequency.
     pub low_cut: LowCut,
+    /// Turns the track down while it is quiet (hiss between phrases).
+    pub noise_gate: NoiseGate,
+    /// Evens out the volume: loud parts down, then everything up.
+    pub compressor: Compressor,
 }
 
 impl TrackEffects {
     /// Whether any effect is switched on (the track header then shows it).
     #[must_use]
     pub fn any_on(&self) -> bool {
-        self.low_cut.enabled
+        self.low_cut.enabled || self.noise_gate.enabled || self.compressor.enabled
     }
+}
+
+/// How much of the way to its target a smoothed value (a level, a gain) moves
+/// per frame, for a time constant of `seconds`: after that time it has gone
+/// about two thirds of the way. Used by the gate and the compressor.
+fn smoothing(seconds: f64, sample_rate: SampleRate) -> f32 {
+    let frames = seconds * f64::from(sample_rate.hz());
+    f32_from_f64(1.0 - (-1.0 / frames).exp())
 }
 
 /// The running effects of one track: the settings turned into filters, plus
@@ -40,6 +58,10 @@ impl TrackEffects {
 pub(crate) struct EffectChain {
     /// `None` while the low cut is off.
     low_cut: Option<LowCutFilter>,
+    /// `None` while the noise gate is off.
+    noise_gate: Option<NoiseGateFilter>,
+    /// `None` while the compressor is off.
+    compressor: Option<CompressorFilter>,
 }
 
 impl EffectChain {
@@ -50,18 +72,32 @@ impl EffectChain {
                 .low_cut
                 .enabled
                 .then(|| LowCutFilter::new(settings.low_cut, sample_rate)),
+            noise_gate: settings
+                .noise_gate
+                .enabled
+                .then(|| NoiseGateFilter::new(settings.noise_gate, sample_rate)),
+            compressor: settings
+                .compressor
+                .enabled
+                .then(|| CompressorFilter::new(settings.compressor, sample_rate)),
         }
     }
 
     /// Whether no effect is switched on (so the mixer can skip warming up).
     pub(crate) fn is_empty(&self) -> bool {
-        self.low_cut.is_none()
+        self.low_cut.is_none() && self.noise_gate.is_none() && self.compressor.is_none()
     }
 
     /// Forgets all earlier audio, as if playback started from silence.
     pub(crate) fn reset(&mut self) {
         if let Some(filter) = &mut self.low_cut {
             filter.reset();
+        }
+        if let Some(gate) = &mut self.noise_gate {
+            gate.reset();
+        }
+        if let Some(compressor) = &mut self.compressor {
+            compressor.reset();
         }
     }
 
@@ -72,12 +108,26 @@ impl EffectChain {
         if let (Some(filter), Some(old)) = (&mut self.low_cut, &old.low_cut) {
             filter.continue_from(old);
         }
+        if let (Some(gate), Some(old)) = (&mut self.noise_gate, &old.noise_gate) {
+            gate.continue_from(old);
+        }
+        if let (Some(compressor), Some(old)) = (&mut self.compressor, &old.compressor) {
+            compressor.continue_from(old);
+        }
     }
 
-    /// Runs the effects over `samples` (interleaved stereo), in place.
+    /// Runs the effects over `samples` (interleaved stereo), in place: the
+    /// low cut first, so rumble cannot hold the gate open; the compressor
+    /// last, so it does not bring up the noise the gate took out.
     pub(crate) fn process(&mut self, samples: &mut [f32]) {
         if let Some(filter) = &mut self.low_cut {
             filter.process(samples);
+        }
+        if let Some(gate) = &mut self.noise_gate {
+            gate.process(samples);
+        }
+        if let Some(compressor) = &mut self.compressor {
+            compressor.process(samples);
         }
     }
 }
@@ -125,6 +175,12 @@ mod tests {
         let mut effects = super::TrackEffects::default();
         assert!(!effects.any_on());
         effects.low_cut.enabled = true;
+        assert!(effects.any_on());
+        effects.low_cut.enabled = false;
+        effects.noise_gate.enabled = true;
+        assert!(effects.any_on());
+        effects.noise_gate.enabled = false;
+        effects.compressor.enabled = true;
         assert!(effects.any_on());
     }
 

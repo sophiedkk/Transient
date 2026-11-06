@@ -163,7 +163,8 @@ splitbutton.record-button:not(.destructive-action) > button:first-child {
    (the track is singled out, or changed), mute in the warning colour (the
    track is silent). */
 .track-header button.solo-toggle:checked,
-.track-header button.effects-on {
+.track-header button.effects-on,
+button.limiter-toggle:checked {
   color: var(--accent-color);
   background-color: alpha(var(--accent-bg-color), 0.15);
 }

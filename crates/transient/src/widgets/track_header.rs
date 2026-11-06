@@ -219,8 +219,7 @@ impl TrackHeader {
             button.remove_css_class("effects-on");
             gettext("Effects")
         };
-        button.set_tooltip_text(Some(&label));
-        button.update_property(&[gtk::accessible::Property::Label(&label)]);
+        super::set_button_text(&button.get(), &label);
     }
 
     /// The track this header shows.

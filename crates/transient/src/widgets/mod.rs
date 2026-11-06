@@ -1,6 +1,7 @@
 //! Custom widgets. Each is a GObject subclass, so Blueprint files can use it
 //! (as `$TransientTimelineView`, for example) once its type is registered.
 
+pub(crate) mod effect_slider;
 pub(crate) mod export_dialog;
 pub(crate) mod timeline_view;
 pub(crate) mod track_header;

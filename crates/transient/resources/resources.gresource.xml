@@ -6,6 +6,7 @@
   <gresource prefix="/io/github/sophiedkk/Transient/">
     <file preprocess="xml-stripblanks">ui/window.ui</file>
     <file preprocess="xml-stripblanks">ui/track-header.ui</file>
+    <file preprocess="xml-stripblanks">ui/effect-slider.ui</file>
     <file preprocess="xml-stripblanks">ui/export-dialog.ui</file>
     <!-- Libadwaita loads style.css from the resource base path automatically. -->
     <file>style.css</file>
@@ -18,5 +19,6 @@
     <!-- Our own symbolic icons, for commands Adwaita has no icon for. -->
     <file alias="icons/scalable/actions/transient-split-symbolic.svg">icons/transient-split-symbolic.svg</file>
     <file alias="icons/scalable/actions/transient-effects-symbolic.svg">icons/transient-effects-symbolic.svg</file>
+    <file alias="icons/scalable/actions/transient-limiter-symbolic.svg">icons/transient-limiter-symbolic.svg</file>
   </gresource>
 </gresources>

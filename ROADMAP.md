@@ -269,10 +269,33 @@ Steps, each one runnable:
       on a 0.5 signal makes a step of 0.36, 25× the signal's largest normal
       step). Fixed: `Mix::continue_from` crossfades from the old mix to the
       new one over 20 ms, which covers every kind of change at once.
-- [ ] Noise gate.
-- [ ] Compressor.
+- [x] Noise gate: "Quiet Below" slider (−80 to −20 dBFS, whole dB, value
+      shown) and a Reduction choice (Silence, Strong −20 dB, Light −10 dB).
+      Stereo-linked, opens at the threshold and closes 6 dB below it, 1 ms
+      attack, 50 ms hold, 150 ms release (fixed, tuned for speech). Runs
+      after the low cut. Note: the test collection's speech has a noise floor
+      only ~13 dB below the voice, too loud for any gate; a synthetic
+      tone-and-noise file shows exactly −20 dB / silence.
+- [x] Compressor: "Compress Above" slider (−40 to 0 dBFS, whole dB) and
+      a Ratio choice (Gentle 2:1, Medium 4:1, Strong 8:1); 6 dB soft knee,
+      peak detector falling over 150 ms, 1 ms attack, automatic make-up gain
+      so a loud word (−10 dBFS) keeps its level. Runs last in the chain. On
+      the test speech at −30 dB the quiet-to-loud spread drops from 13.1 to
+      8.9 dB (2:1) and 7.2 dB (8:1). A sound jumping from quiet to full
+      scale can overshoot for a few samples (10 clipped samples at 8:1 on
+      speech that clips 908 times by itself): the master limiter's job.
+- [x] `EffectSlider` widget (`widgets/effect_slider.rs`): the slider row all
+      effects share (title, value, slider, end captions), extracted at the
+      third copy. `dev/send-keys.py` learned `scroll:STEPS`.
+- [ ] Hand testing (`dev/manual-tests.md`, milestone 15): the noise gate,
+      compressor and limiter (sections B–D) still need the owner's ears.
 - [ ] 3-band EQ.
-- [ ] Master limiter.
+- [x] Master limiter ("Prevent Clipping", a toggle right of the master
+      volume, on by default, also for older files): ceiling −1 dBFS, 1.5 ms
+      lookahead (sliding minimum then moving average of the same length,
+      which provably never passes the ceiling; property-tested), 100 ms
+      release. `Mix` renders the tracks the lookahead ahead, so nothing is
+      delayed. Catches the compressor's overshoot (10 clipped samples → 0).
 - [ ] Screenshots, CHANGELOG, MetaInfo release notes.
 
 ## Publishing (1.0 and Flathub)
@@ -377,6 +400,11 @@ Deliberately left out: changing a clip's speed or pitch by stretching it,
 drawing individual samples, workspaces, plugin hosting (VST, LV2), macros and
 batch processing: powerful, but they would turn Transient into another Audacity
 instead of the simpler alternative.
+
+Stretching was reconsidered on 2026-11-06 and left out again: time-stretching
+(keeping the pitch) needs an outside library and is hard to do well. Varispeed
+(the pitch follows the speed, like a tape) would be cheap in our own mixer, if
+it is ever wanted.
 
 ## Open questions and known gaps
 

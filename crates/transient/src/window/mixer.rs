@@ -1,5 +1,5 @@
-//! Mixer controls: each track's volume, pan, mute and solo, the master volume,
-//! and the output level meter.
+//! Mixer controls: each track's volume, pan, mute and solo, the master volume
+//! and limiter, and the output level meter.
 //!
 //! Slider changes come in many small steps while dragging. They go into the undo
 //! history *coalesced*: steps on the same slider less than a second apart count as
@@ -38,10 +38,15 @@ pub(super) enum MixerControl {
     FadeOut(ClipId),
     /// A track's low cut frequency (in the track pane).
     LowCut(TrackId),
+    /// A track's noise gate threshold (in the track pane).
+    NoiseGate(TrackId),
+    /// A track's compressor threshold (in the track pane).
+    Compressor(TrackId),
 }
 
 impl Window {
-    /// Connects the master volume slider. Called once, from `constructed`.
+    /// Connects the master volume slider and the limiter toggle. Called once,
+    /// from `constructed`.
     pub(super) fn setup_mixer(&self) {
         let weak = self.downgrade();
         self.imp().master_scale.connect_value_changed(move |scale| {
@@ -55,6 +60,22 @@ impl Window {
             window.apply_mixer_change(Some(MixerControl::Master), |project| {
                 let changed = (project.master_volume_db - volume).abs() > f32::EPSILON;
                 project.master_volume_db = volume;
+                changed
+            });
+        });
+        let weak = self.downgrade();
+        self.imp().limiter_button.connect_toggled(move |button| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            if window.imp().updating_controls.get() {
+                return;
+            }
+            let on = button.is_active();
+            // A toggle is its own undo step, like mute and solo.
+            window.apply_mixer_change(None, |project| {
+                let changed = project.master_limiter != on;
+                project.master_limiter = on;
                 changed
             });
         });
@@ -124,12 +145,15 @@ impl Window {
         self.imp().last_mixer_change.replace(None);
     }
 
-    /// Shows the project's master volume on the slider without treating it as a change.
+    /// Shows the project's master volume and limiter on their controls,
+    /// without treating that as a change.
     pub(super) fn show_master_volume(&self) {
         let imp = self.imp();
         imp.updating_controls.set(true);
+        let project = imp.project.borrow();
         imp.master_scale
-            .set_value(f64::from(imp.project.borrow().master_volume_db));
+            .set_value(f64::from(project.master_volume_db));
+        imp.limiter_button.set_active(project.master_limiter);
         imp.updating_controls.set(false);
     }
 

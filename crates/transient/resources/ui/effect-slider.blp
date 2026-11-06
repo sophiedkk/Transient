@@ -1,0 +1,67 @@
+using Gtk 4.0;
+using Adw 1;
+
+translation-domain "transient";
+
+// One effect's slider in the Track tab: the title and, on the right, the
+// current value ("80 Hz"), the slider, and what its two ends mean. The texts
+// and the range are properties, set where it is used (window.blp); see
+// src/widgets/effect_slider.rs.
+template $TransientEffectSlider: Adw.PreferencesRow {
+  activatable: false;
+
+  child: Box {
+    orientation: vertical;
+    margin-top: 6;
+    margin-bottom: 6;
+    margin-start: 12;
+    margin-end: 12;
+
+    Box {
+      Label {
+        label: bind template.title;
+        xalign: 0;
+        hexpand: true;
+      }
+
+      Label {
+        label: bind template.value-text;
+        xalign: 1;
+
+        styles [
+          "numeric",
+          "dimmed",
+        ]
+      }
+    }
+
+    Scale scale {
+      draw-value: false;
+      adjustment: bind template.adjustment;
+      round-digits: bind template.round-digits;
+    }
+
+    Box {
+      Label {
+        label: bind template.start-label;
+        xalign: 0;
+        hexpand: true;
+
+        styles [
+          "caption",
+          "dimmed",
+        ]
+      }
+
+      Label {
+        label: bind template.end-label;
+        xalign: 1;
+
+        styles [
+          "caption",
+          "dimmed",
+        ]
+      }
+    }
+  };
+}

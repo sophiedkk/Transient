@@ -10,7 +10,12 @@ use crate::time::Frames;
 /// Renders the whole project and keeps the left channel, to keep expectations
 /// easy to read.
 pub(crate) fn render(project: &Project, pool: &AudioPool) -> Vec<f32> {
-    let mut mix = Mix::new(project, pool);
+    // Without the master limiter: these tests use levels above full scale.
+    let project = Project {
+        master_limiter: false,
+        ..project.clone()
+    };
+    let mut mix = Mix::new(&project, pool);
     let mut out = vec![0.0; usize::try_from(mix.length()).unwrap() * 2];
     mix.render(0, &mut out);
     out.into_iter().step_by(2).collect()

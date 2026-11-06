@@ -10,7 +10,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Track effects, starting with Low Cut: remove rumble and handling noise, or
   thin out a sound on purpose, with one Cut Below slider (20–500 Hz) and a
-  choice of slope (12, 24 or 48 dB per octave). Each track header has
+  choice of slope (12, 24 or 48 dB per octave).
+- Noise Gate effect: turns a track down while it is quieter than a threshold
+  (Quiet Below), to silence hiss and room noise between phrases; the
+  Reduction choice keeps some room sound for a natural result.
+- Compressor effect: evens out a track's volume (Compress Above and a Ratio
+  of 2:1, 4:1 or 8:1), and turns it up again automatically so loud words
+  keep their level.
+- Prevent Clipping: a master limiter, on by default, keeps the whole mix under
+  −1 dBFS, so loud mixes no longer distort. Toggle it right of the master
+  volume. Each track header has
   an effects button next to mute and solo that opens them; it is coloured
   while an effect is on.
   Effects are saved in the project; projects saved with this version need

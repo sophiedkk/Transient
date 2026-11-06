@@ -50,6 +50,14 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   Unsaved changes = `project != saved_project`. Closing, quitting (app.quit closes
   each window) and New/Open ask "Save Changes?" via `confirm_discard_changes`.
   Clips whose audio is missing stay, drawn grey (`LaneClip::waveform` is `None`).
+- Effects (`transient-core::effects`, milestone 15): per track low cut, noise
+  gate, compressor (`TrackEffects` on `Track`), plus the master limiter
+  (`Project::master_limiter`). `Mix` renders each track into its own buffer,
+  runs its `EffectChain`, then the limiter, rendering ahead by its lookahead.
+  `render(&mut self)`: effects warm up after a jump; `Mix::continue_from`
+  (called by `Player::set_mix`) carries their state over and crossfades 20 ms
+  from the old mix, so edits during playback do not click. UI: the pane's Track
+  tab (`window/track_pane.rs`, `widgets/effect_slider.rs`).
 - Mixer settings (track volume/pan/mute/solo, master volume) live on `Track`/
   `Project`; `Mix` applies them (balance pan law). Slider changes go through
   `Window::apply_mixer_change`: coalesced undo steps and `update_mix()` only,
@@ -184,7 +192,8 @@ just test-audio                                 # decode the whole test collecti
   `--screenshot-delay=6`. `HEADLESS_DATA_HOME=DIR` starts with a prepared data
   folder instead of an empty one (e.g. a `recently-used.xbel` for the start
   screen's recent projects). Drags: `press`, `glide:X,Y` (moves in small
-  steps, so GTK sees a drag), `release`; `wait:SECONDS` holds the session (e.g.
+  steps, so GTK sees a drag), `release`; `scroll:STEPS` turns the mouse wheel where the pointer is
+  (positive = down, e.g. to reach the bottom of the pane); `wait:SECONDS` holds the session (e.g.
   a drag or an open text field for a screenshot: ending the session lets go of
   the button and takes focus away). The first click of a run can get lost, so start
   pointer scripts with a click on empty space, e.g. `HEADLESS_KEYS="move:600,600
@@ -216,6 +225,8 @@ release with notes from `dev/release-notes.sh`.
   `just flatpak`, without running the app), then commit and push to `main` when the
   owner asks. Report what was and was not verified.
 - The owner tests by hand in the installed Flatpak and reports UX problems: fix those first.
+  What to test by hand is in `dev/manual-tests.md` (per milestone, with when
+  each part was last confirmed): add steps for new features there.
 - No GitHub issues yet; keep plans in `ROADMAP.md`.
 
 ## Git

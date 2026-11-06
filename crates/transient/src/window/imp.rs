@@ -7,6 +7,8 @@ use adw::subclass::prelude::*;
 use gtk::{CompositeTemplate, gio, glib};
 use transient_core::history::History;
 use transient_core::project::{ClipId, Project, TrackId};
+
+use crate::widgets::effect_slider::EffectSlider;
 use transient_engine::player::{AudioOutput, Player};
 
 use super::clip_pane::Normalize;
@@ -61,6 +63,8 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) master_scale: TemplateChild<gtk::Scale>,
     #[template_child]
+    pub(super) limiter_button: TemplateChild<gtk::ToggleButton>,
+    #[template_child]
     pub(super) recent_group: TemplateChild<gtk::Box>,
     #[template_child]
     pub(super) recent_list: TemplateChild<gtk::ListBox>,
@@ -89,11 +93,21 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) low_cut_switch: TemplateChild<gtk::Switch>,
     #[template_child]
-    pub(super) low_cut_scale: TemplateChild<gtk::Scale>,
-    #[template_child]
-    pub(super) low_cut_value_label: TemplateChild<gtk::Label>,
+    pub(super) low_cut_slider: TemplateChild<EffectSlider>,
     #[template_child]
     pub(super) low_cut_slope_row: TemplateChild<adw::ComboRow>,
+    #[template_child]
+    pub(super) noise_gate_switch: TemplateChild<gtk::Switch>,
+    #[template_child]
+    pub(super) noise_gate_slider: TemplateChild<EffectSlider>,
+    #[template_child]
+    pub(super) noise_gate_reduction_row: TemplateChild<adw::ComboRow>,
+    #[template_child]
+    pub(super) compressor_switch: TemplateChild<gtk::Switch>,
+    #[template_child]
+    pub(super) compressor_slider: TemplateChild<EffectSlider>,
+    #[template_child]
+    pub(super) compressor_ratio_row: TemplateChild<adw::ComboRow>,
 
     pub(super) settings: OnceCell<gio::Settings>,
     /// The open project (what gets saved).
@@ -151,6 +165,7 @@ impl ObjectSubclass for Window {
     fn class_init(klass: &mut Self::Class) {
         // window.blp uses $TransientTimelineView, so its type must exist first.
         TimelineView::ensure_type();
+        EffectSlider::ensure_type();
         klass.bind_template();
 
         install_project_actions(klass);

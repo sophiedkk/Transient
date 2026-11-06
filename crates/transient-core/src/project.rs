@@ -216,6 +216,10 @@ pub struct Project {
     pub tracks: Vec<Track>,
     /// The volume of the whole mix, in decibels.
     pub master_volume_db: f32,
+    /// Whether the master limiter keeps the mix from clipping (see
+    /// [`crate::effects::limiter`]). On by default, also for older files: it
+    /// only changes a mix that would clip.
+    pub master_limiter: bool,
     /// The next unused ID (shared by sources, tracks and clips).
     pub next_id: u64,
 }
@@ -229,6 +233,7 @@ impl Default for Project {
             sources: Vec::new(),
             tracks: Vec::new(),
             master_volume_db: 0.0,
+            master_limiter: true,
             next_id: 1,
         }
     }
@@ -466,11 +471,22 @@ mod tests {
                   "enabled": false,
                   "frequency_hz": 80.0,
                   "slope": "db24"
+                },
+                "noise_gate": {
+                  "enabled": false,
+                  "threshold_db": -45.0,
+                  "reduction": "strong"
+                },
+                "compressor": {
+                  "enabled": false,
+                  "threshold_db": -20.0,
+                  "ratio": "medium"
                 }
               }
             }
           ],
           "master_volume_db": 0.0,
+          "master_limiter": true,
           "next_id": 4
         }
         "#);

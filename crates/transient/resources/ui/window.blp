@@ -297,8 +297,11 @@ template $TransientWindow: Adw.ApplicationWindow {
                         description: _("Effects on this track, applied before its volume and pan");
                       }
 
-                      // Each effect: a switch in the group's header, one slider in
-                      // plain words, and at most a setting or two below it.
+                      // Each effect: a switch in the group's header, one slider in plain
+                      // words with its value (src/widgets/effect_slider.rs), and one choice.
+                      // The low cut's slider runs 0 to 1 on a logarithmic frequency scale
+                      // (transient_core::effects::low_cut::frequency_for_amount); the others
+                      // are in dBFS.
                       Adw.PreferencesGroup {
                         title: _("Low Cut");
                         description: _("Removes rumble and handling noise below voices and instruments");
@@ -311,85 +314,25 @@ template $TransientWindow: Adw.ApplicationWindow {
                           }
                         };
 
-                        Adw.PreferencesRow {
-                          activatable: false;
+                        $TransientEffectSlider low_cut_slider {
+                          title: _("Cut Below");
+                          start-label: _("Rumble only");
+                          end-label: _("Thin");
                           sensitive: bind low_cut_switch.active;
 
-                          child: Box {
-                            orientation: vertical;
-                            margin-top: 6;
-                            margin-bottom: 6;
-                            margin-start: 12;
-                            margin-end: 12;
-
-                            // The title and, on the right, the frequency ("80 Hz", set by
-                            // track_pane.rs while the slider moves).
-                            Box {
-                              Label {
-                                label: _("Cut Below");
-                                xalign: 0;
-                                hexpand: true;
-                              }
-
-                              Label low_cut_value_label {
-                                xalign: 1;
-
-                                styles [
-                                  "numeric",
-                                  "dimmed",
-                                ]
-                              }
-                            }
-
-                            // 0 = the lowest frequency, 1 = the highest, on a logarithmic
-                            // scale; see transient_core::effects::low_cut::frequency_for_amount.
-                            Scale low_cut_scale {
-                              draw-value: false;
-
-                              adjustment: Adjustment {
-                                lower: 0;
-                                upper: 1;
-                                step-increment: 0.02;
-                                page-increment: 0.1;
-                              };
-
-                              accessibility {
-                                label: _("Cut Below");
-                              }
-                            }
-
-                            Box {
-                              Label {
-                                label: _("Rumble only");
-                                xalign: 0;
-                                hexpand: true;
-
-                                styles [
-                                  "caption",
-                                  "dimmed",
-                                ]
-                              }
-
-                              Label {
-                                label: _("Thin");
-                                xalign: 1;
-
-                                styles [
-                                  "caption",
-                                  "dimmed",
-                                ]
-                              }
-                            }
+                          adjustment: Adjustment {
+                            lower: 0;
+                            upper: 1;
+                            step-increment: 0.02;
+                            page-increment: 0.1;
                           };
                         }
 
-                        // The order matches transient_core::effects::low_cut::Slope
-                        // (see track_pane.rs).
+                        // The order matches transient_core::effects::low_cut::Slope (see track_pane.rs).
                         Adw.ComboRow low_cut_slope_row {
                           title: _("Slope");
                           sensitive: bind low_cut_switch.active;
-                          // The choice shows below the title, where it has
-                          // room, instead of squeezed in on the right.
+                          // The choice shows below the title, where it has room.
                           use-subtitle: true;
 
                           model: StringList {
@@ -397,6 +340,95 @@ template $TransientWindow: Adw.ApplicationWindow {
                               _("Gentle (12 dB per octave)"),
                               _("Medium (24 dB per octave)"),
                               _("Steep (48 dB per octave)"),
+                            ]
+                          };
+                        }
+                      }
+
+                      Adw.PreferencesGroup {
+                        title: _("Noise Gate");
+                        description: _("Silences hiss and room noise between phrases");
+
+                        header-suffix: Switch noise_gate_switch {
+                          valign: center;
+
+                          accessibility {
+                            label: _("Noise Gate");
+                          }
+                        };
+
+                        $TransientEffectSlider noise_gate_slider {
+                          title: _("Quiet Below");
+                          start-label: _("Only silence");
+                          end-label: _("More");
+                          sensitive: bind noise_gate_switch.active;
+                          // Whole decibels, as the value beside it shows.
+                          round-digits: 0;
+
+                          adjustment: Adjustment {
+                            lower: -80;
+                            upper: -20;
+                            step-increment: 1;
+                            page-increment: 5;
+                          };
+                        }
+
+                        // The order matches transient_core::effects::noise_gate::Reduction (see track_pane.rs).
+                        Adw.ComboRow noise_gate_reduction_row {
+                          title: _("Reduction");
+                          sensitive: bind noise_gate_switch.active;
+                          // The choice shows below the title, where it has room.
+                          use-subtitle: true;
+
+                          model: StringList {
+                            strings [
+                              _("Silence"),
+                              _("Strong (−20 dB)"),
+                              _("Light (−10 dB)"),
+                            ]
+                          };
+                        }
+                      }
+
+                      Adw.PreferencesGroup {
+                        title: _("Compressor");
+                        description: _("Evens out the volume: loud parts down, then the whole track up");
+
+                        header-suffix: Switch compressor_switch {
+                          valign: center;
+
+                          accessibility {
+                            label: _("Compressor");
+                          }
+                        };
+
+                        $TransientEffectSlider compressor_slider {
+                          title: _("Compress Above");
+                          start-label: _("Almost all");
+                          end-label: _("Only peaks");
+                          sensitive: bind compressor_switch.active;
+                          round-digits: 0;
+
+                          adjustment: Adjustment {
+                            lower: -40;
+                            upper: 0;
+                            step-increment: 1;
+                            page-increment: 5;
+                          };
+                        }
+
+                        // The order matches transient_core::effects::compressor::Ratio (see track_pane.rs).
+                        Adw.ComboRow compressor_ratio_row {
+                          title: _("Ratio");
+                          sensitive: bind compressor_switch.active;
+                          // The choice shows below the title, where it has room.
+                          use-subtitle: true;
+
+                          model: StringList {
+                            strings [
+                              _("Gentle (2:1)"),
+                              _("Medium (4:1)"),
+                              _("Strong (8:1)"),
                             ]
                           };
                         }
@@ -724,6 +756,24 @@ template $TransientWindow: Adw.ApplicationWindow {
 
           accessibility {
             label: _("Master Volume");
+          }
+        }
+
+        // The master limiter: keeps the whole mix under −1 dBFS. Coloured
+        // while on, like the track header toggles (see mixer.rs).
+        ToggleButton limiter_button {
+          icon-name: "transient-limiter-symbolic";
+          tooltip-text: _("Prevent Clipping");
+          valign: center;
+
+          styles [
+            "flat",
+            "circular",
+            "limiter-toggle",
+          ]
+
+          accessibility {
+            label: _("Prevent Clipping");
           }
         }
 
