@@ -137,7 +137,7 @@ recording that shows it:
 
 ### H. Undo, saving, opening, exporting
 
-*Not yet tested by hand.*
+*Confirmed 2026-11-06.*
 1. Drag Cut Below once, then Ctrl+Z: it goes back in one step (not one per
    tiny move). Ctrl+Z again undoes switching it on; Shift+Ctrl+Z redoes.
 2. Move any slider or toggle mute in a saved project: the title gets its "•"

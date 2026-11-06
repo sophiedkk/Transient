@@ -10,6 +10,7 @@ pub mod clipboard;
 pub mod convert;
 pub mod edit;
 pub mod effects;
+pub mod heard;
 pub mod history;
 pub mod mix;
 pub mod normalize;

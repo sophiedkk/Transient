@@ -11,6 +11,11 @@
 //! zoomed in further than 256 frames per column, it reads the samples directly.
 //!
 //! The pyramid costs about 1/100 of the audio's memory.
+//!
+//! An [`Overview`] is the same pyramid without the audio, built piece by piece
+//! from audio that is not kept (a track as it sounds, with its effects; see
+//! [`crate::heard`]). Its blocks are finer, 16 frames, so it looks right when
+//! zoomed in, at about 1/16 of the audio's memory.
 
 use std::ops::Range;
 
@@ -18,8 +23,10 @@ use crate::audio::{AudioBuffer, CHANNELS};
 use crate::convert::f64_from_usize;
 use crate::time::{Frames, frames_from_f64};
 
-/// Frames per peak at level 0.
+/// Frames per peak at level 0 of a [`Waveform`] (closer in, it reads samples).
 const BASE_BLOCK: usize = 256;
+/// Frames per peak at level 0 of an [`Overview`] (it has no samples to read).
+const OVERVIEW_BLOCK: usize = 16;
 /// How much larger each level's blocks are than the previous level's.
 const LEVEL_FACTOR: usize = 4;
 
@@ -61,26 +68,18 @@ impl Peak {
     }
 }
 
-/// An audio buffer plus its peak pyramid. Cheap to clone (the data is shared).
+/// A peak pyramid: level 0 has one peak per `block` frames, each next level
+/// one per `LEVEL_FACTOR` peaks of the level below, up to a single peak.
 #[derive(Debug, Clone)]
-pub struct Waveform {
-    buffer: AudioBuffer,
-    /// `levels[n]` holds one peak per `BASE_BLOCK * LEVEL_FACTOR^n` frames.
+struct Pyramid {
+    block: usize,
     levels: std::sync::Arc<[Vec<Peak>]>,
 }
 
-impl Waveform {
-    /// Computes the peak pyramid for `buffer`. Takes about 10 ms per minute of
-    /// audio, so call it on a background thread together with decoding.
-    #[must_use]
-    pub fn new(buffer: AudioBuffer) -> Self {
-        let mut levels = vec![
-            buffer
-                .samples()
-                .chunks(BASE_BLOCK * CHANNELS)
-                .filter_map(Peak::of_samples)
-                .collect::<Vec<_>>(),
-        ];
+impl Pyramid {
+    /// The pyramid on top of `base`, level 0 with one peak per `block` frames.
+    fn new(block: usize, base: Vec<Peak>) -> Self {
+        let mut levels = vec![base];
         while let Some(previous) = levels.last()
             && previous.len() > 1
         {
@@ -91,8 +90,69 @@ impl Waveform {
             levels.push(next);
         }
         Self {
-            buffer,
+            block,
             levels: levels.into(),
+        }
+    }
+
+    /// The coarsest level whose blocks are no larger than one column,
+    /// or `None` if even level 0's blocks are larger.
+    fn level_for(&self, frames_per_column: f64) -> Option<usize> {
+        let mut block = self.block;
+        let mut level = None;
+        for index in 0..self.levels.len() {
+            if f64_from_usize(block) > frames_per_column {
+                break;
+            }
+            level = Some(index);
+            block = block.saturating_mul(LEVEL_FACTOR);
+        }
+        level
+    }
+
+    /// The peak of the blocks of `level` that cover frames `first..end`.
+    fn peak(&self, level: usize, first: Frames, end: Frames) -> Option<Peak> {
+        let block =
+            Frames::try_from(self.block * LEVEL_FACTOR.pow(u32::try_from(level).ok()?)).ok()?;
+        let first_block = usize::try_from(first / block).ok()?;
+        let end_block = usize::try_from(end.div_ceil(block)).ok()?;
+        let peaks = self.levels.get(level)?;
+        let blocks = peaks.get(first_block..end_block.min(peaks.len()))?;
+        let peak = blocks.iter().fold(Peak::EMPTY, |a, &b| a.include(b));
+        (!blocks.is_empty()).then_some(peak)
+    }
+}
+
+/// The frames pixel column `column` covers (at least one), the first column
+/// starting at frame `start`; `None` before frame 0.
+fn column_frames(start: f64, frames_per_column: f64, column: usize) -> Option<Range<Frames>> {
+    let first = start + f64_from_usize(column) * frames_per_column;
+    let first_frame = frames_from_f64(first.floor())?;
+    // Every column covers at least one frame, even when zoomed in very far.
+    let end_frame = frames_from_f64((first + frames_per_column).ceil())?.max(first_frame + 1);
+    Some(first_frame..end_frame)
+}
+
+/// An audio buffer plus its peak pyramid. Cheap to clone (the data is shared).
+#[derive(Debug, Clone)]
+pub struct Waveform {
+    buffer: AudioBuffer,
+    pyramid: Pyramid,
+}
+
+impl Waveform {
+    /// Computes the peak pyramid for `buffer`. Takes about 10 ms per minute of
+    /// audio, so call it on a background thread together with decoding.
+    #[must_use]
+    pub fn new(buffer: AudioBuffer) -> Self {
+        let base = buffer
+            .samples()
+            .chunks(BASE_BLOCK * CHANNELS)
+            .filter_map(Peak::of_samples)
+            .collect();
+        Self {
+            buffer,
+            pyramid: Pyramid::new(BASE_BLOCK, base),
         }
     }
 
@@ -122,61 +182,109 @@ impl Waveform {
         columns: usize,
     ) -> Vec<Option<Peak>> {
         let frames_per_column = frames_per_column.max(f64::MIN_POSITIVE);
-        let level = self.level_for(frames_per_column);
+        let level = self.pyramid.level_for(frames_per_column);
         (0..columns)
             .map(|column| {
-                let first = start + f64_from_usize(column) * frames_per_column;
-                let first_frame = frames_from_f64(first.floor())?;
-                // Every column covers at least one frame, even when zoomed in very far.
-                let end_frame =
-                    frames_from_f64((first + frames_per_column).ceil())?.max(first_frame + 1);
-                let clamped_first = first_frame.max(range.start);
-                let clamped_end = end_frame.min(range.end);
+                let frames = column_frames(start, frames_per_column, column)?;
+                let clamped_first = frames.start.max(range.start);
+                let clamped_end = frames.end.min(range.end);
                 if clamped_first >= clamped_end {
                     return None;
                 }
                 // Whole blocks would include audio outside the range, so columns at
                 // the range's edges read the samples themselves.
-                let at_edge = clamped_first != first_frame || clamped_end != end_frame;
+                let at_edge = clamped_first != frames.start || clamped_end != frames.end;
                 match level {
-                    Some(level) if !at_edge => {
-                        self.peak_from_level(level, clamped_first, clamped_end)
-                    }
+                    Some(level) if !at_edge => self.pyramid.peak(level, clamped_first, clamped_end),
                     _ => self.peak_from_samples(clamped_first, clamped_end),
                 }
             })
             .collect()
     }
 
-    /// The coarsest level whose blocks are no larger than one column,
-    /// or `None` to read samples directly.
-    fn level_for(&self, frames_per_column: f64) -> Option<usize> {
-        let mut block = BASE_BLOCK;
-        let mut level = None;
-        for index in 0..self.levels.len() {
-            if f64_from_usize(block) > frames_per_column {
-                break;
-            }
-            level = Some(index);
-            block = block.saturating_mul(LEVEL_FACTOR);
-        }
-        level
-    }
-
     fn peak_from_samples(&self, first: Frames, end: Frames) -> Option<Peak> {
         let count = usize::try_from(end.saturating_sub(first)).ok()?;
         Peak::of_samples(self.buffer.frames_from(first, count))
     }
+}
 
-    fn peak_from_level(&self, level: usize, first: Frames, end: Frames) -> Option<Peak> {
-        let block =
-            Frames::try_from(BASE_BLOCK * LEVEL_FACTOR.pow(u32::try_from(level).ok()?)).ok()?;
-        let first_block = usize::try_from(first / block).ok()?;
-        let end_block = usize::try_from(end.div_ceil(block)).ok()?;
-        let peaks = self.levels.get(level)?;
-        let blocks = peaks.get(first_block..end_block.min(peaks.len()))?;
-        let peak = blocks.iter().fold(Peak::EMPTY, |a, &b| a.include(b));
-        (!blocks.is_empty()).then_some(peak)
+/// A peak overview of audio that is not kept: see the module documentation.
+/// Cheap to clone (the data is shared).
+#[derive(Debug, Clone)]
+pub struct Overview {
+    pyramid: Pyramid,
+}
+
+impl Overview {
+    /// The peaks for `columns` pixel columns, like [`Waveform::peaks_within`].
+    /// Columns narrower than 16 frames show the peak of their 16-frame block,
+    /// and columns at the edges of `range` may include up to 15 frames beyond.
+    #[must_use]
+    pub fn peaks_within(
+        &self,
+        range: Range<Frames>,
+        start: f64,
+        frames_per_column: f64,
+        columns: usize,
+    ) -> Vec<Option<Peak>> {
+        let frames_per_column = frames_per_column.max(f64::MIN_POSITIVE);
+        let level = self.pyramid.level_for(frames_per_column).unwrap_or(0);
+        (0..columns)
+            .map(|column| {
+                let frames = column_frames(start, frames_per_column, column)?;
+                let first = frames.start.max(range.start);
+                let end = frames.end.min(range.end);
+                (first < end).then(|| self.pyramid.peak(level, first, end))?
+            })
+            .collect()
+    }
+}
+
+/// Builds an [`Overview`] from audio handed over piece by piece (interleaved
+/// stereo, any lengths), without keeping it.
+#[derive(Debug)]
+pub struct OverviewBuilder {
+    base: Vec<Peak>,
+    /// The block being filled, and how many frames it has so far.
+    current: Peak,
+    frames_in_current: usize,
+}
+
+impl Default for OverviewBuilder {
+    fn default() -> Self {
+        Self {
+            base: Vec::new(),
+            current: Peak::EMPTY,
+            frames_in_current: 0,
+        }
+    }
+}
+
+impl OverviewBuilder {
+    /// Adds the next piece of audio.
+    pub fn push(&mut self, samples: &[f32]) {
+        for frame in samples.chunks_exact(CHANNELS) {
+            for &sample in frame {
+                self.current = self.current.include_sample(sample);
+            }
+            self.frames_in_current += 1;
+            if self.frames_in_current == OVERVIEW_BLOCK {
+                self.base.push(self.current);
+                self.current = Peak::EMPTY;
+                self.frames_in_current = 0;
+            }
+        }
+    }
+
+    /// The overview of everything pushed.
+    #[must_use]
+    pub fn finish(mut self) -> Overview {
+        if self.frames_in_current > 0 {
+            self.base.push(self.current);
+        }
+        Overview {
+            pyramid: Pyramid::new(OVERVIEW_BLOCK, self.base),
+        }
     }
 }
 
@@ -207,7 +315,7 @@ mod tests {
     #[test]
     fn levels_shrink_by_four_until_one_peak_is_left() {
         let w = waveform(vec![0.0; 2 * 256 * 64]); // 64 base blocks
-        let sizes: Vec<usize> = w.levels.iter().map(Vec::len).collect();
+        let sizes: Vec<usize> = w.pyramid.levels.iter().map(Vec::len).collect();
         assert_eq!(sizes, vec![64, 16, 4, 1]);
     }
 
@@ -296,6 +404,70 @@ mod tests {
                 let exact = brute_force(&w, first, end).unwrap();
                 let peak = peak.unwrap();
                 prop_assert!(peak.min <= exact.min && peak.max >= exact.max);
+            }
+        }
+    }
+
+    /// The overview of `samples`, handed to the builder in pieces of `piece`
+    /// samples.
+    fn overview(samples: &[f32], piece: usize) -> Overview {
+        let mut builder = OverviewBuilder::default();
+        for chunk in samples.chunks(piece) {
+            builder.push(chunk);
+        }
+        builder.finish()
+    }
+
+    #[test]
+    fn an_overview_shows_a_click_at_every_zoom_level() {
+        let mut samples = vec![0.0; 2 * 48_000];
+        samples[2 * 30_000] = 0.9;
+        let overview = overview(&samples, 4096);
+        for frames_per_column in [1.0, 10.0, 100.0, 1000.0, 10_000.0] {
+            let columns = (48_000.0 / frames_per_column) as usize;
+            let peaks = overview.peaks_within(0..48_000, 0.0, frames_per_column, columns);
+            let loudest = peaks
+                .iter()
+                .flatten()
+                .fold(0.0_f32, |max, peak| max.max(peak.max));
+            assert!(
+                (loudest - 0.9).abs() < 1e-6,
+                "at {frames_per_column}: {loudest}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_overview_built_in_pieces_is_the_same() {
+        let samples: Vec<f32> = (0..20_000).map(|n| ((n as f32) * 0.37).sin()).collect();
+        let whole = overview(&samples, samples.len());
+        let pieces = overview(&samples, 334);
+        for frames_per_column in [3.0, 64.0, 900.0] {
+            assert_eq!(
+                whole.peaks_within(0..10_000, 0.0, frames_per_column, 50),
+                pieces.peaks_within(0..10_000, 0.0, frames_per_column, 50)
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn overview_peaks_contain_every_sample_of_their_column(
+            samples in prop::collection::vec(-1.0_f32..1.0, 2..6000),
+            frames_per_column in 1.0_f64..2000.0,
+        ) {
+            let samples = &samples[..samples.len() / 2 * 2];
+            let frames = (samples.len() / 2) as u64;
+            let overview = overview(samples, 1000);
+            let columns = (frames as f64 / frames_per_column).ceil() as usize;
+            let peaks = overview.peaks_within(0..frames, 0.0, frames_per_column, columns);
+            for (column, peak) in peaks.iter().enumerate() {
+                let Some(range) = column_frames(0.0, frames_per_column, column) else { continue };
+                let end = range.end.min(frames);
+                if range.start >= end { continue; }
+                let truth = Peak::of_samples(&samples[range.start as usize * 2..end as usize * 2]).unwrap();
+                let peak = peak.unwrap();
+                prop_assert!(peak.min <= truth.min && peak.max >= truth.max);
             }
         }
     }

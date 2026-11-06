@@ -288,9 +288,10 @@ Steps, each one runnable:
       effects share (title, value, slider, end captions), extracted at the
       third copy. `dev/send-keys.py` learned `scroll:STEPS`.
 - [ ] Hand testing (`dev/manual-tests.md`, milestone 15). Confirmed
-      2026-11-06: A, C, E–G, I–K. Still open: B (noise gate: no clear result
+      2026-11-06: A, C, E–K. Still open: B (noise gate: no clear result
       with the test files; retest with a recording of one's own voice, as the
-      recipe there says), D (compressor) and H (undo, saving, export).
+      recipe there says) and D (compressor; judged by ear, the waveforms did
+      not show it: see "waveforms as heard" below).
 - [x] 3-band equalizer: Bass (low shelf, 120 Hz), Middle (peak, 1 kHz, Q 0.7)
       and Treble (high shelf, 8 kHz), each −12 to +12 dB in whole dB, after
       the gate and before the compressor. Cookbook biquads, tested at each
@@ -302,6 +303,24 @@ Steps, each one runnable:
       which provably never passes the ceiling; property-tested), 100 ms
       release. `Mix` renders the tracks the lookahead ahead, so nothing is
       delayed. Catches the compressor's overshoot (10 clipped samples → 0).
+- [x] Effect order: fixed, low cut → noise gate → equalizer → compressor per
+      track, then the master limiter (decided 2026-11-06). Low cut first so
+      rumble cannot hold the gate open; the gate before the compressor, which
+      would bring up the noise in the pauses; the equalizer before the
+      compressor so its changes come out even too. The Track tab lists them
+      in this order and says "Applied from top to bottom"; the reasons are in
+      `EffectChain::process`. Rearranging was considered and left out: the
+      wrong orders only make things worse, with nothing to explain why.
+- [ ] Waveforms as heard (decided 2026-11-06: the compressor and gate did
+      not show in the timeline). Lanes draw each track as it sounds before
+      its volume and pan: clip gain, fades and effects (also closes the gap
+      "waveforms show clip gain but not fades"). Done: `heard::track_overview`
+      renders a track through the normal `Mix` into a peaks-only
+      `waveform::Overview` (16-frame blocks, the audio is not kept). To do:
+      render changed tracks on a background thread a moment after each
+      change, use a result only if the track still matches it, and draw it in
+      the lanes (the source waveform while a clip is dragged or before the
+      result is in).
 - [x] Wrap-up: a Track tab screenshot (the demo project's voice track has a
       low cut, noise gate and compressor on), effects in the MetaInfo feature
       list and the README. The MetaInfo `<release>` entry is written when the
@@ -406,8 +425,8 @@ account), the MIT licence, the SVG icon and the desktop file.
 - GitHub issue-based workflow instead of this file (not yet)
 
 Deliberately left out: changing a clip's speed or pitch by stretching it,
-drawing individual samples, workspaces, plugin hosting (VST, LV2), macros and
-batch processing: powerful, but they would turn Transient into another Audacity
+drawing individual samples, workspaces, plugin hosting (VST, LV2), rearranging
+a track's effects (see milestone 15), macros and batch processing: powerful, but they would turn Transient into another Audacity
 instead of the simpler alternative.
 
 Stretching was reconsidered on 2026-11-06 and left out again: time-stretching
