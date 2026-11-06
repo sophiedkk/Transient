@@ -426,7 +426,8 @@ account), the MIT licence, the SVG icon and the desktop file.
      whole mix; normalizing already measures loudness.
 - Truncate silence (shorten long pauses), and a spectrogram view (repair work)
 - Level meters per track, in the track headers (the master meter is under the
-  master volume)
+  master volume). Would also help to set the noise gate and compressor: you
+  see where the noise and the loud words are (suggested 2026-11-06).
 - Clip names and colours (a fixed set that works in light and dark themes)
 - Markers and regions, and exporting one file per region
 - GitHub issue-based workflow instead of this file (not yet)
@@ -459,3 +460,12 @@ it is ever wanted.
 - A fade's handle can cover the clip's name when the fade is short or the view
   zoomed out (e.g. a 2-second fade-in at the default zoom: "pi◯o"). Perhaps
   start the name after the handle, or draw the handle below the title bar.
+- The start screen (no project open) shows the pane and export buttons in the
+  header bar, which do nothing there (seen 2026-11-06). Hide or disable them
+  until a project is open.
+- Older numbers still written in the Blueprint files instead of taken from the
+  code (since 2026-11-06 every meaningful number has one named source): clip
+  gain −60…24 dB and fade lengths 0…3600 s (window.blp, clip pane), track
+  volume −60…12 dB (track-header.blp) and master volume −60…12 dB
+  (window.blp), where −60 repeats `transient_core::mix::SILENT_DB`. Set these
+  ranges in code from named constants, as the effect sliders do.
