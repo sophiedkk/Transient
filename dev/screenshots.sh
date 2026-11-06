@@ -59,6 +59,9 @@ shoot main-window --seek=12 --action=select-clip-at-playhead --quit-after=3 "$pr
 # The clip pane, for the piano (the only clip playing at 0:01).
 shoot clip-pane --seek=12 --select-clips-at=1 --action=toggle-clip-pane \
     --quit-after=3 "$project"
+# The Track tab, for the voice track (low cut, noise gate and compressor on).
+shoot track-effects --seek=12 --action=select-clip-at-playhead --action=track-effects \
+    --quit-after=3 "$project"
 shoot export --seek=12 --action=export --quit-after=3 "$project"
 shoot start-screen --quit-after=3
 

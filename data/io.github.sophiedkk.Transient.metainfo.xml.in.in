@@ -17,6 +17,7 @@
       <li>Arrange, trim, split and cut clips on tracks, with undo for every change</li>
       <li>Fades, clip gain and normalizing</li>
       <li>Volume, pan, mute and solo for every track</li>
+      <li>Effects for every track: low cut, noise gate, equalizer and compressor; a limiter keeps the mix from clipping</li>
       <li>Record from a microphone while the other tracks play</li>
       <li>Export to WAV, FLAC, MP3, Opus or Ogg Vorbis</li>
     </ul>
@@ -38,11 +39,19 @@
     </screenshot>
     <screenshot>
       <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/clip-pane.png</image>
-      <caption>The clip pane: gain, fades and normalizing for the selected clip</caption>
+      <caption>The Clip tab: gain, fades and normalizing for the selected clip</caption>
     </screenshot>
     <screenshot environment="gnome:dark">
       <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/clip-pane-dark.png</image>
-      <caption>The clip pane: gain, fades and normalizing for the selected clip</caption>
+      <caption>The Clip tab: gain, fades and normalizing for the selected clip</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/track-effects.png</image>
+      <caption>The Track tab: low cut and noise gate on a voice track</caption>
+    </screenshot>
+    <screenshot environment="gnome:dark">
+      <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/track-effects-dark.png</image>
+      <caption>The Track tab: low cut and noise gate on a voice track</caption>
     </screenshot>
     <screenshot>
       <image>https://raw.githubusercontent.com/sophiedkk/Transient/main/data/screenshots/export.png</image>

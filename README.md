@@ -24,8 +24,9 @@ GStreamer.
 </picture>
 
 > **Status:** early development (0.3). You can import or record audio,
-> arrange, trim and cut it on tracks, give tracks a colour, add fades, mix the
-> tracks and export the result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
+> arrange, trim and cut it on tracks, give tracks a colour, add fades and
+> effects (low cut, noise gate, equalizer, compressor), mix the tracks and
+> export the result; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
 
 ## Install
 

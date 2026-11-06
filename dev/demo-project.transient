@@ -13,6 +13,11 @@
       "id": 5,
       "name": "Voice",
       "color": "blue",
+      "effects": {
+        "low_cut": { "enabled": true, "frequency_hz": 100.0, "slope": "db24" },
+        "noise_gate": { "enabled": true, "threshold_db": -50.0, "reduction": "strong" },
+        "compressor": { "enabled": true, "threshold_db": -24.0, "ratio": "medium" }
+      },
       "clips": [
         { "id": 9, "source": 1, "start": 288000, "offset": 0, "length": 1152000 }
       ]

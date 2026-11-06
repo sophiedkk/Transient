@@ -301,7 +301,10 @@ Steps, each one runnable:
       which provably never passes the ceiling; property-tested), 100 ms
       release. `Mix` renders the tracks the lookahead ahead, so nothing is
       delayed. Catches the compressor's overshoot (10 clipped samples → 0).
-- [ ] Screenshots, CHANGELOG, MetaInfo release notes.
+- [x] Wrap-up: a Track tab screenshot (the demo project's voice track has a
+      low cut, noise gate and compressor on), effects in the MetaInfo feature
+      list and the README. The MetaInfo `<release>` entry is written when the
+      version is released (`RELEASING.md`, step 4).
 
 ## Publishing (1.0 and Flathub)
 
