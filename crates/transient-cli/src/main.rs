@@ -179,7 +179,7 @@ fn run(cli: Cli) -> anyhow::Result<bool> {
 fn mix(files: &[PathBuf]) -> anyhow::Result<MixReport> {
     let (project, pool) = import_files(files)?;
     let started = Instant::now();
-    let mix = Mix::new(&project, &pool);
+    let mut mix = Mix::new(&project, &pool);
     let mut rendered = Vec::new();
     let mut chunk = vec![0.0; 4096 * CHANNELS];
     let mut position = 0;

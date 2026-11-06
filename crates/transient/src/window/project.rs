@@ -55,14 +55,7 @@ impl Window {
 
         let length = format_position(project.length(), project.sample_rate);
         let tracks = project.tracks.len();
-        // A "•" before the name marks unsaved changes.
-        let title = if self.has_unsaved_changes() {
-            format!("• {}", self.project_title())
-        } else {
-            self.project_title()
-        };
-        imp.header_title.set_title(&title);
-        self.set_title(Some(&title));
+        self.update_title();
         let subtitle = if tracks == 0 {
             String::new()
         } else {
@@ -94,7 +87,36 @@ impl Window {
         self.set_playback_enabled(has_audio);
         self.action_set_enabled("win.export", has_audio);
         self.update_edit_actions();
-        self.update_clip_pane();
+        self.update_pane();
+    }
+
+    /// Shows the project's name as the window title, with a "•" before it
+    /// while there are unsaved changes.
+    pub(super) fn update_title(&self) {
+        let title = if self.has_unsaved_changes() {
+            format!("• {}", self.project_title())
+        } else {
+            self.project_title()
+        };
+        self.imp().header_title.set_title(&title);
+        self.set_title(Some(&title));
+    }
+
+    /// Updates the "Effects On" mark in every track header, without
+    /// rebuilding the headers (after an effect change in the Track tab).
+    pub(super) fn refresh_effect_marks(&self) {
+        let imp = self.imp();
+        let project = imp.project.borrow();
+        let mut child = imp.track_headers.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if let Ok(header) = widget.downcast::<TrackHeader>() {
+                let on = project
+                    .track(header.track_id())
+                    .is_some_and(|track| track.effects.any_on());
+                header.show_effects_on(on);
+            }
+        }
     }
 
     /// Redraws the timeline lanes (for example after mute or solo changed),
@@ -166,6 +188,12 @@ impl Window {
                 header.connect_remove(move |track| {
                     if let Some(window) = weak.upgrade() {
                         window.remove_track(track);
+                    }
+                });
+                let weak = self.downgrade();
+                header.connect_effects(move |track| {
+                    if let Some(window) = weak.upgrade() {
+                        window.show_track_effects(track);
                     }
                 });
                 let weak = self.downgrade();

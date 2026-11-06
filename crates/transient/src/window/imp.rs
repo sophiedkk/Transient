@@ -6,7 +6,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{CompositeTemplate, gio, glib};
 use transient_core::history::History;
-use transient_core::project::{ClipId, Project};
+use transient_core::project::{ClipId, Project, TrackId};
 use transient_engine::player::{AudioOutput, Player};
 
 use super::clip_pane::Normalize;
@@ -71,7 +71,11 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) split_view: TemplateChild<adw::OverlaySplitView>,
     #[template_child]
-    pub(super) pane_stack: TemplateChild<adw::ViewStack>,
+    pub(super) pane_tabs: TemplateChild<adw::ViewStack>,
+    #[template_child]
+    pub(super) clip_stack: TemplateChild<adw::ViewStack>,
+    #[template_child]
+    pub(super) track_stack: TemplateChild<adw::ViewStack>,
     #[template_child]
     pub(super) pane_clip_group: TemplateChild<adw::PreferencesGroup>,
     #[template_child]
@@ -80,6 +84,16 @@ pub(crate) struct Window {
     pub(super) fade_in_row: TemplateChild<adw::SpinRow>,
     #[template_child]
     pub(super) fade_out_row: TemplateChild<adw::SpinRow>,
+    #[template_child]
+    pub(super) pane_track_group: TemplateChild<adw::PreferencesGroup>,
+    #[template_child]
+    pub(super) low_cut_switch: TemplateChild<gtk::Switch>,
+    #[template_child]
+    pub(super) low_cut_scale: TemplateChild<gtk::Scale>,
+    #[template_child]
+    pub(super) low_cut_value_label: TemplateChild<gtk::Label>,
+    #[template_child]
+    pub(super) low_cut_slope_row: TemplateChild<adw::ComboRow>,
 
     pub(super) settings: OnceCell<gio::Settings>,
     /// The open project (what gets saved).
@@ -100,6 +114,9 @@ pub(crate) struct Window {
     /// Every selected clip, including the primary one. Moving, nudging, deleting
     /// and splitting act on all of them.
     pub(super) selection: RefCell<Vec<ClipId>>,
+    /// The track whose effects the pane's Track tab shows: the selected clip's
+    /// track, or the one chosen with Effects in its menu (see `track_pane.rs`).
+    pub(super) effects_track: Cell<Option<TrackId>>,
     /// The last mixer slider change and when, to coalesce a drag into one undo step.
     pub(super) last_mixer_change: RefCell<Option<(MixerControl, std::time::Instant)>>,
     /// True while the code sets mixer controls, so that is not taken as a change.
@@ -184,6 +201,9 @@ impl ObjectSubclass for Window {
         klass.install_action("win.toggle-clip-pane", None, |window, _, _| {
             window.toggle_clip_pane();
         });
+        klass.install_action("win.track-effects", None, |window, _, _| {
+            window.show_selected_track_effects();
+        });
         klass.install_action_async("win.normalize-peak", None, |window, _, _| async move {
             window.normalize_selected_clip(Normalize::Peak).await;
         });
@@ -251,6 +271,7 @@ impl ObjectImpl for Window {
         window.imp().timeline.set_context_menu(&self.timeline_menu);
         window.setup_mixer();
         window.setup_clip_pane();
+        window.setup_track_pane();
         window.update_recent_projects();
     }
 }

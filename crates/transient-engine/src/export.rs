@@ -247,6 +247,9 @@ fn push_mix(
     progress: &mut impl FnMut(f64),
     cancel: &AtomicBool,
 ) -> Result<(), ExportError> {
+    // Rendering changes a mix (its effects remember what they heard), so
+    // render a copy; copying is cheap, the audio itself is shared.
+    let mut mix = mix.clone();
     let length = mix.length();
     let chunk_frames = Frames::try_from(CHUNK_FRAMES).unwrap_or(1);
     let mut samples = vec![0.0_f32; CHUNK_FRAMES * CHANNELS];

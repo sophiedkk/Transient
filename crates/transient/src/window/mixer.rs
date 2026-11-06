@@ -36,6 +36,8 @@ pub(super) enum MixerControl {
     FadeIn(ClipId),
     /// A clip's fade-out length (in the clip pane).
     FadeOut(ClipId),
+    /// A track's low cut frequency (in the track pane).
+    LowCut(TrackId),
 }
 
 impl Window {
@@ -113,6 +115,7 @@ impl Window {
         self.update_mix();
         self.refresh_lanes();
         self.update_edit_actions();
+        self.update_title();
     }
 
     /// Ends slider coalescing: the next slider step starts a new undo step.

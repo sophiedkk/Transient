@@ -25,7 +25,7 @@ change.
 | 13 | Recording, with overdubbing and latency correction | `e5eaf9f` |
 | 14 | Stricter Rust rules | `30a6aad` |
 
-Next: the Effects milestone (see "Later"), after the 0.3.0 release.
+Next: milestone 15, Effects (below).
 
 Already there from the original milestone 9 list: shortcuts dialog, About
 dialog, dark mode (Libadwaita), error toasts.
@@ -216,6 +216,65 @@ Requested 2026-11-04: recording comes before 1.0, not after.
       is no portal for the microphone yet). Explaining it to Flathub is in
       "Publishing".
 
+## 15 · Effects (decided 2026-11-05)
+
+A small, curated set of real-time effects with plain-language controls, so a
+voice or band recording sounds finished without knowing audio engineering.
+Non-destructive and saved in the project; written in Rust in `transient-core`
+(unit-tested), since our own mixer renders the audio.
+
+- **Per track**: low cut (rumble, handling noise), noise gate (hiss between
+  phrases), compressor (evens out the volume), 3-band EQ (bass, middle, treble).
+  **On the master**: a limiter (never clips).
+- **Where**: a track pane, the right utility pane like the clip pane, opened with
+  "Effects" in the track's menu. The master limiter sits with the master volume.
+- **Controls**: each effect has an on/off switch and one slider in plain words
+  (for example "Evenness" for the compressor); its real parameters (threshold,
+  ratio, frequency, …) are in an expandable row below.
+- **How the mix works with effects**: effects remember earlier audio (filters,
+  envelopes), so `Mix` renders each track separately into its own buffer, runs
+  that track's effect chain (before the track's volume and pan, as DAW inserts
+  do), adds the tracks, then applies master volume and limiter. `render` takes
+  `&mut self`. When playback jumps (a seek, or rendering a stretch that does not
+  follow the previous one), the effects reset and run over a short stretch
+  before the new position (a warm-up), so they start settled instead of with a
+  click. After an edit, the new `Mix` takes over the effect state of the old one
+  for tracks that still exist, so dragging a slider does not click.
+
+Steps, each one runnable:
+
+- [x] The mixer change: per-track rendering, `render(&mut self)`, warm-up on a
+      jump, state carried over to the next `Mix` (`Mix::continue_from`, called
+      by `Player::set_mix`). No audible change; all mix tests still pass.
+- [x] Low cut end to end: the filter (`effects::biquad`, tested), the
+      `effects` track field in the project file (format 3), the track pane
+      (Effects in the track menu; `--action=track-effects` opens it for the
+      selected or first track) with a switch, a Cut Below slider (logarithmic,
+      20–500 Hz, its value shown beside it) and the slope (12/24/48 dB per
+      octave, Butterworth). No Details row: with the value beside the slider
+      and one other setting, nothing needed hiding (decided 2026-11-06). The range and default 24 dB slope came after
+      a hands-on test (2026-11-06: 12 dB up to 300 Hz was hard to hear on
+      laptop speakers, though measurably right).
+- [x] An effects button (our own faders icon) in every track header, next
+      to mute and solo: it opens the Track tab and is accent-coloured while
+      an effect is on. Mute (warning colour) and solo (accent) are coloured
+      while on too. Waveforms stay drawn from the
+      original audio (as in Audacity and Ardour): a low cut barely changes a
+      waveform's outline, a spectrogram would show it (see "Later").
+- [x] Clip and Track tabs in the pane (Effects was hard to find in the track
+      menu alone). The Track tab follows the selected clip's track.
+- [x] Smooth gain changes during playback (found 2026-11-06, also in 0.3.0):
+      a new clip gain, fade, volume, pan or master volume applies from one
+      sample to the next, so a big change mid-playback clicks (a test: −12 dB
+      on a 0.5 signal makes a step of 0.36, 25× the signal's largest normal
+      step). Fixed: `Mix::continue_from` crossfades from the old mix to the
+      new one over 20 ms, which covers every kind of change at once.
+- [ ] Noise gate.
+- [ ] Compressor.
+- [ ] 3-band EQ.
+- [ ] Master limiter.
+- [ ] Screenshots, CHANGELOG, MetaInfo release notes.
+
 ## Publishing (1.0 and Flathub)
 
 Checked against [Flathub's requirements](https://docs.flathub.org/docs/for-app-authors/requirements)
@@ -298,19 +357,14 @@ account), the MIT licence, the SVG icon and the desktop file.
 
 ## Later (after the MVP)
 
-- **Effects milestone** (ideas from Audacity, 2026-11-05; in order of value for
-  effort):
-  1. **Real-time effects per track**: a small, curated set with plain-language
-     controls (low cut / EQ, compressor, noise gate; a limiter on the master),
-     in an "Effects" section of a track pane. Non-destructive, saved in the
-     project, written in Rust in `transient-core` (unit-tested), since our own
-     mixer renders the audio.
-  2. **Noise reduction** for voice recordings, Audacity's most-used effect.
+- **More effects** (ideas from Audacity, 2026-11-05, after milestone 15; in
+  order of value for effort):
+  1. **Noise reduction** for voice recordings, Audacity's most-used effect.
      Needs a library choice first (for example an RNNoise port: check its
      licence and quality).
-  3. **Volume automation**: points on a clip's volume line; automatic ducking
+  2. **Volume automation**: points on a clip's volume line; automatic ducking
      of music under a voice track.
-  4. **Export at a loudness target** (for example −16 LUFS for podcasts) for the
+  3. **Export at a loudness target** (for example −16 LUFS for podcasts) for the
      whole mix; normalizing already measures loudness.
 - Truncate silence (shorten long pauses), and a spectrogram view (repair work)
 - Level meters per track, in the track headers (the master meter is under the
@@ -336,6 +390,10 @@ instead of the simpler alternative.
   that way. Dragging clips, trim and fade handles, header sliders, spin rows and
   file choosers still need testing by hand.
 - Waveforms show clip gain but not fades.
+- Clicking in the timeline near or past the end of the audio during playback
+  sometimes logs `GStreamer-CRITICAL: gst_segment_to_running_time: assertion
+  'segment->format == format' failed` (seen 2026-11-06 in 0.3.0 too, timing-
+  dependent). Playback carries on; find out which element complains.
 - A fade's handle can cover the clip's name when the fade is short or the view
   zoomed out (e.g. a 2-second fade-in at the default zoom: "pi◯o"). Perhaps
   start the name after the handle, or draw the handle below the title bar.

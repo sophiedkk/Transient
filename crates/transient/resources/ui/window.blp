@@ -99,11 +99,11 @@ template $TransientWindow: Adw.ApplicationWindow {
         [end]
         ToggleButton pane_button {
           icon-name: "sidebar-show-right-symbolic";
-          tooltip-text: _("Clip Properties");
+          tooltip-text: _("Properties");
           active: bind split_view.show-sidebar bidirectional;
 
           accessibility {
-            label: _("Clip Properties");
+            label: _("Properties");
           }
         }
       }
@@ -120,120 +120,292 @@ template $TransientWindow: Adw.ApplicationWindow {
       }
 
       // One page is visible at a time; the code switches by name.
-      // The clip pane (F9) is a utility pane on the right; on narrow windows it
+      // The pane (F9) is a utility pane on the right; on narrow windows it
       // slides over the timeline instead of beside it.
       content: Adw.OverlaySplitView split_view {
         sidebar-position: end;
         show-sidebar: false;
         max-sidebar-width: 320;
 
-        sidebar: Adw.ViewStack pane_stack {
-          Adw.ViewStackPage {
-            name: "none";
+        // Two tabs: the selected clip, and a track's effects. Each shows a
+        // status page while there is nothing to show (see clip_pane.rs and
+        // track_pane.rs).
+        sidebar: Box {
+          orientation: vertical;
 
-            child: Adw.StatusPage {
-              icon-name: "audio-x-generic-symbolic";
-              title: _("No Clip Selected");
-              description: _("Select a clip to change its gain and fades");
-
-              styles [
-                "compact",
-              ]
-            };
+          Adw.InlineViewSwitcher {
+            stack: pane_tabs;
+            homogeneous: true;
+            margin-top: 12;
+            margin-start: 12;
+            margin-end: 12;
           }
 
-          Adw.ViewStackPage {
-            name: "clip";
+          Adw.ViewStack pane_tabs {
+            vexpand: true;
 
-            child: ScrolledWindow {
-              hscrollbar-policy: never;
+            Adw.ViewStackPage {
+              name: "clip";
+              title: _("Clip");
 
-              child: Box {
-                orientation: vertical;
-                spacing: 24;
-                margin-top: 18;
-                margin-bottom: 18;
-                margin-start: 12;
-                margin-end: 12;
+              child: Adw.ViewStack clip_stack {
+                Adw.ViewStackPage {
+                  name: "none";
 
-                Adw.PreferencesGroup pane_clip_group {
-                  Adw.SpinRow gain_row {
-                    title: _("Gain");
-                    subtitle: _("In decibels");
-                    digits: 1;
+                  child: Adw.StatusPage {
+                    icon-name: "audio-x-generic-symbolic";
+                    title: _("No Clip Selected");
+                    description: _("Select a clip to change its gain and fades");
 
-                    adjustment: Adjustment {
-                      lower: -60;
-                      upper: 24;
-                      step-increment: 0.5;
-                      page-increment: 6;
-                    };
-                  }
-
-                  Adw.SpinRow fade_in_row {
-                    title: _("Fade In");
-                    subtitle: _("In seconds");
-                    digits: 2;
-
-                    adjustment: Adjustment {
-                      lower: 0;
-                      upper: 3600;
-                      step-increment: 0.1;
-                      page-increment: 1;
-                    };
-                  }
-
-                  Adw.SpinRow fade_out_row {
-                    title: _("Fade Out");
-                    subtitle: _("In seconds");
-                    digits: 2;
-
-                    adjustment: Adjustment {
-                      lower: 0;
-                      upper: 3600;
-                      step-increment: 0.1;
-                      page-increment: 1;
-                    };
-                  }
+                    styles [
+                      "compact",
+                    ]
+                  };
                 }
 
-                Adw.PreferencesGroup {
-                  Adw.ButtonRow {
-                    title: _("Move to New Track");
-                    action-name: "win.move-to-new-track";
-                  }
-                }
+                Adw.ViewStackPage {
+                  name: "clip";
 
-                Adw.PreferencesGroup {
-                  title: _("Fades");
+                  child: ScrolledWindow {
+                    hscrollbar-policy: never;
 
-                  Adw.ButtonRow {
-                    title: _("Fade In to Playhead");
-                    action-name: "win.fade-in-to-playhead";
-                  }
+                    child: Box {
+                      orientation: vertical;
+                      spacing: 24;
+                      margin-top: 18;
+                      margin-bottom: 18;
+                      margin-start: 12;
+                      margin-end: 12;
 
-                  Adw.ButtonRow {
-                    title: _("Fade Out from Playhead");
-                    action-name: "win.fade-out-from-playhead";
-                  }
-                }
+                      Adw.PreferencesGroup pane_clip_group {
+                        Adw.SpinRow gain_row {
+                          title: _("Gain");
+                          subtitle: _("In decibels");
+                          digits: 1;
 
-                Adw.PreferencesGroup {
-                  title: _("Normalize");
-                  description: _("Set the gain so the clip reaches a standard level");
+                          adjustment: Adjustment {
+                            lower: -60;
+                            upper: 24;
+                            step-increment: 0.5;
+                            page-increment: 6;
+                          };
+                        }
 
-                  Adw.ButtonRow {
-                    title: _("Peak to −1 dB");
-                    action-name: "win.normalize-peak";
-                  }
+                        Adw.SpinRow fade_in_row {
+                          title: _("Fade In");
+                          subtitle: _("In seconds");
+                          digits: 2;
 
-                  Adw.ButtonRow {
-                    title: _("Loudness to −16 LUFS");
-                    action-name: "win.normalize-loudness";
-                  }
+                          adjustment: Adjustment {
+                            lower: 0;
+                            upper: 3600;
+                            step-increment: 0.1;
+                            page-increment: 1;
+                          };
+                        }
+
+                        Adw.SpinRow fade_out_row {
+                          title: _("Fade Out");
+                          subtitle: _("In seconds");
+                          digits: 2;
+
+                          adjustment: Adjustment {
+                            lower: 0;
+                            upper: 3600;
+                            step-increment: 0.1;
+                            page-increment: 1;
+                          };
+                        }
+                      }
+
+                      Adw.PreferencesGroup {
+                        Adw.ButtonRow {
+                          title: _("Move to New Track");
+                          action-name: "win.move-to-new-track";
+                        }
+                      }
+
+                      Adw.PreferencesGroup {
+                        title: _("Fades");
+
+                        Adw.ButtonRow {
+                          title: _("Fade In to Playhead");
+                          action-name: "win.fade-in-to-playhead";
+                        }
+
+                        Adw.ButtonRow {
+                          title: _("Fade Out from Playhead");
+                          action-name: "win.fade-out-from-playhead";
+                        }
+                      }
+
+                      Adw.PreferencesGroup {
+                        title: _("Normalize");
+                        description: _("Set the gain so the clip reaches a standard level");
+
+                        Adw.ButtonRow {
+                          title: _("Peak to −1 dB");
+                          action-name: "win.normalize-peak";
+                        }
+
+                        Adw.ButtonRow {
+                          title: _("Loudness to −16 LUFS");
+                          action-name: "win.normalize-loudness";
+                        }
+                      }
+                    };
+                  };
                 }
               };
-            };
+            }
+
+            Adw.ViewStackPage {
+              name: "track";
+              title: _("Track");
+
+              child: Adw.ViewStack track_stack {
+                Adw.ViewStackPage {
+                  name: "none";
+
+                  child: Adw.StatusPage {
+                    icon-name: "view-list-symbolic";
+                    title: _("No Track Selected");
+                    description: _("Select a clip, or choose Effects in a track’s menu, to change the track’s effects");
+
+                    styles [
+                      "compact",
+                    ]
+                  };
+                }
+
+                Adw.ViewStackPage {
+                  name: "track";
+
+                  child: ScrolledWindow {
+                    hscrollbar-policy: never;
+
+                    child: Box {
+                      orientation: vertical;
+                      spacing: 24;
+                      margin-top: 18;
+                      margin-bottom: 18;
+                      margin-start: 12;
+                      margin-end: 12;
+
+                      // Only a heading: the track's name, set by the code.
+                      Adw.PreferencesGroup pane_track_group {
+                        description: _("Effects on this track, applied before its volume and pan");
+                      }
+
+                      // Each effect: a switch in the group's header, one slider in
+                      // plain words, and at most a setting or two below it.
+                      Adw.PreferencesGroup {
+                        title: _("Low Cut");
+                        description: _("Removes rumble and handling noise below voices and instruments");
+
+                        header-suffix: Switch low_cut_switch {
+                          valign: center;
+
+                          accessibility {
+                            label: _("Low Cut");
+                          }
+                        };
+
+                        Adw.PreferencesRow {
+                          activatable: false;
+                          sensitive: bind low_cut_switch.active;
+
+                          child: Box {
+                            orientation: vertical;
+                            margin-top: 6;
+                            margin-bottom: 6;
+                            margin-start: 12;
+                            margin-end: 12;
+
+                            // The title and, on the right, the frequency ("80 Hz", set by
+                            // track_pane.rs while the slider moves).
+                            Box {
+                              Label {
+                                label: _("Cut Below");
+                                xalign: 0;
+                                hexpand: true;
+                              }
+
+                              Label low_cut_value_label {
+                                xalign: 1;
+
+                                styles [
+                                  "numeric",
+                                  "dimmed",
+                                ]
+                              }
+                            }
+
+                            // 0 = the lowest frequency, 1 = the highest, on a logarithmic
+                            // scale; see transient_core::effects::low_cut::frequency_for_amount.
+                            Scale low_cut_scale {
+                              draw-value: false;
+
+                              adjustment: Adjustment {
+                                lower: 0;
+                                upper: 1;
+                                step-increment: 0.02;
+                                page-increment: 0.1;
+                              };
+
+                              accessibility {
+                                label: _("Cut Below");
+                              }
+                            }
+
+                            Box {
+                              Label {
+                                label: _("Rumble only");
+                                xalign: 0;
+                                hexpand: true;
+
+                                styles [
+                                  "caption",
+                                  "dimmed",
+                                ]
+                              }
+
+                              Label {
+                                label: _("Thin");
+                                xalign: 1;
+
+                                styles [
+                                  "caption",
+                                  "dimmed",
+                                ]
+                              }
+                            }
+                          };
+                        }
+
+                        // The order matches transient_core::effects::low_cut::Slope
+                        // (see track_pane.rs).
+                        Adw.ComboRow low_cut_slope_row {
+                          title: _("Slope");
+                          sensitive: bind low_cut_switch.active;
+                          // The choice shows below the title, where it has
+                          // room, instead of squeezed in on the right.
+                          use-subtitle: true;
+
+                          model: StringList {
+                            strings [
+                              _("Gentle (12 dB per octave)"),
+                              _("Medium (24 dB per octave)"),
+                              _("Steep (48 dB per octave)"),
+                            ]
+                          };
+                        }
+                      }
+                    };
+                  };
+                }
+              };
+            }
           }
         };
 

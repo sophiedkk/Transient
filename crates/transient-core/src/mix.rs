@@ -5,13 +5,17 @@
 //! After every edit the app builds a new `Mix` and hands it to the player, so
 //! changes are heard right away. Building one is cheap: the audio is shared
 //! (`Arc`), only the list of clips is copied.
+//!
+//! Each track is rendered into its own buffer first, so its effects
+//! ([`crate::effects`]) hear only that track; then the tracks are added up.
 
 use std::collections::HashMap;
 
 use crate::audio::{AudioBuffer, CHANNELS};
 use crate::clip::visible_parts;
 use crate::convert::f32_from_f64;
-use crate::project::{Project, SourceId};
+use crate::effects::EffectChain;
+use crate::project::{Project, SourceId, TrackId};
 use crate::range::TimeRange;
 use crate::time::{Frames, SampleRate, frames_to_f64};
 
@@ -22,6 +26,16 @@ pub type AudioPool = HashMap<SourceId, AudioBuffer>;
 /// volume sliders).
 pub const SILENT_DB: f32 = -60.0;
 
+/// How much audio before the playing position effects hear when playback
+/// jumps (a seek, the start of an export of a selection), in seconds. A filter
+/// settles within milliseconds; compressors and gates need a little longer.
+const WARM_UP_SECONDS: f64 = 0.25;
+
+/// How long the switch from an old mix to a new one takes during playback, in
+/// seconds (see [`Mix::continue_from`]): short enough to sound immediate, long
+/// enough not to click.
+const CROSSFADE_SECONDS: f64 = 0.02;
+
 /// One clip, ready to mix.
 #[derive(Debug, Clone)]
 struct MixClip {
@@ -29,11 +43,87 @@ struct MixClip {
     start: Frames,
     offset: Frames,
     length: Frames,
-    /// What to multiply the left and right channel by: the clip's gain, the
-    /// track's volume and pan, and the master volume.
-    gains: [f32; CHANNELS],
+    /// The clip's gain, as a multiplier.
+    gain: f32,
     fade_in: Frames,
     fade_out: Frames,
+}
+
+impl MixClip {
+    /// Adds the part of this clip that falls in the `out.len() / CHANNELS`
+    /// frames from timeline frame `start` on to `out`, with gain and fades.
+    fn add_to(&self, start: Frames, out: &mut [f32]) {
+        let frames = Frames::try_from(out.len() / CHANNELS).unwrap_or(0);
+        let end = start.saturating_add(frames);
+        // The part of this clip that falls inside start..end, in timeline frames.
+        let from = start.max(self.start);
+        let to = end.min(self.start.saturating_add(self.length));
+        if from >= to {
+            return;
+        }
+        let (Ok(out_first), Ok(count)) =
+            (usize::try_from(from - start), usize::try_from(to - from))
+        else {
+            return;
+        };
+        let source_first = self.offset.saturating_add(from - self.start);
+        let samples = self.audio.frames_from(source_first, count);
+        let Some(target) = out.get_mut(out_first * CHANNELS..) else {
+            return;
+        };
+        let first_position = from - self.start;
+        let fades = self.fade_in > 0 || self.fade_out > 0;
+        for ((out_frame, frame), position) in target
+            .chunks_exact_mut(CHANNELS)
+            .zip(samples.chunks_exact(CHANNELS))
+            .zip(first_position..)
+        {
+            let fade = if fades {
+                fade_gain(position, self.length, self.fade_in, self.fade_out)
+            } else {
+                1.0
+            };
+            let gain = self.gain * fade;
+            for (out, sample) in out_frame.iter_mut().zip(frame) {
+                *out += sample * gain;
+            }
+        }
+    }
+}
+
+/// One audible track, ready to mix.
+#[derive(Debug, Clone)]
+struct MixTrack {
+    id: TrackId,
+    /// Only the visible parts of its clips (see [`visible_parts`]).
+    clips: Vec<MixClip>,
+    effects: EffectChain,
+    /// What to multiply the left and right channel by after the effects: the
+    /// track's volume and pan, and the master volume.
+    gains: [f32; CHANNELS],
+    /// Room to render the track into before it is added to the mix; kept
+    /// between calls so rendering does not allocate every time.
+    buffer: Vec<f32>,
+}
+
+impl MixTrack {
+    /// Renders this track from timeline frame `start` on and adds it to `out`.
+    fn add_to(&mut self, start: Frames, out: &mut [f32]) {
+        self.buffer.clear();
+        self.buffer.resize(out.len(), 0.0);
+        for clip in &self.clips {
+            clip.add_to(start, &mut self.buffer);
+        }
+        self.effects.process(&mut self.buffer);
+        for (out_frame, frame) in out
+            .chunks_exact_mut(CHANNELS)
+            .zip(self.buffer.chunks_exact(CHANNELS))
+        {
+            for ((out, sample), gain) in out_frame.iter_mut().zip(frame).zip(self.gains) {
+                *out += sample * gain;
+            }
+        }
+    }
 }
 
 /// The shape of a fade: how loud (0 to 1) a fade is at `t`, the fraction of the
@@ -81,56 +171,120 @@ pub fn pan_gains(pan: f32) -> [f32; CHANNELS] {
     [(1.0 - pan).min(1.0), (1.0 + pan).min(1.0)]
 }
 
-/// A project's clips with their audio, ready to render.
+/// A project's tracks with their audio and effects, ready to render.
+///
+/// Rendering changes it (`&mut self`): the effects remember the audio they
+/// heard, so a mix plays best from start to end, one stretch after another.
 #[derive(Debug, Clone)]
 pub struct Mix {
     sample_rate: SampleRate,
     length: Frames,
-    clips: Vec<MixClip>,
+    tracks: Vec<MixTrack>,
     /// Where frame 0 of this mix is on the timeline: 0, except for an excerpt
     /// (see [`Mix::excerpt`]).
     offset: Frames,
+    /// The timeline frame right after the last render, if there was one. A
+    /// render that starts anywhere else is a jump: the effects start over.
+    next_frame: Option<Frames>,
+    /// The mix this one replaced during playback, still fading out.
+    crossfade: Option<Crossfade>,
+}
+
+/// The switch from an old mix to a new one: for a moment both play, the old
+/// one turning down while the new one turns up.
+///
+/// Without it, a change during playback (a clip's gain, a fade, a track's
+/// volume) would jump from one sample to the next, which is heard as a click.
+/// Both mixes play the same audio, so a straight-line crossfade keeps the
+/// volume steady.
+#[derive(Debug, Clone)]
+struct Crossfade {
+    /// The old mix (boxed: a `Mix` cannot contain a `Mix` directly).
+    from: Box<Mix>,
+    /// The crossfade's length in frames, and how much of it has been played.
+    length: Frames,
+    done: Frames,
+    /// Room to render the old mix into; kept between calls.
+    buffer: Vec<f32>,
+}
+
+impl Crossfade {
+    /// Mixes the old mix into `out` (the new mix from `start` on, in the mixes'
+    /// own frames). Returns whether the crossfade is still going.
+    fn apply(&mut self, start: Frames, out: &mut [f32]) -> bool {
+        self.buffer.clear();
+        self.buffer.resize(out.len(), 0.0);
+        self.from.render(start, &mut self.buffer);
+        let length = frames_to_f64(self.length);
+        for (out_frame, old_frame) in out
+            .chunks_exact_mut(CHANNELS)
+            .zip(self.buffer.chunks_exact(CHANNELS))
+        {
+            if self.done >= self.length {
+                break;
+            }
+            // How far the crossfade is: 0 = only the old mix, 1 = only the new.
+            let new = f32_from_f64(frames_to_f64(self.done) / length);
+            for (out, old) in out_frame.iter_mut().zip(old_frame) {
+                *out = *old * (1.0 - new) + *out * new;
+            }
+            self.done += 1;
+        }
+        self.done < self.length
+    }
 }
 
 impl Mix {
-    /// Collects every audible clip of `project` whose audio is in `pool`, with
-    /// its track's mixer settings. Muted tracks, tracks silenced by another
-    /// track's solo, and clips whose source is missing are left out.
+    /// Collects every audible track of `project`, with the clips whose audio is
+    /// in `pool`, its effects and its mixer settings. Muted tracks, tracks
+    /// silenced by another track's solo or volume, and clips whose source is
+    /// missing are left out.
     #[must_use]
     pub fn new(project: &Project, pool: &AudioPool) -> Self {
         let any_solo = project.tracks.iter().any(|track| track.solo);
         let master = db_to_gain(project.master_volume_db);
-        let clips = project
+        let tracks = project
             .tracks
             .iter()
             .filter(|track| !track.mute && (track.solo || !any_solo))
-            .flat_map(|track| {
+            .filter_map(|track| {
                 let volume = db_to_gain(track.volume_db) * master;
-                let [left, right] = pan_gains(track.pan);
+                let gains = pan_gains(track.pan).map(|pan| pan * volume);
+                if gains.iter().all(|gain| *gain <= 0.0) {
+                    return None;
+                }
                 // Where clips on a track overlap, only the top one plays.
-                visible_parts(&track.clips).into_iter().map(move |clip| {
-                    let gain = volume * db_to_gain(clip.gain_db);
-                    (clip, [left * gain, right * gain])
-                })
-            })
-            .filter(|(_, gains)| gains.iter().any(|gain| *gain > 0.0))
-            .filter_map(|(clip, gains)| {
-                Some(MixClip {
-                    audio: pool.get(&clip.source)?.clone(),
-                    start: clip.start,
-                    offset: clip.offset,
-                    length: clip.length,
+                let clips = visible_parts(&track.clips)
+                    .into_iter()
+                    .filter_map(|clip| {
+                        Some(MixClip {
+                            audio: pool.get(&clip.source)?.clone(),
+                            start: clip.start,
+                            offset: clip.offset,
+                            length: clip.length,
+                            gain: db_to_gain(clip.gain_db),
+                            fade_in: clip.fade_in,
+                            fade_out: clip.fade_out,
+                        })
+                    })
+                    .filter(|clip| clip.gain > 0.0)
+                    .collect();
+                Some(MixTrack {
+                    id: track.id,
+                    clips,
+                    effects: EffectChain::new(track.effects, project.sample_rate),
                     gains,
-                    fade_in: clip.fade_in,
-                    fade_out: clip.fade_out,
+                    buffer: Vec::new(),
                 })
             })
             .collect();
         Self {
             sample_rate: project.sample_rate,
             length: project.length(),
-            clips,
+            tracks,
             offset: 0,
+            next_frame: None,
+            crossfade: None,
         }
     }
 
@@ -140,14 +294,17 @@ impl Mix {
         Self {
             sample_rate,
             length: 0,
-            clips: Vec::new(),
+            tracks: Vec::new(),
             offset: 0,
+            next_frame: None,
+            crossfade: None,
         }
     }
 
     /// Only the stretch `range` of this mix (for exporting a selection): its
     /// frame 0 is `range.start`, and it ends at `range.end` (or where the mix
-    /// ends, if that is earlier). Fades sound exactly as in the whole mix.
+    /// ends, if that is earlier). Fades and effects sound exactly as in the
+    /// whole mix.
     #[must_use]
     pub fn excerpt(&self, range: TimeRange) -> Self {
         Self {
@@ -155,6 +312,35 @@ impl Mix {
             offset: self.offset + range.start,
             ..self.clone()
         }
+    }
+
+    /// Takes over from `old` during playback (after an edit) without a click:
+    /// the effects keep what they remember of `old`'s audio (for tracks in both
+    /// mixes), and for the first moment (20 ms) `old` fades out while this mix
+    /// fades in. A jump elsewhere ends the crossfade early.
+    pub fn continue_from(&mut self, mut old: Self) {
+        let Some(next_frame) = old.next_frame.filter(|_| self.offset == old.offset) else {
+            return;
+        };
+        for track in &mut self.tracks {
+            if let Some(old_track) = old.tracks.iter().find(|old| old.id == track.id) {
+                track.effects.continue_from(&old_track.effects);
+            }
+        }
+        self.next_frame = Some(next_frame);
+        // While a slider is dragged, a new mix arrives before the last
+        // crossfade ended: fade from where `old` is now, not from its own old
+        // mix too, so crossfades never pile up.
+        old.crossfade = None;
+        self.crossfade = Some(Crossfade {
+            from: Box::new(old),
+            length: self
+                .sample_rate
+                .seconds_to_frames(CROSSFADE_SECONDS)
+                .unwrap_or(0),
+            done: 0,
+            buffer: Vec::new(),
+        });
     }
 
     /// The sample rate of the mix.
@@ -172,46 +358,51 @@ impl Mix {
     /// Fills `out` (interleaved stereo) with the mix from frame `start` on.
     /// Places without clips are silent; overlapping tracks are added together
     /// (on one track, only the visible parts of clips play).
-    pub fn render(&self, start: Frames, out: &mut [f32]) {
+    ///
+    /// Rendering the stretch right after the previous one continues the
+    /// effects; rendering anywhere else first lets them hear a moment of the
+    /// audio before `start`, so they start settled.
+    pub fn render(&mut self, start: Frames, out: &mut [f32]) {
         out.fill(0.0);
         // In timeline frames (an excerpt starts later on the timeline).
+        let mix_start = start;
         let start = start.saturating_add(self.offset);
+        if self.next_frame != Some(start) {
+            // A jump: nothing to crossfade from, and the effects start over.
+            self.crossfade = None;
+            self.warm_up(start);
+        }
+        for track in &mut self.tracks {
+            track.add_to(start, out);
+        }
+        if let Some(crossfade) = &mut self.crossfade
+            && !crossfade.apply(mix_start, out)
+        {
+            self.crossfade = None;
+        }
         let frames = Frames::try_from(out.len() / CHANNELS).unwrap_or(0);
-        let end = start.saturating_add(frames);
+        self.next_frame = Some(start.saturating_add(frames));
+    }
 
-        for clip in &self.clips {
-            // The part of this clip that falls inside start..end, in timeline frames.
-            let from = start.max(clip.start);
-            let to = end.min(clip.start.saturating_add(clip.length));
-            if from >= to {
-                continue;
-            }
-            let (Ok(out_first), Ok(count)) =
-                (usize::try_from(from - start), usize::try_from(to - from))
-            else {
-                continue;
-            };
-            let source_first = clip.offset.saturating_add(from - clip.start);
-            let samples = clip.audio.frames_from(source_first, count);
-            let Some(target) = out.get_mut(out_first * CHANNELS..) else {
-                continue;
-            };
-            let first_position = from - clip.start;
-            let fades = clip.fade_in > 0 || clip.fade_out > 0;
-            for ((out_frame, frame), position) in target
-                .chunks_exact_mut(CHANNELS)
-                .zip(samples.chunks_exact(CHANNELS))
-                .zip(first_position..)
-            {
-                let fade = if fades {
-                    fade_gain(position, clip.length, clip.fade_in, clip.fade_out)
-                } else {
-                    1.0
-                };
-                for ((out, sample), gain) in out_frame.iter_mut().zip(frame).zip(clip.gains) {
-                    *out += sample * gain * fade;
-                }
-            }
+    /// Starts the effects over, and plays them the audio just before timeline
+    /// frame `start` (the result is not heard).
+    fn warm_up(&mut self, start: Frames) {
+        let warm_up = self
+            .sample_rate
+            .seconds_to_frames(WARM_UP_SECONDS)
+            .unwrap_or(0);
+        let from = start.saturating_sub(warm_up);
+        let samples = usize::try_from(start - from).unwrap_or(0) * CHANNELS;
+        let mut discarded = Vec::new();
+        for track in self
+            .tracks
+            .iter_mut()
+            .filter(|track| !track.effects.is_empty())
+        {
+            track.effects.reset();
+            discarded.clear();
+            discarded.resize(samples, 0.0);
+            track.add_to(from, &mut discarded);
         }
     }
 }
@@ -219,6 +410,7 @@ impl Mix {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::Clip;
 
     /// A project with one track playing a 100-frame [`ramp`] from frame 0, and
     /// its audio.
@@ -245,9 +437,10 @@ mod tests {
         AudioBuffer::new(SampleRate::HZ_48000, samples).unwrap()
     }
 
+    /// Renders a copy of `mix`, so each call is a fresh start.
     fn render(mix: &Mix, start: Frames, frames: usize) -> Vec<f32> {
         let mut out = vec![f32::NAN; frames * CHANNELS];
-        mix.render(start, &mut out);
+        mix.clone().render(start, &mut out);
         // Keep the left channel only, to make the expectations easy to read.
         out.iter().step_by(CHANNELS).copied().collect()
     }
@@ -447,5 +640,96 @@ mod tests {
         project.import("missing.wav".into(), 10, "m".to_owned(), 0);
         let mix = Mix::new(&project, &AudioPool::new());
         assert_eq!(render(&mix, 0, 3), [0.0, 0.0, 0.0]);
+    }
+
+    /// One second of constant 0.5 on one track, with the clip at `gain_db`.
+    fn constant_project(gain_db: f32) -> (Project, AudioPool) {
+        let mut project = Project::default();
+        let track = project.import("c.wav".into(), 48_000, "c".to_owned(), 0);
+        let clip = project.track(track).unwrap().clips[0];
+        project.change_clip(clip.id, |clip| Clip { gain_db, ..clip });
+        let pool = AudioPool::from([(clip.source, constant(0.5, 48_000))]);
+        (project, pool)
+    }
+
+    /// Plays 1000 frames at 0 dB, then switches to a mix at `gain_db` as an
+    /// edit during playback does, and plays 2000 more (left channel).
+    fn switch_during_playback(gain_db: f32) -> Vec<f32> {
+        let (project, pool) = constant_project(0.0);
+        let mut old = Mix::new(&project, &pool);
+        let mut out = vec![0.0; 1000 * CHANNELS];
+        old.render(0, &mut out);
+        let (project, pool) = constant_project(gain_db);
+        let mut new = Mix::new(&project, &pool);
+        new.continue_from(old);
+        let mut out = vec![0.0; 2000 * CHANNELS];
+        new.render(1000, &mut out);
+        out.into_iter().step_by(CHANNELS).collect()
+    }
+
+    #[test]
+    fn a_change_during_playback_fades_over_instead_of_jumping() {
+        let after = switch_during_playback(-12.0);
+        let target = 0.5 * db_to_gain(-12.0);
+        // It starts where the old mix was, and ends at the new level after
+        // 20 ms (960 frames at 48 kHz)...
+        assert!((after[0] - 0.5).abs() < 1e-3, "{}", after[0]);
+        assert!((after[960] - target).abs() < 1e-6, "{}", after[960]);
+        assert!((after[1999] - target).abs() < 1e-6);
+        // ...in steps far too small to click.
+        let largest_step = after
+            .windows(2)
+            .map(|pair| (pair[1] - pair[0]).abs())
+            .fold(0.0, f32::max);
+        assert!(largest_step < 0.001, "{largest_step}");
+    }
+
+    #[test]
+    fn a_crossfade_spans_several_renders() {
+        let (project, pool) = constant_project(0.0);
+        let mut old = Mix::new(&project, &pool);
+        old.render(0, &mut [0.0; 2 * CHANNELS]);
+        let (project, pool) = constant_project(SILENT_DB);
+        let mut new = Mix::new(&project, &pool);
+        new.continue_from(old);
+        // Small pieces, as a player with a small buffer asks for them.
+        let mut pieces = Vec::new();
+        for start in (2..1002).step_by(100) {
+            let mut out = [0.0; 100 * CHANNELS];
+            new.render(start, &mut out);
+            pieces.extend(out.into_iter().step_by(CHANNELS));
+        }
+        assert!(pieces.windows(2).all(|pair| pair[1] <= pair[0]));
+        assert!(pieces[959].abs() < 0.001 && pieces[999] == 0.0);
+    }
+
+    #[test]
+    fn a_jump_ends_the_crossfade() {
+        let (project, pool) = constant_project(0.0);
+        let mut old = Mix::new(&project, &pool);
+        old.render(0, &mut [0.0; 1000 * CHANNELS]);
+        let (project, pool) = constant_project(-12.0);
+        let mut new = Mix::new(&project, &pool);
+        new.continue_from(old);
+        // A seek right after the edit plays only the new mix.
+        let mut out = [0.0; 2 * CHANNELS];
+        new.render(30_000, &mut out);
+        assert!((out[0] - 0.5 * db_to_gain(-12.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_mix_that_never_played_has_nothing_to_fade_from() {
+        let (project, pool) = constant_project(0.0);
+        let old = Mix::new(&project, &pool);
+        let (project, pool) = constant_project(-12.0);
+        let mut new = Mix::new(&project, &pool);
+        new.continue_from(old);
+        assert!((first_frame_of(&mut new) - 0.5 * db_to_gain(-12.0)).abs() < 1e-6);
+    }
+
+    fn first_frame_of(mix: &mut Mix) -> f32 {
+        let mut out = [0.0; CHANNELS];
+        mix.render(0, &mut out);
+        out[0]
     }
 }

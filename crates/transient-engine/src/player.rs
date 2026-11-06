@@ -205,10 +205,14 @@ impl Player {
 
     /// Replaces what is played, keeping the position. Used after every edit.
     /// Audio GStreamer has already received (about 0.1 s) still plays as it was.
+    /// The new mix takes over smoothly (see `Mix::continue_from`), so the
+    /// change does not click.
     pub fn set_mix(&mut self, mix: Mix) {
         self.duration = mix.length();
         if let Ok(mut source) = self.source.lock() {
-            source.mix = mix;
+            // Put the new mix in place and hand it the old one to fade from.
+            let old = std::mem::replace(&mut source.mix, mix);
+            source.mix.continue_from(old);
         }
     }
 

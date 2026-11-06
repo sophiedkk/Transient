@@ -6,6 +6,34 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Track effects, starting with Low Cut: remove rumble and handling noise, or
+  thin out a sound on purpose, with one Cut Below slider (20–500 Hz) and a
+  choice of slope (12, 24 or 48 dB per octave). Each track header has
+  an effects button next to mute and solo that opens them; it is coloured
+  while an effect is on.
+  Effects are saved in the project; projects saved with this version need
+  it to open.
+
+### Changed
+
+- Track headers show the name on its own line, so longer names fit; the
+  buttons are a little smaller.
+- Mute and solo are coloured while on (mute orange, solo in the accent
+  colour), so a muted or soloed track is easy to spot.
+
+- The pane on the right (F9) is now called Properties and has two tabs: Clip
+  (the selected clip) and Track (that clip's track's effects). Effects in a
+  track's menu opens the Track tab for that track.
+
+### Fixed
+
+- Changing a clip's gain or fades, a track's volume or pan, or the master
+  volume during playback no longer clicks: the change fades in over 20 ms.
+- The "•" for unsaved changes now appears right after a slider or mute/solo
+  change, not only after the next other edit.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

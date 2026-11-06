@@ -4,7 +4,7 @@
 
 /* One header per track, as tall as a timeline lane (LANE_HEIGHT in timeline_view). */
 .track-header {
-  padding: 6px 8px 6px 12px;
+  padding: 6px 8px 5px 12px;
   border-bottom: 1px solid alpha(currentColor, 0.08);
 }
 
@@ -135,4 +135,40 @@ splitbutton.record-button:not(.destructive-action) > button:first-child {
 .track-header-list:drop(active) {
   box-shadow: none;
   outline: none;
+}
+
+/* Track header buttons a little smaller than GTK's 34 pixels, so the name,
+   the buttons and the sliders fit in one lane's height (LANE_HEIGHT). */
+.track-header button.circular {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+/* The rename field, as tall as the name it replaces: the name's row (a
+   stack) is as tall as its tallest page, this field. */
+.track-header entry {
+  min-height: 24px;
+}
+
+/* The volume and pan sliders with less room above and below than Adwaita
+   gives a scale, for the same reason. */
+.track-header scale {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Mute, solo and effects, when on, are coloured, so a muted or soloed track,
+   or one with effects, is easy to spot: solo and effects in the accent colour
+   (the track is singled out, or changed), mute in the warning colour (the
+   track is silent). */
+.track-header button.solo-toggle:checked,
+.track-header button.effects-on {
+  color: var(--accent-color);
+  background-color: alpha(var(--accent-bg-color), 0.15);
+}
+
+.track-header button.mute-toggle:checked {
+  color: var(--warning-color);
+  background-color: alpha(var(--warning-bg-color), 0.2);
 }

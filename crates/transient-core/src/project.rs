@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::effects::TrackEffects;
 use crate::time::{Frames, SampleRate};
 
 /// The project file format version written by this build of Transient.
@@ -28,7 +29,8 @@ use crate::time::{Frames, SampleRate};
 /// - 1: a plain JSON file, with paths to the audio files.
 /// - 2: a ZIP archive holding this JSON (`project.json`) and the audio
 ///   (see [`crate::archive`]); source paths point into the archive.
-pub const FORMAT_VERSION: u32 = 2;
+/// - 3: tracks have effects ([`crate::effects::TrackEffects`]).
+pub const FORMAT_VERSION: u32 = 3;
 
 /// Defines a numeric ID type. Separate types for sources, tracks and clips mean
 /// the compiler refuses to mix them up.
@@ -125,6 +127,8 @@ pub struct Track {
     pub solo: bool,
     /// The colour its clips are drawn in; `None` is the system's accent colour.
     pub color: Option<TrackColor>,
+    /// Effects applied to the track's audio before its volume and pan.
+    pub effects: TrackEffects,
 }
 
 /// A track's colour: one of the named colours of the GNOME desktop.
@@ -426,7 +430,7 @@ mod tests {
         let json = project.to_json().unwrap();
         insta::assert_snapshot!(json, @r#"
         {
-          "format_version": 2,
+          "format_version": 3,
           "name": "",
           "sample_rate": 48000,
           "sources": [
@@ -456,7 +460,14 @@ mod tests {
               "pan": 0.0,
               "mute": false,
               "solo": false,
-              "color": null
+              "color": null,
+              "effects": {
+                "low_cut": {
+                  "enabled": false,
+                  "frequency_hz": 80.0,
+                  "slope": "db24"
+                }
+              }
             }
           ],
           "master_volume_db": 0.0,

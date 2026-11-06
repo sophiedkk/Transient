@@ -14,39 +14,40 @@ template $TransientTrackHeader: Box {
     "track-header",
   ]
 
+  // The name, on its own row so it has the header's full width, or a text
+  // field while renaming (double-click the name, Rename in the menu, or F2).
+  Stack name_stack {
+    hexpand: true;
+
+    StackPage {
+      name: "label";
+
+      child: Label name_label {
+        xalign: 0;
+        ellipsize: end;
+
+        styles [
+          "heading",
+        ]
+      };
+    }
+
+    StackPage {
+      name: "entry";
+
+      child: Entry name_entry {
+        width-chars: 6;
+
+        accessibility {
+          label: _("Track Name");
+        }
+      };
+    }
+  }
+
+  // The track's buttons; the menu sits at the right end.
   Box {
     spacing: 2;
-
-    // The name, or a text field while renaming (double-click the name, Rename
-    // in the menu, or F2).
-    Stack name_stack {
-      hexpand: true;
-
-      StackPage {
-        name: "label";
-
-        child: Label name_label {
-          xalign: 0;
-          ellipsize: end;
-
-          styles [
-            "heading",
-          ]
-        };
-      }
-
-      StackPage {
-        name: "entry";
-
-        child: Entry name_entry {
-          width-chars: 6;
-
-          accessibility {
-            label: _("Track Name");
-          }
-        };
-      }
-    }
 
     // The icon shows the track's state (speaker, or crossed-out speaker when
     // muted), like the volume icons elsewhere in GNOME; see `update_tooltips`.
@@ -58,6 +59,7 @@ template $TransientTrackHeader: Box {
       styles [
         "flat",
         "circular",
+        "mute-toggle",
       ]
 
       accessibility {
@@ -73,11 +75,35 @@ template $TransientTrackHeader: Box {
       styles [
         "flat",
         "circular",
+        "solo-toggle",
       ]
 
       accessibility {
         label: _("Solo");
       }
+    }
+
+    // Opens the track's effects, like Effects in the menu. Always there, so
+    // people find the effects; in the accent colour while one is on (see
+    // `TrackHeader::show_effects_on`).
+    Button effects_button {
+      icon-name: "transient-effects-symbolic";
+      tooltip-text: _("Effects");
+      action-name: "track.effects";
+      valign: center;
+
+      styles [
+        "flat",
+        "circular",
+      ]
+
+      accessibility {
+        label: _("Effects");
+      }
+    }
+
+    Box {
+      hexpand: true;
     }
 
     // More track commands (for now Remove Track). The menu's actions are the
@@ -152,6 +178,13 @@ menu track_menu {
     item {
       label: _("Move _Down");
       action: "track.move-down";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Effects");
+      action: "track.effects";
     }
   }
 

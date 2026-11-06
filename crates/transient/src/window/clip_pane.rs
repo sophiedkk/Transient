@@ -1,8 +1,9 @@
-//! The clip pane (F9): the selected clip's gain and fades, and normalizing.
+//! The pane's Clip tab (F9): the selected clip's gain and fades, and normalizing.
 //!
 //! The pane is a GNOME "utility pane": it sits on the right of the timeline, can
 //! be shown and hidden, and slides over the timeline on narrow windows (an
-//! `AdwOverlaySplitView` with a breakpoint, see window.blp).
+//! `AdwOverlaySplitView` with a breakpoint, see window.blp). Its other tab,
+//! Track, shows a track's effects (see `track_pane.rs`).
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -58,15 +59,25 @@ impl Window {
                 });
             }
         });
-        self.update_clip_pane();
+        self.update_pane();
     }
 
-    /// Shows the selected clip in the pane, or "No Clip Selected".
-    pub(super) fn update_clip_pane(&self) {
+    /// Shows the selected clip on the Clip tab (or "No Clip Selected"), and
+    /// its track's effects on the Track tab.
+    pub(super) fn update_pane(&self) {
         let imp = self.imp();
         let selected = imp.selected.get().and_then(|id| self.clip_with_name(id));
+        // The Track tab follows the selected clip's track.
+        let clip_track = imp
+            .selected
+            .get()
+            .and_then(|id| imp.project.borrow().clip(id).map(|(track, _)| track));
+        if clip_track.is_some() {
+            imp.effects_track.set(clip_track);
+        }
+        self.update_track_pane();
         let Some((clip, name)) = selected else {
-            imp.pane_stack.set_visible_child_name("none");
+            imp.clip_stack.set_visible_child_name("none");
             return;
         };
         let rate = f64::from(imp.project.borrow().sample_rate.hz());
@@ -81,12 +92,14 @@ impl Window {
         imp.fade_out_row
             .set_value(transient_core::time::frames_to_f64(clip.fade_out) / rate);
         imp.updating_controls.set(false);
-        imp.pane_stack.set_visible_child_name("clip");
+        imp.clip_stack.set_visible_child_name("clip");
     }
 
-    /// Shows the pane (double-clicking a clip).
+    /// Shows the pane on its Clip tab (double-clicking a clip).
     pub(super) fn show_clip_pane(&self) {
-        self.imp().split_view.set_show_sidebar(true);
+        let imp = self.imp();
+        imp.pane_tabs.set_visible_child_name("clip");
+        imp.split_view.set_show_sidebar(true);
     }
 
     /// Hides the pane (clicking empty space, which deselects).
@@ -132,7 +145,7 @@ impl Window {
             return;
         };
         self.apply_edit(|project| project.change_clip(id, |clip| Clip { gain_db, ..clip }));
-        self.update_clip_pane();
+        self.update_pane();
         if limited {
             self.show_toast(&gettext("Kept quieter than the target to avoid clipping"));
         }
@@ -159,7 +172,7 @@ impl Window {
             return;
         };
         self.apply_edit(|project| project.change_clip(id, |clip| fade(clip, at)));
-        self.update_clip_pane();
+        self.update_pane();
     }
 
     /// Changes the selected clip from the pane; coalesced like a mixer slider.

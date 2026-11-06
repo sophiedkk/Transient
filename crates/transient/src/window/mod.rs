@@ -29,6 +29,7 @@ mod selection;
 mod shortcuts;
 mod style;
 mod track_order;
+mod track_pane;
 mod transport;
 
 use std::path::Path;

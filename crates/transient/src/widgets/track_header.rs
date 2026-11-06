@@ -30,8 +30,8 @@ pub(crate) struct TrackSettings {
 
 /// What a header reports when the user changes a control.
 type ChangedCallback = Box<dyn Fn(TrackId, TrackSettings)>;
-/// What a header reports when the user chooses Remove Track.
-type RemoveCallback = Box<dyn Fn(TrackId)>;
+/// What a header reports when the user chooses Remove Track or Effects.
+type TrackCallback = Box<dyn Fn(TrackId)>;
 /// What a header reports when the user renames the track.
 type RenameCallback = Box<dyn Fn(TrackId, String)>;
 /// What a header reports for Move Up (`true`) or Move Down (`false`).
@@ -46,7 +46,7 @@ mod imp {
     use gtk::{gio, glib};
     use transient_core::project::TrackId;
 
-    use super::{ChangedCallback, ColorCallback, MoveCallback, RemoveCallback, RenameCallback};
+    use super::{ChangedCallback, ColorCallback, MoveCallback, RenameCallback, TrackCallback};
 
     #[derive(Default, gtk::CompositeTemplate)]
     #[template(resource = "/io/github/sophiedkk/Transient/ui/track-header.ui")]
@@ -60,6 +60,8 @@ mod imp {
         #[template_child]
         pub(super) menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
+        pub(super) effects_button: TemplateChild<gtk::Button>,
+        #[template_child]
         pub(super) mute_button: TemplateChild<gtk::ToggleButton>,
         #[template_child]
         pub(super) solo_button: TemplateChild<gtk::ToggleButton>,
@@ -70,7 +72,8 @@ mod imp {
 
         pub(super) track: Cell<TrackId>,
         pub(super) on_changed: RefCell<Option<ChangedCallback>>,
-        pub(super) on_remove: RefCell<Option<RemoveCallback>>,
+        pub(super) on_remove: RefCell<Option<TrackCallback>>,
+        pub(super) on_effects: RefCell<Option<TrackCallback>>,
         pub(super) on_rename: RefCell<Option<RenameCallback>>,
         pub(super) on_move: RefCell<Option<MoveCallback>>,
         pub(super) on_color: RefCell<Option<ColorCallback>>,
@@ -110,6 +113,12 @@ mod imp {
             klass.install_action("track.remove", None, |header, _, _| {
                 let imp = header.imp();
                 if let Some(callback) = imp.on_remove.borrow().as_ref() {
+                    callback(imp.track.get());
+                }
+            });
+            klass.install_action("track.effects", None, |header, _, _| {
+                let imp = header.imp();
+                if let Some(callback) = imp.on_effects.borrow().as_ref() {
                     callback(imp.track.get());
                 }
             });
@@ -153,6 +162,7 @@ impl TrackHeader {
         imp.name_label.set_label(&track.name);
         imp.name_label
             .set_tooltip_text(Some(&format!("{}\n{details}", track.name)));
+        self.show_effects_on(track.effects.any_on());
         imp.mute_button.set_active(track.mute);
         imp.solo_button.set_active(track.solo);
         imp.volume_scale.set_value(f64::from(track.volume_db));
@@ -175,6 +185,11 @@ impl TrackHeader {
         self.imp().on_remove.replace(Some(Box::new(callback)));
     }
 
+    /// Calls `callback` with the track when the user chooses Effects.
+    pub(crate) fn connect_effects(&self, callback: impl Fn(TrackId) + 'static) {
+        self.imp().on_effects.replace(Some(Box::new(callback)));
+    }
+
     /// Calls `callback` with the track and its new name after the user renamed it.
     pub(crate) fn connect_rename(&self, callback: impl Fn(TrackId, String) + 'static) {
         self.imp().on_rename.replace(Some(Box::new(callback)));
@@ -190,6 +205,22 @@ impl TrackHeader {
     /// Move Up and Move Down.
     pub(crate) fn connect_move(&self, callback: impl Fn(TrackId, bool) + 'static) {
         self.imp().on_move.replace(Some(Box::new(callback)));
+    }
+
+    /// Colours the effects button while an effect is on (and says so in its
+    /// tooltip), without touching the rest of the header: effect changes
+    /// happen while the pane's controls are used.
+    pub(crate) fn show_effects_on(&self, on: bool) {
+        let button = &self.imp().effects_button;
+        let label = if on {
+            button.add_css_class("effects-on");
+            gettext("Effects On")
+        } else {
+            button.remove_css_class("effects-on");
+            gettext("Effects")
+        };
+        button.set_tooltip_text(Some(&label));
+        button.update_property(&[gtk::accessible::Property::Label(&label)]);
     }
 
     /// The track this header shows.

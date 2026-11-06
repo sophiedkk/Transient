@@ -151,7 +151,7 @@ impl Window {
         imp.timeline
             .set_selection(imp.selected.get(), &imp.selection.borrow());
         self.update_edit_actions();
-        self.update_clip_pane();
+        self.update_pane();
     }
 
     /// The selected clips (all of them).
