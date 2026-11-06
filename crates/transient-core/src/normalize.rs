@@ -67,7 +67,7 @@ pub fn loudness_gain(
     if peak <= 0.0 {
         return None;
     }
-    let peak_db = 20.0 * peak.log10();
+    let peak_db = f64::from(crate::audio::db_from_amplitude(f32_from_f64(peak)));
 
     let wanted = target_lufs - loudness;
     let allowed = ceiling_db - peak_db;

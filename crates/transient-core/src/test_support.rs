@@ -1,7 +1,7 @@
 //! Helpers shared by the unit tests of several modules (only built for tests).
 
 use crate::audio::CHANNELS;
-use crate::convert::f32_from_f64;
+use crate::convert::{f32_from_f64, f64_from_usize};
 use crate::mix::{AudioPool, Mix};
 use crate::project::{Clip, Project, TrackId};
 use crate::range::TimeRange;
@@ -31,11 +31,28 @@ pub(crate) fn range(start: Frames, end: Frames) -> TimeRange {
     TimeRange { start, end }
 }
 
+/// Frames in one second at the tests' sample rate (`SampleRate::HZ_48000`).
+pub(crate) const ONE_SECOND: usize = 48_000;
+
+/// Half of [`ONE_SECOND`].
+pub(crate) const HALF_A_SECOND: usize = ONE_SECOND / 2;
+
+/// Where a filter has settled in a one-second test signal: from half a second
+/// on, its start-up is long over.
+const SETTLED_FROM: usize = HALF_A_SECOND;
+
+/// `count` frames as a timeline position or length.
+pub(crate) fn frames(count: usize) -> Frames {
+    Frames::try_from(count).unwrap()
+}
+
 /// A stereo sine of `frequency` Hz, one second long at 48 kHz, at full scale.
 pub(crate) fn sine(frequency: f64) -> Vec<f32> {
-    (0..48_000)
+    (0..ONE_SECOND)
         .flat_map(|n| {
-            let value = (std::f64::consts::TAU * frequency * f64::from(n) / 48_000.0).sin();
+            let value = (std::f64::consts::TAU * frequency * f64_from_usize(n)
+                / f64_from_usize(ONE_SECOND))
+            .sin();
             [f32_from_f64(value); CHANNELS]
         })
         .collect()
@@ -47,7 +64,7 @@ pub(crate) fn settled_peak(samples: &[f32]) -> f32 {
     samples
         .iter()
         .step_by(CHANNELS)
-        .skip(24_000)
+        .skip(SETTLED_FROM)
         .fold(0.0, |peak, sample| peak.max(sample.abs()))
 }
 
@@ -59,9 +76,9 @@ pub(crate) fn settled_rms(samples: &[f32]) -> f32 {
     let settled: Vec<f32> = samples
         .iter()
         .step_by(CHANNELS)
-        .skip(24_000)
+        .skip(SETTLED_FROM)
         .copied()
         .collect();
     let power = settled.iter().map(|sample| sample * sample).sum::<f32>();
-    (power / f32_from_f64(crate::convert::f64_from_usize(settled.len().max(1)))).sqrt()
+    (power / f32_from_f64(f64_from_usize(settled.len().max(1)))).sqrt()
 }

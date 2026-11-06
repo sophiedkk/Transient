@@ -106,11 +106,29 @@ impl AudioBuffer {
     }
 }
 
+/// Decibels per factor of ten in sample level (amplitude): 20 dB louder is ten
+/// times the level, 6 dB about twice.
+const DB_PER_DECADE: f32 = 20.0;
+
+/// A level in decibels as a sample level, or a gain in decibels as a
+/// multiplier: 0 dB → 1.0 (full scale, unchanged), −20 dB → 0.1, +6 dB → about 2.
+#[must_use]
+pub fn amplitude_from_db(db: f32) -> f32 {
+    10_f32.powf(db / DB_PER_DECADE)
+}
+
+/// A sample level (1.0 = full scale) or multiplier in decibels; the inverse of
+/// [`amplitude_from_db`]. Silence (0) is −∞.
+#[must_use]
+pub fn db_from_amplitude(level: f32) -> f32 {
+    DB_PER_DECADE * level.log10()
+}
+
 /// Converts a level (1.0 = full scale) to decibels relative to full scale (dBFS).
 /// Silence has no decibel value and returns `None`.
 #[must_use]
 pub fn to_dbfs(level: f32) -> Option<f64> {
-    (level > 0.0).then(|| 20.0 * f64::from(level).log10())
+    (level > 0.0).then(|| f64::from(DB_PER_DECADE) * f64::from(level).log10())
 }
 
 #[cfg(test)]

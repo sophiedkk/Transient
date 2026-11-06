@@ -294,7 +294,7 @@ template $TransientWindow: Adw.ApplicationWindow {
 
                       // Only a heading: the track's name, set by the code.
                       Adw.PreferencesGroup pane_track_group {
-                        description: _("Effects on this track, applied before its volume and pan");
+                        description: _("Applied from top to bottom, before the track’s volume and pan");
                       }
 
                       // Each effect: a switch in the group's header, one slider in plain
@@ -366,8 +366,6 @@ template $TransientWindow: Adw.ApplicationWindow {
                           round-digits: 0;
 
                           adjustment: Adjustment {
-                            lower: -80;
-                            upper: -20;
                             step-increment: 1;
                             page-increment: 5;
                           };
@@ -390,8 +388,7 @@ template $TransientWindow: Adw.ApplicationWindow {
                         }
                       }
 
-                      // Three fixed bands, each −12 to +12 dB
-                      // (transient_core::effects::equalizer).
+                      // Three fixed bands (transient_core::effects::equalizer).
                       Adw.PreferencesGroup {
                         title: _("Equalizer");
                         description: _("Shapes the tone: more or less bass, middle and treble");
@@ -412,8 +409,6 @@ template $TransientWindow: Adw.ApplicationWindow {
                           round-digits: 0;
 
                           adjustment: Adjustment {
-                            lower: -12;
-                            upper: 12;
                             step-increment: 1;
                             page-increment: 3;
                           };
@@ -427,8 +422,6 @@ template $TransientWindow: Adw.ApplicationWindow {
                           round-digits: 0;
 
                           adjustment: Adjustment {
-                            lower: -12;
-                            upper: 12;
                             step-increment: 1;
                             page-increment: 3;
                           };
@@ -442,8 +435,6 @@ template $TransientWindow: Adw.ApplicationWindow {
                           round-digits: 0;
 
                           adjustment: Adjustment {
-                            lower: -12;
-                            upper: 12;
                             step-increment: 1;
                             page-increment: 3;
                           };
@@ -470,8 +461,6 @@ template $TransientWindow: Adw.ApplicationWindow {
                           round-digits: 0;
 
                           adjustment: Adjustment {
-                            lower: -40;
-                            upper: 0;
                             step-increment: 1;
                             page-increment: 5;
                           };

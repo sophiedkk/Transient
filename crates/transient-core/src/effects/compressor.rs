@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::smoothing;
-use crate::audio::CHANNELS;
+use crate::audio::{CHANNELS, amplitude_from_db, db_from_amplitude};
 use crate::time::SampleRate;
 
 /// The lowest threshold, in dBFS: almost everything is compressed.
@@ -24,6 +24,10 @@ pub const MIN_THRESHOLD_DB: f32 = -40.0;
 
 /// The highest threshold, in dBFS: only peaks at full scale would be.
 pub const MAX_THRESHOLD_DB: f32 = 0.0;
+
+/// Where a new compressor starts, in dBFS: with [`Ratio::Medium`], a common
+/// starting point for a voice.
+pub const DEFAULT_THRESHOLD_DB: f32 = -20.0;
 
 /// The width of the soft knee, in dB.
 const KNEE_DB: f32 = 6.0;
@@ -71,11 +75,11 @@ pub struct Compressor {
 }
 
 impl Default for Compressor {
-    /// Off; at −20 dBFS and 4:1, a common starting point for a voice.
+    /// Off, at [`DEFAULT_THRESHOLD_DB`] and 4:1.
     fn default() -> Self {
         Self {
             enabled: false,
-            threshold_db: -20.0,
+            threshold_db: DEFAULT_THRESHOLD_DB,
             ratio: Ratio::default(),
         }
     }
@@ -166,7 +170,7 @@ impl CompressorFilter {
             } else {
                 self.level += (peak - self.level) * self.release;
             }
-            let level_db = (20.0 * self.level.log10()).max(FLOOR_DB);
+            let level_db = db_from_amplitude(self.level).max(FLOOR_DB);
             let target = gain_reduction_db(level_db, self.threshold_db, self.ratio);
             // Turning down takes the attack time; letting go follows the
             // detector, which already falls slowly.
@@ -175,7 +179,7 @@ impl CompressorFilter {
             } else {
                 self.reduction_db = target;
             }
-            let gain = 10_f32.powf((self.make_up_db - self.reduction_db) / 20.0);
+            let gain = amplitude_from_db(self.make_up_db - self.reduction_db);
             for sample in frame {
                 *sample *= gain;
             }
@@ -188,16 +192,17 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::convert::f32_from_f64;
+    use crate::convert::{f32_from_f64, f64_from_usize};
+    use crate::test_support::ONE_SECOND;
 
     const RATE: SampleRate = SampleRate::HZ_48000;
 
     /// One second of a stereo 200 Hz sine at `db` dBFS.
     fn tone(db: f32) -> Vec<f32> {
-        let level = f64::from(10_f32.powf(db / 20.0));
-        (0..48_000)
+        let level = f64::from(amplitude_from_db(db));
+        (0..ONE_SECOND)
             .flat_map(|n| {
-                let t = f64::from(n) / 48_000.0;
+                let t = f64_from_usize(n) / f64_from_usize(ONE_SECOND);
                 [f32_from_f64(level * (std::f64::consts::TAU * 200.0 * t).sin()); CHANNELS]
             })
             .collect()
@@ -206,7 +211,7 @@ mod tests {
     /// The level (peak, in dBFS) of the left channel over the last half second.
     fn settled_db(samples: &[f32]) -> f32 {
         let peak = crate::test_support::settled_peak(samples);
-        20.0 * peak.log10()
+        db_from_amplitude(peak)
     }
 
     fn compressed(db: f32, threshold_db: f32, ratio: Ratio) -> f32 {

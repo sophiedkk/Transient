@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::audio::{AudioBuffer, CHANNELS};
+use crate::audio::{AudioBuffer, CHANNELS, amplitude_from_db};
 use crate::clip::visible_parts;
 use crate::convert::f32_from_f64;
 use crate::effects::EffectChain;
@@ -158,7 +158,7 @@ pub fn db_to_gain(db: f32) -> f32 {
     if db <= SILENT_DB {
         0.0
     } else {
-        10_f32.powf(db / 20.0)
+        amplitude_from_db(db)
     }
 }
 

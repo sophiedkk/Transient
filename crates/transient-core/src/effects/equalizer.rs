@@ -91,7 +91,7 @@ mod tests {
         let original = sine(frequency);
         let mut samples = original.clone();
         EqualizerFilter::new(settings, SampleRate::HZ_48000).process(&mut samples);
-        20.0 * (settled_rms(&samples) / settled_rms(&original)).log10()
+        crate::audio::db_from_amplitude(settled_rms(&samples) / settled_rms(&original))
     }
 
     fn settings(bass_db: f32, middle_db: f32, treble_db: f32) -> Equalizer {

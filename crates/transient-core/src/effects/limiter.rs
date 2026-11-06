@@ -20,7 +20,7 @@
 use std::collections::VecDeque;
 
 use super::smoothing;
-use crate::audio::CHANNELS;
+use crate::audio::{CHANNELS, amplitude_from_db};
 use crate::time::{Frames, SampleRate};
 
 /// The highest level a sample can reach, in dBFS: 1 dB of room below full
@@ -63,7 +63,7 @@ impl Limiter {
             .unwrap_or(0);
         let mut limiter = Self {
             window: lookahead + 1,
-            ceiling: 10_f32.powf(CEILING_DB / 20.0),
+            ceiling: amplitude_from_db(CEILING_DB),
             release: smoothing(RELEASE_SECONDS, sample_rate),
             delay: VecDeque::new(),
             needed: VecDeque::new(),
@@ -167,7 +167,7 @@ mod tests {
         input[300 * CHANNELS] = 2.0;
         input[300 * CHANNELS + 1] = -2.0;
         let output = limited(&input);
-        let ceiling = 10_f32.powf(CEILING_DB / 20.0);
+        let ceiling = amplitude_from_db(CEILING_DB);
         assert!(
             output
                 .iter()
@@ -209,7 +209,7 @@ mod tests {
             input in prop::collection::vec(-8.0_f32..8.0, 2..4000),
         ) {
             let input = &input[..input.len() / CHANNELS * CHANNELS];
-            let ceiling = 10_f32.powf(CEILING_DB / 20.0);
+            let ceiling = amplitude_from_db(CEILING_DB);
             for sample in limited(input) {
                 prop_assert!(sample.abs() <= ceiling * 1.000_01, "{sample}");
             }

@@ -3,6 +3,15 @@
 use super::*;
 use crate::effects::limiter::CEILING_DB;
 use crate::project::Clip;
+use crate::test_support::{ONE_SECOND, frames};
+
+/// The crossfade's length in frames at the tests' 48 kHz.
+fn crossfade_frames() -> usize {
+    let frames = SampleRate::HZ_48000
+        .seconds_to_frames(CROSSFADE_SECONDS)
+        .unwrap();
+    usize::try_from(frames).unwrap()
+}
 
 /// The mix of `project` without the master limiter: these tests check the
 /// mixing itself, with levels far above full scale (ramps up to 99).
@@ -247,10 +256,10 @@ fn a_source_without_audio_is_silent() {
 /// One second of constant 0.5 on one track, with the clip at `gain_db`.
 fn constant_project(gain_db: f32) -> (Project, AudioPool) {
     let mut project = Project::default();
-    let track = project.import("c.wav".into(), 48_000, "c".to_owned(), 0);
+    let track = project.import("c.wav".into(), frames(ONE_SECOND), "c".to_owned(), 0);
     let clip = project.track(track).unwrap().clips[0];
     project.change_clip(clip.id, |clip| Clip { gain_db, ..clip });
-    let pool = AudioPool::from([(clip.source, constant(0.5, 48_000))]);
+    let pool = AudioPool::from([(clip.source, constant(0.5, ONE_SECOND))]);
     (project, pool)
 }
 
@@ -274,10 +283,15 @@ fn a_change_during_playback_fades_over_instead_of_jumping() {
     let after = switch_during_playback(-12.0);
     let target = 0.5 * db_to_gain(-12.0);
     // It starts where the old mix was, and ends at the new level after
-    // 20 ms (960 frames at 48 kHz)...
+    // the crossfade (20 ms)...
     assert!((after[0] - 0.5).abs() < 1e-3, "{}", after[0]);
-    assert!((after[960] - target).abs() < 1e-6, "{}", after[960]);
-    assert!((after[1999] - target).abs() < 1e-6);
+    let done = crossfade_frames();
+    assert!((after[done] - target).abs() < 1e-6, "{}", after[done]);
+    assert!(
+        after[done..]
+            .iter()
+            .all(|sample| (sample - target).abs() < 1e-6)
+    );
     // ...in steps far too small to click.
     let largest_step = after
         .windows(2)
@@ -302,7 +316,8 @@ fn a_crossfade_spans_several_renders() {
         pieces.extend(out.into_iter().step_by(CHANNELS));
     }
     assert!(pieces.windows(2).all(|pair| pair[1] <= pair[0]));
-    assert!(pieces[959].abs() < 0.001 && pieces[999] == 0.0);
+    let done = crossfade_frames();
+    assert!(pieces[done - 1].abs() < 0.001 && pieces[done..].iter().all(|s| *s == 0.0));
 }
 
 #[test]
@@ -362,7 +377,7 @@ fn loud_project() -> (Project, AudioPool) {
 fn the_master_limiter_keeps_the_mix_under_its_ceiling() {
     let (project, pool) = loud_project();
     let out = render_all(&mut Mix::new(&project, &pool), 0, 1000);
-    let ceiling = 10_f32.powf(CEILING_DB / 20.0);
+    let ceiling = amplitude_from_db(CEILING_DB);
     assert!(out.iter().all(|sample| sample.abs() <= ceiling * 1.000_01));
     // Without it, the same mix goes far over.
     let out = render_all(&mut unlimited(&project, &pool), 0, 1000);

@@ -8,6 +8,7 @@
 //! It is an `AdwPreferencesRow`, so it sits in a preferences group like any
 //! other row, and it uses the row's own `title`.
 
+use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
 
@@ -111,5 +112,13 @@ impl EffectSlider {
     /// The slider itself, to read its value and follow its changes.
     pub(crate) fn scale(&self) -> gtk::Scale {
         self.imp().scale.get()
+    }
+
+    /// Sets the slider's range: the effect's limits, defined in
+    /// `transient-core` (window.blp only sets the step sizes).
+    pub(crate) fn set_range(&self, lower: f32, upper: f32) {
+        self.imp()
+            .scale
+            .set_range(f64::from(lower), f64::from(upper));
     }
 }

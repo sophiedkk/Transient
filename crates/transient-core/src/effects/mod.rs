@@ -138,10 +138,20 @@ impl EffectChain {
         }
     }
 
-    /// Runs the effects over `samples` (interleaved stereo), in place: the
-    /// low cut first, so rumble cannot hold the gate open; then the
-    /// equalizer shapes the tone; the compressor last, so it does not bring
-    /// up the noise the gate took out, and evens out the shaped sound.
+    /// Runs the effects over `samples` (interleaved stereo), in place, in a
+    /// fixed order (decided 2026-11-06; the Track tab lists them in this
+    /// order and says so), the usual chain for a voice:
+    ///
+    /// 1. Low cut: first, so rumble cannot hold the gate open.
+    /// 2. Noise gate: before the compressor, which would otherwise bring the
+    ///    noise in the pauses up and make speech and noise harder to tell
+    ///    apart.
+    /// 3. Equalizer: shapes the tone the compressor then evens out, so a
+    ///    bass boost stays even too.
+    /// 4. Compressor: last on the track.
+    ///
+    /// The master limiter comes after all tracks are added up (see
+    /// [`crate::mix::Mix`]).
     pub(crate) fn process(&mut self, samples: &mut [f32]) {
         if let Some(filter) = &mut self.low_cut {
             filter.process(samples);
@@ -161,21 +171,22 @@ impl EffectChain {
 #[cfg(test)]
 mod tests {
     use crate::audio::{AudioBuffer, CHANNELS};
-    use crate::convert::f32_from_f64;
+    use crate::convert::{f32_from_f64, f64_from_usize};
     use crate::mix::{AudioPool, Mix};
     use crate::project::Project;
+    use crate::test_support::{HALF_A_SECOND, ONE_SECOND, frames};
     use crate::time::{Frames, SampleRate};
 
     /// One second of a 440 Hz sine plus a constant offset of 0.5 (which a low
     /// cut removes), on one track with the low cut on.
     fn low_cut_project() -> (Project, AudioPool) {
         let mut project = Project::default();
-        let track = project.import("tone.wav".into(), 48_000, "tone".to_owned(), 0);
+        let track = project.import("tone.wav".into(), frames(ONE_SECOND), "tone".to_owned(), 0);
         let source = project.track(track).unwrap().clips[0].source;
         project.tracks[0].effects.low_cut.enabled = true;
-        let samples = (0..48_000)
+        let samples = (0..ONE_SECOND)
             .flat_map(|n| {
-                let t = f64::from(n) / 48_000.0;
+                let t = f64_from_usize(n) / f64_from_usize(ONE_SECOND);
                 [f32_from_f64(0.5 + 0.25 * (std::f64::consts::TAU * 440.0 * t).sin()); CHANNELS]
             })
             .collect();
@@ -216,17 +227,18 @@ mod tests {
     #[test]
     fn a_low_cut_on_a_track_removes_its_offset() {
         let (project, pool) = low_cut_project();
-        let out = render(&mut Mix::new(&project, &pool), 0, 48_000);
+        let out = render(&mut Mix::new(&project, &pool), 0, ONE_SECOND);
         // After settling, the offset is gone: the sine swings around 0.
-        let settled = out.get(24_000 * CHANNELS..).unwrap();
-        let average = settled.iter().sum::<f32>() / f32_from_f64(24_000.0 * 2.0);
+        let settled = out.get(HALF_A_SECOND * CHANNELS..).unwrap();
+        let average =
+            settled.iter().sum::<f32>() / f32_from_f64(f64_from_usize(HALF_A_SECOND * CHANNELS));
         assert!(average.abs() < 1e-3, "{average}");
     }
 
     #[test]
     fn rendering_in_pieces_is_the_same_as_in_one_go() {
         let (project, pool) = low_cut_project();
-        let whole = render(&mut Mix::new(&project, &pool), 0, 48_000);
+        let whole = render(&mut Mix::new(&project, &pool), 0, ONE_SECOND);
         let mut mix = Mix::new(&project, &pool);
         let pieces: Vec<f32> = (0..48)
             .flat_map(|piece| render(&mut mix, piece * 1000, 1000))
@@ -237,11 +249,13 @@ mod tests {
     #[test]
     fn after_a_jump_the_effects_start_settled() {
         let (project, pool) = low_cut_project();
-        let whole = render(&mut Mix::new(&project, &pool), 0, 48_000);
+        let whole = render(&mut Mix::new(&project, &pool), 0, ONE_SECOND);
         // A fresh mix starting halfway, as after a seek, sounds as if it had
         // played all along (the warm-up), not like a filter starting cold.
-        let jumped = render(&mut Mix::new(&project, &pool), 24_000, 1000);
-        let expected = whole.get(24_000 * CHANNELS..25_000 * CHANNELS).unwrap();
+        let jumped = render(&mut Mix::new(&project, &pool), frames(HALF_A_SECOND), 1000);
+        let expected = whole
+            .get(HALF_A_SECOND * CHANNELS..(HALF_A_SECOND + 1000) * CHANNELS)
+            .unwrap();
         assert!(max_difference(&jumped, expected) < 1e-4);
     }
 

@@ -13,7 +13,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::smoothing;
-use crate::audio::CHANNELS;
+use crate::audio::{CHANNELS, amplitude_from_db};
 use crate::time::SampleRate;
 
 /// The lowest threshold the gate can be set to, in dBFS: only near-silence
@@ -22,6 +22,15 @@ pub const MIN_THRESHOLD_DB: f32 = -80.0;
 
 /// The highest threshold, in dBFS: quiet speech is turned down too.
 pub const MAX_THRESHOLD_DB: f32 = -20.0;
+
+/// Where a new gate starts, in dBFS: above typical room noise, below quiet
+/// speech.
+pub const DEFAULT_THRESHOLD_DB: f32 = -45.0;
+
+/// How far [`Reduction::Strong`] turns the sound down, in dB.
+const STRONG_REDUCTION_DB: f32 = -20.0;
+/// How far [`Reduction::Light`] turns the sound down, in dB.
+const LIGHT_REDUCTION_DB: f32 = -10.0;
 
 /// How much quieter the gate closes than it opens, in dB.
 const HYSTERESIS_DB: f32 = 6.0;
@@ -53,8 +62,8 @@ impl Reduction {
     fn gain(self) -> f32 {
         match self {
             Self::Silence => 0.0,
-            Self::Strong => amplitude(-20.0),
-            Self::Light => amplitude(-10.0),
+            Self::Strong => amplitude_from_db(STRONG_REDUCTION_DB),
+            Self::Light => amplitude_from_db(LIGHT_REDUCTION_DB),
         }
     }
 }
@@ -72,21 +81,14 @@ pub struct NoiseGate {
 }
 
 impl Default for NoiseGate {
-    /// Off; at −45 dBFS, above typical room noise and below quiet speech.
+    /// Off, at [`DEFAULT_THRESHOLD_DB`].
     fn default() -> Self {
         Self {
             enabled: false,
-            threshold_db: -45.0,
+            threshold_db: DEFAULT_THRESHOLD_DB,
             reduction: Reduction::default(),
         }
     }
-}
-
-/// Decibels to a sample level: 0 dB is full scale, −20 dB a tenth. Unlike
-/// [`crate::mix::db_to_gain`] it has no "silent" floor, since thresholds go
-/// down to −80 dB.
-fn amplitude(db: f32) -> f32 {
-    10_f32.powf(db / 20.0)
 }
 
 /// The running gate: its settings in the form it needs, and what it measured
@@ -120,8 +122,8 @@ impl NoiseGateFilter {
         let floor = settings.reduction.gain();
         let hold = HOLD_SECONDS * f64::from(sample_rate.hz());
         Self {
-            open_level: amplitude(threshold),
-            close_level: amplitude(threshold - HYSTERESIS_DB),
+            open_level: amplitude_from_db(threshold),
+            close_level: amplitude_from_db(threshold - HYSTERESIS_DB),
             floor,
             attack: smoothing(ATTACK_SECONDS, sample_rate),
             release: smoothing(RELEASE_SECONDS, sample_rate),
@@ -194,11 +196,11 @@ mod tests {
 
     /// `seconds` of a stereo 200 Hz sine at `db` dBFS.
     fn tone(db: f32, seconds: f64) -> Vec<f32> {
-        let level = f64::from(amplitude(db));
+        let level = f64::from(amplitude_from_db(db));
         let frames = RATE.seconds_to_frames(seconds).unwrap();
         (0..frames)
             .flat_map(|n| {
-                let t = crate::time::frames_to_f64(n) / 48_000.0;
+                let t = crate::time::frames_to_f64(n) / f64::from(RATE.hz());
                 [f32_from_f64(level * (std::f64::consts::TAU * 200.0 * t).sin()); CHANNELS]
             })
             .collect()
@@ -227,7 +229,7 @@ mod tests {
     fn loud_sound_passes_unchanged() {
         let mut samples = tone(-12.0, 0.5);
         gate(Reduction::Strong).process(&mut samples);
-        let expected = amplitude(-12.0);
+        let expected = amplitude_from_db(-12.0);
         assert!((peak(&samples, 0.1, 0.5) - expected).abs() < 0.001 * expected);
     }
 
@@ -240,7 +242,7 @@ mod tests {
         ] {
             let mut samples = tone(-60.0, 1.0);
             gate(reduction).process(&mut samples);
-            let expected = db.map_or(0.0, |db| amplitude(-60.0) * amplitude(db));
+            let expected = db.map_or(0.0, |db| amplitude_from_db(-60.0) * amplitude_from_db(db));
             let actual = peak(&samples, 0.5, 1.0);
             assert!((actual - expected).abs() < 1e-5, "{reduction:?}: {actual}");
         }
@@ -252,7 +254,7 @@ mod tests {
         let mut samples = tone(-12.0, 0.5);
         samples.extend(tone(-60.0, 1.0));
         gate(Reduction::Silence).process(&mut samples);
-        let noise = amplitude(-60.0);
+        let noise = amplitude_from_db(-60.0);
         // Right after the phrase the noise is still heard (held open)...
         assert!(peak(&samples, 0.52, 0.54) > 0.9 * noise);
         // ...then it fades out, and is gone a second later.
@@ -266,7 +268,7 @@ mod tests {
         let mut samples = tone(-12.0, 0.2);
         samples.extend(tone(-48.0, 1.0));
         gate(Reduction::Silence).process(&mut samples);
-        let level = amplitude(-48.0);
+        let level = amplitude_from_db(-48.0);
         assert!((peak(&samples, 0.8, 1.2) - level).abs() < 0.01 * level);
     }
 

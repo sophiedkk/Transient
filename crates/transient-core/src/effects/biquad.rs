@@ -23,6 +23,22 @@ pub(crate) struct Biquad {
     state: [[f64; 2]; CHANNELS],
 }
 
+/// The lowest frequency a filter can be set to, in hertz: the formulas need
+/// it above 0.
+const LOWEST_HZ: f64 = 1.0;
+
+/// The highest frequency a filter can be set to, as a fraction of the sample
+/// rate: just under half of it (the Nyquist frequency), where the formulas
+/// break down.
+const HIGHEST_FRACTION: f64 = 0.45;
+
+/// The cookbook's `A` for shelves and peaks: the square root of the gain as a
+/// multiplier (10^(dB/40)), because each of the filter's two halves applies
+/// half of it.
+fn shelf_a(gain_db: f32) -> f64 {
+    f64::from(crate::audio::amplitude_from_db(gain_db)).sqrt()
+}
+
 impl Biquad {
     /// A filter from the cookbook's six coefficients, dividing them by `a0`
     /// as the processing loop expects.
@@ -40,7 +56,7 @@ impl Biquad {
     /// 0 and below half the sample rate.
     fn angle(frequency_hz: f32, sample_rate: SampleRate) -> (f64, f64) {
         let rate = f64::from(sample_rate.hz());
-        let frequency = f64::from(frequency_hz).clamp(1.0, rate * 0.45);
+        let frequency = f64::from(frequency_hz).clamp(LOWEST_HZ, rate * HIGHEST_FRACTION);
         (std::f64::consts::TAU * frequency / rate).sin_cos()
     }
 
@@ -60,7 +76,7 @@ impl Biquad {
     /// by `gain_db`, everything well above it unchanged (a "bass" control).
     pub(crate) fn low_shelf(frequency_hz: f32, gain_db: f32, sample_rate: SampleRate) -> Self {
         let (sin, cos) = Self::angle(frequency_hz, sample_rate);
-        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        let a = shelf_a(gain_db);
         // The cookbook's shelf with slope 1: as steep as it goes without a
         // bump next to the shelf.
         let two_sqrt_a_alpha = 2.0 * a.sqrt() * sin / std::f64::consts::SQRT_2;
@@ -82,7 +98,7 @@ impl Biquad {
     /// by `gain_db` (a "treble" control).
     pub(crate) fn high_shelf(frequency_hz: f32, gain_db: f32, sample_rate: SampleRate) -> Self {
         let (sin, cos) = Self::angle(frequency_hz, sample_rate);
-        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        let a = shelf_a(gain_db);
         let two_sqrt_a_alpha = 2.0 * a.sqrt() * sin / std::f64::consts::SQRT_2;
         Self::from_cookbook(
             [
@@ -102,7 +118,7 @@ impl Biquad {
     /// `gain_db`; `q` sets how wide (0.7 is about two octaves).
     pub(crate) fn peak(frequency_hz: f32, gain_db: f32, q: f64, sample_rate: SampleRate) -> Self {
         let (sin, cos) = Self::angle(frequency_hz, sample_rate);
-        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        let a = shelf_a(gain_db);
         let alpha = sin / (2.0 * q);
         Self::from_cookbook(
             [1.0 + alpha * a, -2.0 * cos, 1.0 - alpha * a],
@@ -139,7 +155,7 @@ impl Biquad {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{settled_peak, settled_rms, sine};
+    use crate::test_support::{ONE_SECOND, settled_peak, settled_rms, sine};
 
     /// The Q of a 2nd-order Butterworth filter.
     const BUTTERWORTH_Q: f64 = std::f64::consts::FRAC_1_SQRT_2;
@@ -154,7 +170,7 @@ mod tests {
 
     #[test]
     fn a_high_pass_removes_a_constant_offset() {
-        let mut samples = vec![0.5; 48_000 * CHANNELS];
+        let mut samples = vec![0.5; ONE_SECOND * CHANNELS];
         Biquad::high_pass(80.0, BUTTERWORTH_Q, RATE).process(&mut samples);
         assert!(settled_peak(&samples) < 1e-6);
     }
@@ -187,7 +203,7 @@ mod tests {
         let original = sine(frequency);
         let mut samples = original.clone();
         filter.process(&mut samples);
-        20.0 * (settled_rms(&samples) / settled_rms(&original)).log10()
+        crate::audio::db_from_amplitude(settled_rms(&samples) / settled_rms(&original))
     }
 
     #[test]

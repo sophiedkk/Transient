@@ -52,6 +52,10 @@ impl Slope {
     }
 }
 
+/// Where a new low cut starts, in hertz: below a low male voice, above most
+/// rumble.
+pub const DEFAULT_FREQUENCY_HZ: f32 = 80.0;
+
 /// The low cut's settings, as saved in the project file.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -66,11 +70,11 @@ pub struct LowCut {
 }
 
 impl Default for LowCut {
-    /// Off, at 80 Hz: below a low male voice, above most rumble.
+    /// Off, at [`DEFAULT_FREQUENCY_HZ`].
     fn default() -> Self {
         Self {
             enabled: false,
-            frequency_hz: 80.0,
+            frequency_hz: DEFAULT_FREQUENCY_HZ,
             slope: Slope::default(),
         }
     }

@@ -9,8 +9,10 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use transient_core::convert::f32_from_f64;
 use transient_core::effects::TrackEffects;
-use transient_core::effects::compressor::Ratio;
+use transient_core::effects::compressor::{self, Ratio};
+use transient_core::effects::equalizer::{MAX_GAIN_DB, MIN_GAIN_DB};
 use transient_core::effects::low_cut::{Slope, amount_for_frequency, frequency_for_amount};
+use transient_core::effects::noise_gate;
 use transient_core::effects::noise_gate::Reduction;
 use transient_core::project::TrackId;
 
@@ -68,6 +70,19 @@ impl Window {
     /// Connects the pane's effect controls. Called once, from `constructed`.
     pub(super) fn setup_track_pane(&self) {
         let imp = self.imp();
+        // The ranges come from the effects themselves (window.blp only sets
+        // the step sizes).
+        imp.noise_gate_slider
+            .set_range(noise_gate::MIN_THRESHOLD_DB, noise_gate::MAX_THRESHOLD_DB);
+        imp.compressor_slider
+            .set_range(compressor::MIN_THRESHOLD_DB, compressor::MAX_THRESHOLD_DB);
+        for band in [
+            &imp.equalizer_bass_slider,
+            &imp.equalizer_middle_slider,
+            &imp.equalizer_treble_slider,
+        ] {
+            band.set_range(MIN_GAIN_DB, MAX_GAIN_DB);
+        }
         self.connect_switch(&imp.low_cut_switch, |e, on| e.low_cut.enabled = on);
         self.connect_slider(
             &imp.low_cut_slider,
