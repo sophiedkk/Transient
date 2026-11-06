@@ -19,6 +19,8 @@ whatever has keyboard focus. Pointer steps:
     glide:X,Y     moves the pointer to X,Y in small steps from where the last
                   move or glide left it, as a hand would (GTK starts a drag
                   only after the pointer moves a little with the button held)
+    scroll:STEPS  turns the mouse wheel STEPS clicks where the pointer is
+                  (positive scrolls down, negative up)
     wait:SECONDS  does nothing for a while, e.g. to hold a drag for a screenshot
                   (the session ends after the last step, which lets go of the
                   button)
@@ -61,7 +63,7 @@ def keysym(name: str) -> int:
 
 def parse(arg: str):
     """One step: ("keys", [keysyms]), ("move"/"glide", (x, y)), ("click", count),
-    ("button", pressed) or ("wait", seconds)."""
+    ("button", pressed), ("scroll", steps) or ("wait", seconds)."""
     for kind in ("move", "glide"):
         if arg.startswith(kind + ":"):
             try:
@@ -73,6 +75,11 @@ def parse(arg: str):
         return ("click", 2 if arg == "double-click" else 1)
     if arg in ("press", "release"):
         return ("button", arg == "press")
+    if arg.startswith("scroll:"):
+        try:
+            return ("scroll", int(arg.removeprefix("scroll:")))
+        except ValueError:
+            sys.exit(f"send-keys: expected scroll:STEPS, got {arg!r}")
     if arg.startswith("wait:"):
         try:
             return ("wait", float(arg.removeprefix("wait:")))
@@ -96,6 +103,10 @@ def main() -> None:
 
     def button(pressed: bool) -> None:
         call(session, SESSION, "NotifyPointerButton", GLib.Variant("(ib)", (BUTTON_LEFT, pressed)))
+
+    def scroll(steps: int) -> None:
+        # Mouse wheel clicks on the vertical axis (0); positive scrolls down.
+        call(session, SESSION, "NotifyPointerAxisDiscrete", GLib.Variant("(ui)", (0, steps)))
 
     session = call("/org/gnome/Mutter/RemoteDesktop", REMOTE_DESKTOP, "CreateSession").unpack()[0]
     call(session, SESSION, "Start")
@@ -123,6 +134,8 @@ def main() -> None:
             x, y = value
         elif kind == "button":
             button(value)
+        elif kind == "scroll":
+            scroll(value)
         elif kind == "wait":
             time.sleep(value)
         else:
