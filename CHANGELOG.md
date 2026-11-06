@@ -17,6 +17,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Compressor effect: evens out a track's volume (Compress Above and a Ratio
   of 2:1, 4:1 or 8:1), and turns it up again automatically so loud words
   keep their level.
+- Equalizer effect: Bass, Middle and Treble sliders (−12 to +12 dB) to
+  shape a track's tone.
 - Prevent Clipping: a master limiter, on by default, keeps the whole mix under
   −1 dBFS, so loud mixes no longer distort. Toggle it right of the master
   volume. Each track header has

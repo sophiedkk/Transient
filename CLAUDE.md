@@ -51,7 +51,8 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   each window) and New/Open ask "Save Changes?" via `confirm_discard_changes`.
   Clips whose audio is missing stay, drawn grey (`LaneClip::waveform` is `None`).
 - Effects (`transient-core::effects`, milestone 15): per track low cut, noise
-  gate, compressor (`TrackEffects` on `Track`), plus the master limiter
+  gate, equalizer, compressor (`TrackEffects` on `Track`, processed in that
+  order), plus the master limiter
   (`Project::master_limiter`). `Mix` renders each track into its own buffer,
   runs its `EffectChain`, then the limiter, rendering ahead by its lookahead.
   `render(&mut self)`: effects warm up after a jump; `Mix::continue_from`

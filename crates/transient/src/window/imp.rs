@@ -103,6 +103,14 @@ pub(crate) struct Window {
     #[template_child]
     pub(super) noise_gate_reduction_row: TemplateChild<adw::ComboRow>,
     #[template_child]
+    pub(super) equalizer_switch: TemplateChild<gtk::Switch>,
+    #[template_child]
+    pub(super) equalizer_bass_slider: TemplateChild<EffectSlider>,
+    #[template_child]
+    pub(super) equalizer_middle_slider: TemplateChild<EffectSlider>,
+    #[template_child]
+    pub(super) equalizer_treble_slider: TemplateChild<EffectSlider>,
+    #[template_child]
     pub(super) compressor_switch: TemplateChild<gtk::Switch>,
     #[template_child]
     pub(super) compressor_slider: TemplateChild<EffectSlider>,

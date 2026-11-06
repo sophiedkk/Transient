@@ -390,6 +390,66 @@ template $TransientWindow: Adw.ApplicationWindow {
                         }
                       }
 
+                      // Three fixed bands, each −12 to +12 dB
+                      // (transient_core::effects::equalizer).
+                      Adw.PreferencesGroup {
+                        title: _("Equalizer");
+                        description: _("Shapes the tone: more or less bass, middle and treble");
+
+                        header-suffix: Switch equalizer_switch {
+                          valign: center;
+
+                          accessibility {
+                            label: _("Equalizer");
+                          }
+                        };
+
+                        $TransientEffectSlider equalizer_bass_slider {
+                          title: _("Bass");
+                          start-label: _("Less");
+                          end-label: _("More");
+                          sensitive: bind equalizer_switch.active;
+                          round-digits: 0;
+
+                          adjustment: Adjustment {
+                            lower: -12;
+                            upper: 12;
+                            step-increment: 1;
+                            page-increment: 3;
+                          };
+                        }
+
+                        $TransientEffectSlider equalizer_middle_slider {
+                          title: _("Middle");
+                          start-label: _("Less");
+                          end-label: _("More");
+                          sensitive: bind equalizer_switch.active;
+                          round-digits: 0;
+
+                          adjustment: Adjustment {
+                            lower: -12;
+                            upper: 12;
+                            step-increment: 1;
+                            page-increment: 3;
+                          };
+                        }
+
+                        $TransientEffectSlider equalizer_treble_slider {
+                          title: _("Treble");
+                          start-label: _("Less");
+                          end-label: _("More");
+                          sensitive: bind equalizer_switch.active;
+                          round-digits: 0;
+
+                          adjustment: Adjustment {
+                            lower: -12;
+                            upper: 12;
+                            step-increment: 1;
+                            page-increment: 3;
+                          };
+                        }
+                      }
+
                       Adw.PreferencesGroup {
                         title: _("Compressor");
                         description: _("Evens out the volume: loud parts down, then the whole track up");

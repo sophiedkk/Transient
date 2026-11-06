@@ -51,7 +51,20 @@ were final; recheck steps 4–6.*
 3. Try **Reduction**: Silence (dead quiet pauses), Light (some room sound
    left, most natural). No clicks when switching or dragging.
 
-### C. Compressor
+### C. Equalizer
+
+*Not yet tested by hand.*
+
+1. On a music or voice track, switch **Equalizer** on (between Noise Gate and
+   Compressor). Drag **Bass** to the right: more boom and body; to the left:
+   thinner. The value shows "+3 dB", "0 dB", "−3 dB" in whole decibels.
+2. **Middle** to the right: more presence (a voice comes forward, can sound
+   nasal at the top); to the left: more hollow.
+3. **Treble** to the right: brighter, more air (and more hiss); to the left:
+   duller, softer "s" sounds.
+4. All three at 0 dB: the sound is exactly as with the Equalizer off.
+
+### D. Compressor
 
 *Not yet tested by hand.*
 
@@ -66,7 +79,7 @@ were final; recheck steps 4–6.*
 3. With Low Cut, Noise Gate and Compressor all on: the pauses stay quiet (the
    compressor runs after the gate, so it does not bring the noise back up).
 
-### D. Prevent Clipping (master limiter)
+### E. Prevent Clipping (master limiter)
 
 *Not yet tested by hand.*
 
@@ -78,7 +91,7 @@ were final; recheck steps 4–6.*
    - On: louder but clean; the level meter never turns red.
    - Off: it distorts and the meter turns red. Ctrl+Z turns it back on.
 
-### E. Track headers and the effects button
+### F. Track headers and the effects button
 
 *Confirmed 2026-11-06 ("Perfect").*
 
@@ -86,14 +99,14 @@ were final; recheck steps 4–6.*
    button (faders icon) and ⋮ below it. Headers line up exactly with their
    lanes, also with many tracks (scroll down: no growing offset).
 2. The effects button is grey (tooltip "Effects") until any effect of the
-   track is on, then blue ("Effects On"). With two effects on, it stays blue
+   track (low cut, gate, equalizer, compressor) is on, then blue ("Effects On"). With two effects on, it stays blue
    until both are off. Clicking it opens that track's Track tab.
 3. Mute turns the speaker orange; solo turns the headphones blue. Check in the
    dark style too.
 4. Rename a track (double-click its name, or F2): the text field fits in the
    name's line, and the header does not change height.
 
-### F. The pane: Clip and Track tabs
+### G. The pane: Clip and Track tabs
 
 1. Open the pane (top right button, or F9) and click a clip: the Clip tab
    shows its Gain and Fades; the Track tab shows the effects of its track.
@@ -107,7 +120,7 @@ were final; recheck steps 4–6.*
 5. F9 closes and opens the pane; the button's tooltip is "Properties", and the
    Keyboard Shortcuts (Ctrl+?) say "Show Properties".
 
-### G. Undo, saving, opening, exporting
+### H. Undo, saving, opening, exporting
 
 1. Drag Cut Below once, then Ctrl+Z: it goes back in one step (not one per
    tiny move). Ctrl+Z again undoes switching it on; Shift+Ctrl+Z redoes.
@@ -120,7 +133,7 @@ were final; recheck steps 4–6.*
    it opens, all track effects off, Prevent Clipping on, sounds as before
    (unless it clipped). Saved again, it is format 3, which 0.3.0 refuses.
 
-### H. No clicks when changing things during playback
+### I. No clicks when changing things during playback
 
 Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 
@@ -132,7 +145,7 @@ Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 4. Toggle mute, solo and Prevent Clipping while playing: clean, no pop.
 5. "Fade In to Playhead" while playing: no click.
 
-### I. Seeking with effects on
+### J. Seeking with effects on
 
 1. With Cut Below near Thin (and the compressor on), click around the
    timeline while playing, and move the playhead with the arrow keys: each
@@ -140,7 +153,7 @@ Quiet, steady sound shows clicks best (`speech-mono.wav`, `piano.flac`).
 2. Export a time selection from the middle of a clip: the file starts
    cleanly.
 
-### J. Keyboard and looks
+### K. Keyboard and looks
 
 1. Tab into the pane: Space toggles a switch, the arrow keys move a slider,
    Enter opens a choice row.

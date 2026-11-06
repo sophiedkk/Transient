@@ -16,6 +16,7 @@ use transient_core::project::TrackId;
 
 use super::Window;
 use super::mixer::MixerControl;
+use crate::widgets::effect_slider::EffectSlider;
 
 /// The choices of the Slope row, in the order of its list in window.blp.
 const SLOPES: [Slope; 3] = [Slope::Db12, Slope::Db24, Slope::Db48];
@@ -29,6 +30,23 @@ const RATIOS: [Ratio; 3] = [Ratio::Gentle, Ratio::Medium, Ratio::Strong];
 /// a minus sign (−), not a hyphen, as in the rest of the interface.
 fn decibels(db: f32) -> String {
     gettext("{} dB").replace("{}", &format!("{db:.0}").replace('-', "−"))
+}
+
+/// Which slider a change came from, for coalescing undo steps (given the
+/// track); see `mixer.rs`.
+type SliderControl = fn(TrackId) -> MixerControl;
+
+/// How a control's new value changes a track's effects.
+type Change<T> = fn(&mut TrackEffects, T);
+
+/// A level change for a slider's value: "+3 dB", "0 dB", "−2 dB".
+fn signed_decibels(db: f32) -> String {
+    let rounded = db.round();
+    if rounded > 0.0 {
+        gettext("+{} dB").replace("{}", &format!("{rounded:.0}"))
+    } else {
+        decibels(rounded)
+    }
 }
 
 /// The item of a choice row (`ComboRow::selected`) among `choices`.
@@ -50,84 +68,122 @@ impl Window {
     /// Connects the pane's effect controls. Called once, from `constructed`.
     pub(super) fn setup_track_pane(&self) {
         let imp = self.imp();
+        self.connect_switch(&imp.low_cut_switch, |e, on| e.low_cut.enabled = on);
+        self.connect_slider(
+            &imp.low_cut_slider,
+            MixerControl::LowCut,
+            frequency_for_amount,
+            |e, hz| {
+                e.low_cut.frequency_hz = hz;
+            },
+        );
+        self.connect_choice(&imp.low_cut_slope_row, &SLOPES, |e, slope| {
+            e.low_cut.slope = slope;
+        });
+
+        self.connect_switch(&imp.noise_gate_switch, |e, on| e.noise_gate.enabled = on);
+        self.connect_slider(
+            &imp.noise_gate_slider,
+            MixerControl::NoiseGate,
+            f32_from_f64,
+            |e, db| {
+                e.noise_gate.threshold_db = db;
+            },
+        );
+        self.connect_choice(
+            &imp.noise_gate_reduction_row,
+            &REDUCTIONS,
+            |e, reduction| {
+                e.noise_gate.reduction = reduction;
+            },
+        );
+
+        self.connect_switch(&imp.equalizer_switch, |e, on| e.equalizer.enabled = on);
+        self.connect_slider(
+            &imp.equalizer_bass_slider,
+            MixerControl::EqualizerBass,
+            f32_from_f64,
+            |e, db| {
+                e.equalizer.bass_db = db;
+            },
+        );
+        self.connect_slider(
+            &imp.equalizer_middle_slider,
+            MixerControl::EqualizerMiddle,
+            f32_from_f64,
+            |e, db| {
+                e.equalizer.middle_db = db;
+            },
+        );
+        self.connect_slider(
+            &imp.equalizer_treble_slider,
+            MixerControl::EqualizerTreble,
+            f32_from_f64,
+            |e, db| {
+                e.equalizer.treble_db = db;
+            },
+        );
+
+        self.connect_switch(&imp.compressor_switch, |e, on| e.compressor.enabled = on);
+        self.connect_slider(
+            &imp.compressor_slider,
+            MixerControl::Compressor,
+            f32_from_f64,
+            |e, db| {
+                e.compressor.threshold_db = db;
+            },
+        );
+        self.connect_choice(&imp.compressor_ratio_row, &RATIOS, |e, ratio| {
+            e.compressor.ratio = ratio;
+        });
+    }
+
+    /// Makes an effect's on/off switch change the shown track's effects. A
+    /// switch is its own undo step, like mute and solo.
+    fn connect_switch(&self, switch: &gtk::Switch, change: Change<bool>) {
         let weak = self.downgrade();
-        imp.low_cut_switch.connect_active_notify(move |switch| {
+        switch.connect_active_notify(move |switch| {
             if let Some(window) = weak.upgrade() {
-                let enabled = switch.is_active();
-                // Switching is its own undo step (`None`), like mute and solo.
-                window.change_effects(None, |effects| effects.low_cut.enabled = enabled);
+                let on = switch.is_active();
+                window.change_effects(None, |effects| change(effects, on));
             }
         });
+    }
+
+    /// Makes an effect's slider change the shown track's effects: `setting`
+    /// turns the slider's value into the setting's (for the low cut, a
+    /// position into hertz). A drag is one undo step (`control`).
+    fn connect_slider(
+        &self,
+        slider: &EffectSlider,
+        control: SliderControl,
+        setting: fn(f64) -> f32,
+        change: Change<f32>,
+    ) {
         let weak = self.downgrade();
-        imp.low_cut_slider
-            .scale()
-            .connect_value_changed(move |scale| {
-                if let Some(window) = weak.upgrade() {
-                    let frequency = frequency_for_amount(scale.value());
-                    window.change_effects(Some(MixerControl::LowCut), |effects| {
-                        effects.low_cut.frequency_hz = frequency;
-                    });
-                }
-            });
-        let weak = self.downgrade();
-        imp.low_cut_slope_row.connect_selected_notify(move |row| {
-            let slope = chosen(&SLOPES, row.selected());
-            if let (Some(window), Some(slope)) = (weak.upgrade(), slope) {
-                window.change_effects(None, |effects| effects.low_cut.slope = slope);
-            }
-        });
-        let weak = self.downgrade();
-        imp.noise_gate_switch.connect_active_notify(move |switch| {
+        slider.scale().connect_value_changed(move |scale| {
             if let Some(window) = weak.upgrade() {
-                let enabled = switch.is_active();
-                window.change_effects(None, |effects| effects.noise_gate.enabled = enabled);
+                let value = setting(scale.value());
+                window.change_effects(Some(control), |effects| change(effects, value));
             }
         });
+    }
+
+    /// Makes an effect's choice row change the shown track's effects; `choices`
+    /// are its items in the order of its list in window.blp.
+    fn connect_choice<T: Copy + 'static>(
+        &self,
+        row: &adw::ComboRow,
+        choices: &'static [T],
+        change: Change<T>,
+    ) {
         let weak = self.downgrade();
-        imp.noise_gate_slider
-            .scale()
-            .connect_value_changed(move |scale| {
-                if let Some(window) = weak.upgrade() {
-                    let threshold = f32_from_f64(scale.value());
-                    window.change_effects(Some(MixerControl::NoiseGate), |effects| {
-                        effects.noise_gate.threshold_db = threshold;
-                    });
-                }
-            });
-        let weak = self.downgrade();
-        imp.noise_gate_reduction_row
-            .connect_selected_notify(move |row| {
-                let reduction = chosen(&REDUCTIONS, row.selected());
-                if let (Some(window), Some(reduction)) = (weak.upgrade(), reduction) {
-                    window.change_effects(None, |effects| effects.noise_gate.reduction = reduction);
-                }
-            });
-        let weak = self.downgrade();
-        imp.compressor_switch.connect_active_notify(move |switch| {
-            if let Some(window) = weak.upgrade() {
-                let enabled = switch.is_active();
-                window.change_effects(None, |effects| effects.compressor.enabled = enabled);
+        row.connect_selected_notify(move |row| {
+            if let (Some(window), Some(choice)) = (weak.upgrade(), chosen(choices, row.selected()))
+            {
+                window.change_effects(None, |effects| change(effects, choice));
             }
         });
-        let weak = self.downgrade();
-        imp.compressor_slider
-            .scale()
-            .connect_value_changed(move |scale| {
-                if let Some(window) = weak.upgrade() {
-                    let threshold = f32_from_f64(scale.value());
-                    window.change_effects(Some(MixerControl::Compressor), |effects| {
-                        effects.compressor.threshold_db = threshold;
-                    });
-                }
-            });
-        let weak = self.downgrade();
-        imp.compressor_ratio_row
-            .connect_selected_notify(move |row| {
-                let ratio = chosen(&RATIOS, row.selected());
-                if let (Some(window), Some(ratio)) = (weak.upgrade(), ratio) {
-                    window.change_effects(None, |effects| effects.compressor.ratio = ratio);
-                }
-            });
     }
 
     /// Opens the pane on the Track tab with `track`'s effects (Effects in the
@@ -196,6 +252,16 @@ impl Window {
         if let Some(index) = position(&REDUCTIONS, &gate.reduction) {
             imp.noise_gate_reduction_row.set_selected(index);
         }
+        let equalizer = track.effects.equalizer;
+        imp.equalizer_switch.set_active(equalizer.enabled);
+        for (slider, db) in [
+            (&imp.equalizer_bass_slider, equalizer.bass_db),
+            (&imp.equalizer_middle_slider, equalizer.middle_db),
+            (&imp.equalizer_treble_slider, equalizer.treble_db),
+        ] {
+            slider.scale().set_value(f64::from(db));
+            slider.set_value_text(signed_decibels(db));
+        }
         let compressor = track.effects.compressor;
         imp.compressor_switch.set_active(compressor.enabled);
         imp.compressor_slider
@@ -215,7 +281,7 @@ impl Window {
     /// (see `mixer.rs`); `None` always makes a new one.
     fn change_effects(
         &self,
-        control: Option<fn(TrackId) -> MixerControl>,
+        control: Option<SliderControl>,
         change: impl FnOnce(&mut TrackEffects),
     ) {
         let imp = self.imp();

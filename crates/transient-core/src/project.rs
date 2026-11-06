@@ -477,6 +477,12 @@ mod tests {
                   "threshold_db": -45.0,
                   "reduction": "strong"
                 },
+                "equalizer": {
+                  "enabled": false,
+                  "bass_db": 0.0,
+                  "middle_db": 0.0,
+                  "treble_db": 0.0
+                },
                 "compressor": {
                   "enabled": false,
                   "threshold_db": -20.0,

@@ -42,6 +42,12 @@ pub(super) enum MixerControl {
     NoiseGate(TrackId),
     /// A track's compressor threshold (in the track pane).
     Compressor(TrackId),
+    /// A track's equalizer bass (in the track pane).
+    EqualizerBass(TrackId),
+    /// A track's equalizer middle.
+    EqualizerMiddle(TrackId),
+    /// A track's equalizer treble.
+    EqualizerTreble(TrackId),
 }
 
 impl Window {

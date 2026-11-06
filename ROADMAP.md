@@ -288,8 +288,13 @@ Steps, each one runnable:
       effects share (title, value, slider, end captions), extracted at the
       third copy. `dev/send-keys.py` learned `scroll:STEPS`.
 - [ ] Hand testing (`dev/manual-tests.md`, milestone 15): the noise gate,
-      compressor and limiter (sections B–D) still need the owner's ears.
-- [ ] 3-band EQ.
+      compressor, equalizer and limiter (sections B–E) still need the
+      owner's ears.
+- [x] 3-band equalizer: Bass (low shelf, 120 Hz), Middle (peak, 1 kHz, Q 0.7)
+      and Treble (high shelf, 8 kHz), each −12 to +12 dB in whole dB, after
+      the gate and before the compressor. Cookbook biquads, tested at each
+      band (by RMS: at 8 kHz a sine has six samples per wave). Track pane
+      controls are connected through three helpers (switch, slider, choice).
 - [x] Master limiter ("Prevent Clipping", a toggle right of the master
       volume, on by default, also for older files): ceiling −1 dBFS, 1.5 ms
       lookahead (sliding minimum then moving average of the same length,

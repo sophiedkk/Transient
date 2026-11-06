@@ -50,3 +50,18 @@ pub(crate) fn settled_peak(samples: &[f32]) -> f32 {
         .skip(24_000)
         .fold(0.0, |peak, sample| peak.max(sample.abs()))
 }
+
+/// The RMS (average power) of the left channel over the last half second of
+/// a one-second signal. Unlike the peak it does not depend on where the
+/// samples fall on the wave, which matters at high frequencies (six samples
+/// per wave at 8 kHz) after a filter shifted the wave.
+pub(crate) fn settled_rms(samples: &[f32]) -> f32 {
+    let settled: Vec<f32> = samples
+        .iter()
+        .step_by(CHANNELS)
+        .skip(24_000)
+        .copied()
+        .collect();
+    let power = settled.iter().map(|sample| sample * sample).sum::<f32>();
+    (power / f32_from_f64(crate::convert::f64_from_usize(settled.len().max(1)))).sqrt()
+}

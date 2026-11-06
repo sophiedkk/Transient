@@ -24,25 +24,90 @@ pub(crate) struct Biquad {
 }
 
 impl Biquad {
+    /// A filter from the cookbook's six coefficients, dividing them by `a0`
+    /// as the processing loop expects.
+    fn from_cookbook(b: [f64; 3], a: [f64; 3]) -> Self {
+        let [a0, a1, a2] = a;
+        Self {
+            b: b.map(|value| value / a0),
+            a: [a1 / a0, a2 / a0],
+            state: [[0.0; 2]; CHANNELS],
+        }
+    }
+
+    /// The sine and cosine of `frequency_hz` as an angle per sample (the
+    /// cookbook's ω), with the frequency kept where the formulas work: above
+    /// 0 and below half the sample rate.
+    fn angle(frequency_hz: f32, sample_rate: SampleRate) -> (f64, f64) {
+        let rate = f64::from(sample_rate.hz());
+        let frequency = f64::from(frequency_hz).clamp(1.0, rate * 0.45);
+        (std::f64::consts::TAU * frequency / rate).sin_cos()
+    }
+
     /// A high-pass filter: frequencies below `frequency_hz` are turned down,
     /// 12 dB per octave. `q` (sharpness) shapes the bend at the frequency:
     /// with 1/√2 (a 2nd-order Butterworth filter) the response is as flat as
     /// possible above it and 3 dB down at it. Steeper filters chain biquads
     /// with other Qs (see [`super::low_cut`]).
     pub(crate) fn high_pass(frequency_hz: f32, q: f64, sample_rate: SampleRate) -> Self {
-        let rate = f64::from(sample_rate.hz());
-        // Keep the frequency where the formulas work: above 0, below Nyquist.
-        let frequency = f64::from(frequency_hz).clamp(1.0, rate * 0.45);
-        let omega = std::f64::consts::TAU * frequency / rate;
-        let (sin, cos) = omega.sin_cos();
+        let (sin, cos) = Self::angle(frequency_hz, sample_rate);
         let alpha = sin / (2.0 * q);
-        let a0 = 1.0 + alpha;
-        let b0 = f64::midpoint(1.0, cos) / a0;
-        Self {
-            b: [b0, -2.0 * b0, b0],
-            a: [-2.0 * cos / a0, (1.0 - alpha) / a0],
-            state: [[0.0; 2]; CHANNELS],
-        }
+        let b0 = f64::midpoint(1.0, cos);
+        Self::from_cookbook([b0, -2.0 * b0, b0], [1.0 + alpha, -2.0 * cos, 1.0 - alpha])
+    }
+
+    /// A low shelf: everything below about `frequency_hz` turned up or down
+    /// by `gain_db`, everything well above it unchanged (a "bass" control).
+    pub(crate) fn low_shelf(frequency_hz: f32, gain_db: f32, sample_rate: SampleRate) -> Self {
+        let (sin, cos) = Self::angle(frequency_hz, sample_rate);
+        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        // The cookbook's shelf with slope 1: as steep as it goes without a
+        // bump next to the shelf.
+        let two_sqrt_a_alpha = 2.0 * a.sqrt() * sin / std::f64::consts::SQRT_2;
+        Self::from_cookbook(
+            [
+                a * ((a + 1.0) - (a - 1.0) * cos + two_sqrt_a_alpha),
+                2.0 * a * ((a - 1.0) - (a + 1.0) * cos),
+                a * ((a + 1.0) - (a - 1.0) * cos - two_sqrt_a_alpha),
+            ],
+            [
+                (a + 1.0) + (a - 1.0) * cos + two_sqrt_a_alpha,
+                -2.0 * ((a - 1.0) + (a + 1.0) * cos),
+                (a + 1.0) + (a - 1.0) * cos - two_sqrt_a_alpha,
+            ],
+        )
+    }
+
+    /// A high shelf: everything above about `frequency_hz` turned up or down
+    /// by `gain_db` (a "treble" control).
+    pub(crate) fn high_shelf(frequency_hz: f32, gain_db: f32, sample_rate: SampleRate) -> Self {
+        let (sin, cos) = Self::angle(frequency_hz, sample_rate);
+        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        let two_sqrt_a_alpha = 2.0 * a.sqrt() * sin / std::f64::consts::SQRT_2;
+        Self::from_cookbook(
+            [
+                a * ((a + 1.0) + (a - 1.0) * cos + two_sqrt_a_alpha),
+                -2.0 * a * ((a - 1.0) + (a + 1.0) * cos),
+                a * ((a + 1.0) + (a - 1.0) * cos - two_sqrt_a_alpha),
+            ],
+            [
+                (a + 1.0) - (a - 1.0) * cos + two_sqrt_a_alpha,
+                2.0 * ((a - 1.0) - (a + 1.0) * cos),
+                (a + 1.0) - (a - 1.0) * cos - two_sqrt_a_alpha,
+            ],
+        )
+    }
+
+    /// A peak: the frequencies around `frequency_hz` turned up or down by
+    /// `gain_db`; `q` sets how wide (0.7 is about two octaves).
+    pub(crate) fn peak(frequency_hz: f32, gain_db: f32, q: f64, sample_rate: SampleRate) -> Self {
+        let (sin, cos) = Self::angle(frequency_hz, sample_rate);
+        let a = 10_f64.powf(f64::from(gain_db) / 40.0);
+        let alpha = sin / (2.0 * q);
+        Self::from_cookbook(
+            [1.0 + alpha * a, -2.0 * cos, 1.0 - alpha * a],
+            [1.0 + alpha / a, -2.0 * cos, 1.0 - alpha / a],
+        )
     }
 
     /// Forgets earlier audio.
@@ -74,7 +139,7 @@ impl Biquad {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{settled_peak, sine};
+    use crate::test_support::{settled_peak, settled_rms, sine};
 
     /// The Q of a 2nd-order Butterworth filter.
     const BUTTERWORTH_Q: f64 = std::f64::consts::FRAC_1_SQRT_2;
@@ -115,6 +180,55 @@ mod tests {
         // (a quarter); at 20 Hz, two octaves below 80 Hz, about 1/16.
         let peak = high_passed(20.0, 80.0);
         assert!((peak - 1.0 / 16.0).abs() < 0.01, "{peak}");
+    }
+
+    /// The change in level (dB, by RMS) of a sine of `frequency` Hz.
+    fn change_db(mut filter: Biquad, frequency: f64) -> f32 {
+        let original = sine(frequency);
+        let mut samples = original.clone();
+        filter.process(&mut samples);
+        20.0 * (settled_rms(&samples) / settled_rms(&original)).log10()
+    }
+
+    #[test]
+    fn a_low_shelf_changes_only_the_low_end() {
+        let shelf = || Biquad::low_shelf(120.0, 6.0, RATE);
+        assert!((change_db(shelf(), 30.0) - 6.0).abs() < 0.3);
+        assert!(change_db(shelf(), 3000.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn a_high_shelf_changes_only_the_high_end() {
+        let shelf = || Biquad::high_shelf(8000.0, -6.0, RATE);
+        assert!((change_db(shelf(), 18_000.0) - -6.0).abs() < 0.3);
+        assert!(change_db(shelf(), 300.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn a_peak_changes_the_middle() {
+        let peak = || Biquad::peak(1000.0, 6.0, 0.7, RATE);
+        assert!((change_db(peak(), 1000.0) - 6.0).abs() < 0.05);
+        assert!(change_db(peak(), 40.0).abs() < 0.3);
+        assert!(change_db(peak(), 18_000.0).abs() < 0.3);
+    }
+
+    #[test]
+    fn at_0_db_the_tone_filters_change_nothing() {
+        for filter in [
+            Biquad::low_shelf(120.0, 0.0, RATE),
+            Biquad::peak(1000.0, 0.0, 0.7, RATE),
+            Biquad::high_shelf(8000.0, 0.0, RATE),
+        ] {
+            let mut samples = sine(440.0);
+            let original = samples.clone();
+            let mut filter = filter;
+            filter.process(&mut samples);
+            let difference = samples
+                .iter()
+                .zip(&original)
+                .fold(0.0_f32, |max, (a, b)| max.max((a - b).abs()));
+            assert!(difference < 1e-6, "{difference}");
+        }
     }
 
     #[test]

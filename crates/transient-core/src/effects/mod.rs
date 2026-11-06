@@ -9,6 +9,7 @@
 
 mod biquad;
 pub mod compressor;
+pub mod equalizer;
 pub mod limiter;
 pub mod low_cut;
 pub mod noise_gate;
@@ -18,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::convert::f32_from_f64;
 use crate::time::SampleRate;
 use compressor::{Compressor, CompressorFilter};
+use equalizer::{Equalizer, EqualizerFilter};
 use low_cut::{LowCut, LowCutFilter};
 use noise_gate::{NoiseGate, NoiseGateFilter};
 
@@ -32,6 +34,8 @@ pub struct TrackEffects {
     pub low_cut: LowCut,
     /// Turns the track down while it is quiet (hiss between phrases).
     pub noise_gate: NoiseGate,
+    /// More or less bass, middle and treble.
+    pub equalizer: Equalizer,
     /// Evens out the volume: loud parts down, then everything up.
     pub compressor: Compressor,
 }
@@ -40,7 +44,10 @@ impl TrackEffects {
     /// Whether any effect is switched on (the track header then shows it).
     #[must_use]
     pub fn any_on(&self) -> bool {
-        self.low_cut.enabled || self.noise_gate.enabled || self.compressor.enabled
+        self.low_cut.enabled
+            || self.noise_gate.enabled
+            || self.equalizer.enabled
+            || self.compressor.enabled
     }
 }
 
@@ -60,6 +67,8 @@ pub(crate) struct EffectChain {
     low_cut: Option<LowCutFilter>,
     /// `None` while the noise gate is off.
     noise_gate: Option<NoiseGateFilter>,
+    /// `None` while the equalizer is off.
+    equalizer: Option<EqualizerFilter>,
     /// `None` while the compressor is off.
     compressor: Option<CompressorFilter>,
 }
@@ -76,6 +85,10 @@ impl EffectChain {
                 .noise_gate
                 .enabled
                 .then(|| NoiseGateFilter::new(settings.noise_gate, sample_rate)),
+            equalizer: settings
+                .equalizer
+                .enabled
+                .then(|| EqualizerFilter::new(settings.equalizer, sample_rate)),
             compressor: settings
                 .compressor
                 .enabled
@@ -85,7 +98,10 @@ impl EffectChain {
 
     /// Whether no effect is switched on (so the mixer can skip warming up).
     pub(crate) fn is_empty(&self) -> bool {
-        self.low_cut.is_none() && self.noise_gate.is_none() && self.compressor.is_none()
+        self.low_cut.is_none()
+            && self.noise_gate.is_none()
+            && self.equalizer.is_none()
+            && self.compressor.is_none()
     }
 
     /// Forgets all earlier audio, as if playback started from silence.
@@ -95,6 +111,9 @@ impl EffectChain {
         }
         if let Some(gate) = &mut self.noise_gate {
             gate.reset();
+        }
+        if let Some(equalizer) = &mut self.equalizer {
+            equalizer.reset();
         }
         if let Some(compressor) = &mut self.compressor {
             compressor.reset();
@@ -111,20 +130,27 @@ impl EffectChain {
         if let (Some(gate), Some(old)) = (&mut self.noise_gate, &old.noise_gate) {
             gate.continue_from(old);
         }
+        if let (Some(equalizer), Some(old)) = (&mut self.equalizer, &old.equalizer) {
+            equalizer.continue_from(old);
+        }
         if let (Some(compressor), Some(old)) = (&mut self.compressor, &old.compressor) {
             compressor.continue_from(old);
         }
     }
 
     /// Runs the effects over `samples` (interleaved stereo), in place: the
-    /// low cut first, so rumble cannot hold the gate open; the compressor
-    /// last, so it does not bring up the noise the gate took out.
+    /// low cut first, so rumble cannot hold the gate open; then the
+    /// equalizer shapes the tone; the compressor last, so it does not bring
+    /// up the noise the gate took out, and evens out the shaped sound.
     pub(crate) fn process(&mut self, samples: &mut [f32]) {
         if let Some(filter) = &mut self.low_cut {
             filter.process(samples);
         }
         if let Some(gate) = &mut self.noise_gate {
             gate.process(samples);
+        }
+        if let Some(equalizer) = &mut self.equalizer {
+            equalizer.process(samples);
         }
         if let Some(compressor) = &mut self.compressor {
             compressor.process(samples);
@@ -181,6 +207,9 @@ mod tests {
         assert!(effects.any_on());
         effects.noise_gate.enabled = false;
         effects.compressor.enabled = true;
+        assert!(effects.any_on());
+        effects.compressor.enabled = false;
+        effects.equalizer.enabled = true;
         assert!(effects.any_on());
     }
 
