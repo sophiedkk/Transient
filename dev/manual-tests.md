@@ -120,6 +120,30 @@ recording that shows it:
 4. Rename a track (double-click its name, or F2): the text field fits in the
    name's line, and the header does not change height.
 
+### F2. Waveforms as heard
+
+*Partly confirmed 2026-11-06: fades and moving clips (step 4) work; the
+other steps not yet tested by hand.*
+
+1. Open a project with fades (or add a fade): the waveform tapers along the
+   fade, not just the shaded fade curve.
+2. On a voice track, switch the Compressor on and off: a moment later (well
+   under a second for a few minutes of audio) the waveform turns flatter
+   (on) and spikier (off). The same for the Noise Gate: pauses go flat.
+3. Change a clip's gain: the waveform grows or shrinks, as before.
+4. Drag a fade handle (fade-in or fade-out), trim a clip shorter, move a
+   clip (also to another track), split it, or paste a copy: it keeps its look
+   (with effects) throughout, no flash to the plain audio, and takes its new
+   shape a moment after letting go. Only trimming a clip *longer* than it
+   was shows the plain audio of the new part until it is rendered.
+5. Track volume, pan and mute do not change the waveform (mute dims the lane
+   as before).
+6. Toggle an effect quickly several times: the waveform never flashes back
+   to the plain audio; it switches straight from the old look to the new.
+7. Preferences (Ctrl+,) → Timeline → turn **Show Effects in Waveforms** off:
+   the lanes show the plain audio at once (fades only as the shaded curve);
+   turn it on again: a moment later the effects show again.
+
 ### G. The pane: Clip and Track tabs
 
 *Confirmed 2026-11-06.*

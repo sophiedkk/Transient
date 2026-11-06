@@ -30,6 +30,11 @@
       <summary>Recording offset</summary>
       <description>Milliseconds added to where recordings are placed, on top of the measured delay; negative moves them earlier.</description>
     </key>
+    <key name="heard-waveforms" type="b">
+      <default>true</default>
+      <summary>Show effects in waveforms</summary>
+      <description>Draw each track as it sounds, with clip gain, fades and effects, rendered in the background after every change. Off draws the audio files as they are, with no rendering.</description>
+    </key>
     <key name="record-input" type="s">
       <default>''</default>
       <summary>Recording input</summary>

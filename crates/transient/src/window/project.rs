@@ -20,6 +20,7 @@ use transient_engine::decode::SourceFormat;
 use transient_engine::player::Player;
 
 use super::Window;
+use super::heard::{HeardTracks, clip_heard};
 use crate::widgets::timeline_view::{Lane, LaneClip};
 use crate::widgets::track_header::TrackHeader;
 
@@ -45,11 +46,8 @@ impl Window {
         let project = imp.project.borrow().clone();
         let sources = imp.sources.borrow();
         self.rebuild_track_headers(&project, &sources);
-        imp.timeline.set_lanes(
-            lanes(&project, &sources),
-            project.sample_rate,
-            project.length(),
-        );
+        self.refresh_lanes();
+        self.schedule_heard_waveforms();
         self.show_time_selection();
         self.update_missing_banner();
 
@@ -125,7 +123,7 @@ impl Window {
         let imp = self.imp();
         let project = imp.project.borrow();
         imp.timeline.set_lanes(
-            lanes(&project, &imp.sources.borrow()),
+            lanes(&project, &imp.sources.borrow(), &imp.heard.borrow()),
             project.sample_rate,
             project.length(),
         );
@@ -241,7 +239,7 @@ pub(super) fn clip_file_name(project: &Project, clip: &Clip) -> Option<String> {
 }
 
 /// The timeline's view of the project: one lane per track.
-fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
+fn lanes(project: &Project, sources: &LoadedSources, heard: &HeardTracks) -> Vec<Lane> {
     let any_solo = project.tracks.iter().any(|track| track.solo);
     project
         .tracks
@@ -259,6 +257,7 @@ fn lanes(project: &Project, sources: &LoadedSources) -> Vec<Lane> {
                     // The clip shows the file it plays (tracks can hold clips of
                     // several files), falling back to the track name.
                     name: clip_file_name(project, clip).unwrap_or_else(|| track.name.clone()),
+                    heard: clip_heard(heard, clip, sources),
                 })
                 .collect(),
         })

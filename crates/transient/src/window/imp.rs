@@ -157,6 +157,15 @@ pub(crate) struct Window {
     pub(super) clipboard: RefCell<Option<transient_core::clipboard::Clipboard>>,
     /// The time selection (see `selection.rs`).
     pub(super) time_selection: RefCell<Option<super::selection::TimeSelection>>,
+    /// Each track's overview as heard, for drawing (see `heard.rs`).
+    pub(super) heard: RefCell<super::heard::HeardTracks>,
+    /// The pending render of those overviews, if a change was just made.
+    pub(super) heard_timer: RefCell<Option<glib::SourceId>>,
+    /// True while those overviews are being rendered: only one render runs
+    /// at a time.
+    pub(super) heard_rendering: Cell<bool>,
+    /// Set by a change during a render: render again when it is done.
+    pub(super) heard_again: Cell<bool>,
     /// Plays the project's mix; `None` until something is imported.
     pub(super) player: RefCell<Option<Player>>,
     /// Where playback goes (`--silent` sends it nowhere).
@@ -295,6 +304,7 @@ impl ObjectImpl for Window {
         window.setup_mixer();
         window.setup_clip_pane();
         window.setup_track_pane();
+        window.setup_heard_waveforms();
         window.update_recent_projects();
     }
 }

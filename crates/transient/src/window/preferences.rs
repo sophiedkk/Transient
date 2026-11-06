@@ -1,6 +1,7 @@
 //! The Preferences dialog (`win.preferences`, Ctrl+, or the main menu).
 //!
-//! It holds the recording offset, to fine-tune where takes land when the delay
+//! It holds whether waveforms show effects (see `heard.rs`), the recording
+//! offset, to fine-tune where takes land when the delay
 //! Transient measures is not the whole story (see `transient_core::take`), and
 //! the format the Export dialog starts with. That format is also remembered by
 //! the Export dialog itself (the last one exported to), so most people never
@@ -24,12 +25,31 @@ impl Window {
             return;
         };
         let page = adw::PreferencesPage::new();
+        page.add(&timeline_group(&settings));
         page.add(&recording_group(settings.clone()));
         page.add(&export_group(&settings));
         let dialog = adw::PreferencesDialog::new();
         dialog.add(&page);
         dialog.present(Some(self));
     }
+}
+
+/// The "Timeline" group: whether waveforms show effects. The window follows
+/// the setting itself (`Window::setup_heard_waveforms`).
+fn timeline_group(settings: &gio::Settings) -> adw::PreferencesGroup {
+    let row = adw::SwitchRow::builder()
+        .title(gettext("Show Effects in Waveforms"))
+        .subtitle(gettext(
+            "Draw tracks as they sound, with fades and effects. Turn off for very \
+             long projects on a slow computer.",
+        ))
+        .build();
+    settings.bind("heard-waveforms", &row, "active").build();
+    let group = adw::PreferencesGroup::builder()
+        .title(gettext("Timeline"))
+        .build();
+    group.add(&row);
+    group
 }
 
 /// The "Recording" group: the recording offset.

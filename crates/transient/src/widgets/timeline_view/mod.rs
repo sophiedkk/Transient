@@ -17,6 +17,7 @@
 //! The lanes line up with the track headers next to the view because both use
 //! [`RULER_HEIGHT`] and [`LANE_HEIGHT`]. Drawing is in `draw.rs`.
 
+pub(crate) mod clip_waveform;
 mod context_menu;
 mod draw;
 mod gestures;
@@ -32,6 +33,8 @@ use transient_core::range::TimeRange;
 use transient_core::time::{Frames, SampleRate, frames_from_f64, frames_to_f64};
 use transient_core::view::start_keeping_anchor;
 use transient_core::waveform::Waveform;
+
+use clip_waveform::ClipHeard;
 
 /// Height of the time ruler, in pixels.
 pub(crate) const RULER_HEIGHT: i32 = 28;
@@ -76,6 +79,9 @@ pub(crate) struct LaneClip {
     pub(crate) waveform: Option<Waveform>,
     /// The label drawn on the clip.
     pub(crate) name: String,
+    /// Where its audio is in an overview as heard, to draw it with gain,
+    /// fades and effects (`None`: not rendered yet; see `window/heard.rs`).
+    pub(crate) heard: Option<ClipHeard>,
 }
 
 /// A time selection as the timeline shows it: a stretch of time over a run of

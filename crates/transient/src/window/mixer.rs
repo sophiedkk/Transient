@@ -141,6 +141,7 @@ impl Window {
             .replace(control.map(|control| (control, now)));
         self.update_mix();
         self.refresh_lanes();
+        self.schedule_heard_waveforms();
         self.update_edit_actions();
         self.update_title();
     }

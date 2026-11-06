@@ -45,6 +45,10 @@ run --quit-after=1 --save-to="$rehearsal" "$rehearsal"
 sleep 1
 run --quit-after=1 --save-to="$project" "$rehearsal"
 
+# Seconds to wait before a screenshot of the timeline: the waveforms as heard
+# (fades, effects) are rendered a moment after loading (window/heard.rs).
+heard_delay=3
+
 # Takes one screenshot in both styles: NAME, then the app's options.
 shoot() {
     local name="$1"
@@ -55,14 +59,14 @@ shoot() {
 
 # The main window: the playhead at 0:12 and the voice clip under it selected
 # (on the top track; --select-clips-at would also select the piano below).
-shoot main-window --seek=12 --action=select-clip-at-playhead --quit-after=3 "$project"
+shoot main-window --screenshot-delay="$heard_delay" --seek=12 --action=select-clip-at-playhead --quit-after=3 "$project"
 # The clip pane, for the piano (the only clip playing at 0:01).
-shoot clip-pane --seek=12 --select-clips-at=1 --action=toggle-clip-pane \
+shoot clip-pane --screenshot-delay="$heard_delay" --seek=12 --select-clips-at=1 --action=toggle-clip-pane \
     --quit-after=3 "$project"
 # The Track tab, for the voice track (low cut, noise gate and compressor on).
-shoot track-effects --seek=12 --action=select-clip-at-playhead --action=track-effects \
+shoot track-effects --screenshot-delay="$heard_delay" --seek=12 --action=select-clip-at-playhead --action=track-effects \
     --quit-after=3 "$project"
-shoot export --seek=12 --action=export --quit-after=3 "$project"
+shoot export --screenshot-delay="$heard_delay" --seek=12 --action=export --quit-after=3 "$project"
 shoot start-screen --quit-after=3
 
 echo "Screenshots written to $out/"

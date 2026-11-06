@@ -59,6 +59,12 @@ replies, prefer clear code over clever code, and work in small, runnable steps.
   (called by `Player::set_mix`) carries their state over and crossfades 20 ms
   from the old mix, so edits during playback do not click. UI: the pane's Track
   tab (`window/track_pane.rs`, `widgets/effect_slider.rs`).
+- Waveforms as heard (`transient-core::heard`, `window/heard.rs`): lanes draw
+  each track rendered with clip gain, fades and effects, 250 ms after a change
+  on a background thread; until then each clip is drawn from the last
+  overview that has its audio, shifted to where it is now
+  (`timeline_view/clip_waveform.rs`), or else from its source. Screenshots of the timeline need `--screenshot-delay` (2–3 s) to
+  show them.
 - Mixer settings (track volume/pan/mute/solo, master volume) live on `Track`/
   `Project`; `Mix` applies them (balance pan law). Slider changes go through
   `Window::apply_mixer_change`: coalesced undo steps and `update_mix()` only,

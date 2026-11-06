@@ -18,6 +18,7 @@ mod clipboard;
 mod edit;
 mod export;
 mod file;
+mod heard;
 mod imp;
 mod import;
 mod missing;

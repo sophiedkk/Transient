@@ -11,12 +11,13 @@ use gettextrs::gettext;
 use gtk::{gdk, graphene, gsk, pango};
 use transient_core::clip::visible_parts;
 use transient_core::convert::{f32_from_f64, f64_from_usize, i32_from_f64, u32_from_f64};
-use transient_core::mix::{db_to_gain, fade_shape};
+use transient_core::mix::fade_shape;
 use transient_core::project::{Clip, ClipId, TrackColor};
 use transient_core::ruler;
 use transient_core::time::{Frames, frames_to_f64};
 use transient_core::waveform::Peak;
 
+use super::clip_waveform;
 use super::{
     CLIP_INSET, CLIP_LABEL_HEIGHT, LANE_HEIGHT, LaneClip, LaneRange, LiveTake, RULER_HEIGHT,
     TimelineView,
@@ -436,24 +437,19 @@ impl TimelineView {
         let first_column = left.max(0.0).floor();
         let last_column = right.min(f64::from(view.width)).ceil();
         let columns = usize::try_from(u32_from_f64(last_column - first_column)).unwrap_or(0);
-        let source_start =
-            frames_to_f64(clip.offset) + view.start + first_column * view.frames_per_pixel
-                - frames_to_f64(clip.start);
-        let peaks = drawn.waveform.as_ref().map_or_else(Vec::new, |waveform| {
-            waveform.peaks_within(
-                clip.offset..clip.offset.saturating_add(clip.length),
-                source_start,
-                view.frames_per_pixel,
-                columns,
-            )
-        });
-        // Drawn with the clip's gain applied, so normalizing visibly changes it.
+        let (peaks, gain) = clip_waveform::clip_peaks(
+            drawn,
+            clip,
+            view.start + first_column * view.frames_per_pixel,
+            view.frames_per_pixel,
+            columns,
+        );
         if let Some(path) = waveform_path(
             &peaks,
             f32_from_f64(first_column),
             wave_top + half_height,
             half_height,
-            db_to_gain(clip.gain_db),
+            gain,
         ) {
             snapshot.append_fill(&path, gsk::FillRule::Winding, &palette.accent);
         }

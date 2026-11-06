@@ -311,16 +311,23 @@ Steps, each one runnable:
       in this order and says "Applied from top to bottom"; the reasons are in
       `EffectChain::process`. Rearranging was considered and left out: the
       wrong orders only make things worse, with nothing to explain why.
-- [ ] Waveforms as heard (decided 2026-11-06: the compressor and gate did
+- [x] Waveforms as heard (decided 2026-11-06: the compressor and gate did
       not show in the timeline). Lanes draw each track as it sounds before
       its volume and pan: clip gain, fades and effects (also closes the gap
       "waveforms show clip gain but not fades"). Done: `heard::track_overview`
       renders a track through the normal `Mix` into a peaks-only
-      `waveform::Overview` (16-frame blocks, the audio is not kept). To do:
-      render changed tracks on a background thread a moment after each
-      change, use a result only if the track still matches it, and draw it in
-      the lanes (the source waveform while a clip is dragged or before the
-      result is in).
+      `waveform::Overview` (16-frame blocks, the audio is not kept).
+      `window/heard.rs` renders the tracks whose clips, effects or loaded
+      audio changed, 250 ms after the last change, on a background thread
+      (5.5 min of audio: 2.7 s in a debug build), and uses a result only if
+      its track still matches. Lanes draw clips from it; a dragged clip and a
+      track not rendered yet show the source audio. Until a new overview
+      arrives, each clip is drawn from the last overview that has its audio,
+      shifted to where the clip is now (`timeline_view/clip_waveform.rs`):
+      no flash back to the source audio when toggling an effect, dragging a
+      fade, moving, splitting, trimming shorter or pasting. At most one render runs at a
+      time; changes during it get one more pass. Preferences → Timeline →
+      "Show Effects in Waveforms" (setting `heard-waveforms`) turns it off.
 - [x] Wrap-up: a Track tab screenshot (the demo project's voice track has a
       low cut, noise gate and compressor on), effects in the MetaInfo feature
       list and the README. The MetaInfo `<release>` entry is written when the
@@ -445,7 +452,6 @@ it is ever wanted.
   `release` in `dev/send-keys.py`), but only track reordering has been tested
   that way. Dragging clips, trim and fade handles, header sliders, spin rows and
   file choosers still need testing by hand.
-- Waveforms show clip gain but not fades.
 - Clicking in the timeline near or past the end of the audio during playback
   sometimes logs `GStreamer-CRITICAL: gst_segment_to_running_time: assertion
   'segment->format == format' failed` (seen 2026-11-06 in 0.3.0 too, timing-

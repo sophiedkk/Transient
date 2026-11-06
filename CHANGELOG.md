@@ -29,6 +29,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Waveforms show tracks as they sound: fades, clip gain and effects (a
+  compressor evening out a voice, a noise gate silencing its pauses) are
+  visible in the timeline, a moment after each change. Preferences can turn
+  this off ("Show Effects in Waveforms") for very long projects.
+
 - Track headers show the name on its own line, so longer names fit; the
   buttons are a little smaller.
 - Mute and solo are coloured while on (mute orange, solo in the accent
