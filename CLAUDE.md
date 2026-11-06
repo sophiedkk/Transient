@@ -124,6 +124,7 @@ Everything runs inside the `transient-dev` toolbox (see README.md):
 ```sh
 just run      # cargo run with the compiled settings schema
 just check    # fmt --check, clippy -D warnings, nextest, cargo deny, meson test
+just fix      # cargo fmt + clippy --fix: what tools can fix themselves; run before check
 just flatpak  # full Flatpak build (GNOME 51 runtime) and run
 ```
 

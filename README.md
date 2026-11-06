@@ -111,6 +111,7 @@ toolbox enter transient-dev
 just run        # build and start Transient
 just test       # run the tests
 just check      # everything CI checks: format, clippy, tests, cargo-deny, metadata
+just fix        # fix formatting and the lints clippy can fix automatically
 just flatpak    # build, install and run the Flatpak
 ```
 

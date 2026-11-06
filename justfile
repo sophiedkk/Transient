@@ -42,6 +42,13 @@ screenshot *args:
 fmt:
     cargo fmt --all
 
+# Fix what tools can fix by themselves: formatting, then the clippy lints
+# with a safe automatic fix. Run before `just check`; the rest is fixed by hand.
+fix:
+    cargo fmt --all
+    cargo clippy --fix --allow-dirty --allow-staged --workspace --all-targets
+    cargo fmt --all
+
 # Everything CI checks: formatting, lints, tests, licences, and the app metadata
 check: lint test deny meson-test
 
